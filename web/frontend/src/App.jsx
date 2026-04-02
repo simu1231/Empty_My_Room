@@ -2,6 +2,7 @@ import { useStore } from './store/useStore'
 import UploadStep from './components/UploadStep'
 import SegmentStep from './components/SegmentStep'
 import ResultStep from './components/ResultStep'
+import RelocateStep from './components/RelocateStep'
 import { Toaster } from 'react-hot-toast'
 import './App.css'
 
@@ -30,21 +31,25 @@ function App() {
 
       {/* 단계 표시 */}
       <div className="steps-bar">
-        {['upload', 'segment', 'result'].map((s, i) => (
-          <div key={s} className={`step-item ${step === s ? 'active' : ''}`}>
+        {[
+          { key: 'upload',   label: '사진 업로드' },
+          { key: 'segment',  label: '가구 선택' },
+          { key: 'result',   label: '결과' },
+          { key: 'relocate', label: '재배치' },
+        ].map((s, i) => (
+          <div key={s.key} className={`step-item ${step === s.key ? 'active' : ''}`}>
             <span className="step-num">{i + 1}</span>
-            <span className="step-label">
-              {s === 'upload' ? '사진 업로드' : s === 'segment' ? '가구 선택' : '결과'}
-            </span>
+            <span className="step-label">{s.label}</span>
           </div>
         ))}
       </div>
 
       {/* 메인 콘텐츠 */}
       <main className="main">
-        {step === 'upload' && <UploadStep />}
-        {step === 'segment' && <SegmentStep />}
-        {step === 'result' && <ResultStep />}
+        {step === 'upload'   && <UploadStep />}
+        {step === 'segment'  && <SegmentStep />}
+        {step === 'result'   && <ResultStep />}
+        {step === 'relocate' && <RelocateStep />}
       </main>
     </div>
   )

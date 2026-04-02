@@ -13,16 +13,16 @@ export const useStore = create((set) => ({
     set({ originalFile: file, originalUrl: url })
   },
 
-  // 클릭 포인트 (가구 위치)
+  // 클릭 포인트
   clickPoints: [],
   addPoint: (pt) => set((s) => ({ clickPoints: [...s.clickPoints, pt] })),
   clearPoints: () => set({ clickPoints: [] }),
 
-  // 마스크 (SAM2 결과)
+  // 마스크
   maskB64: null,
   setMask: (b64) => set({ maskB64: b64 }),
 
-  // 인페인팅 결과 (LaMa 결과)
+  // 인페인팅 결과
   inpaintedUrl: null,
   setInpainted: (url) => set({ inpaintedUrl: url }),
 

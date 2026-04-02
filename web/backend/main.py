@@ -35,6 +35,15 @@ async def lifespan(app: FastAPI):
         print(f"SD 로드 실패: {e}")
         app.state.sd = None
 
+    # Extract 서비스 로드
+    try:
+        from services.extract_service import ExtractService
+        app.state.extract = ExtractService()
+        print("Extract 서비스 로드 완료!")
+    except Exception as e:
+        print(f"Extract 로드 실패: {e}")
+        app.state.extract = None
+
     print("서버 준비 완료!")
     yield
     print("서버 종료")
@@ -49,9 +58,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from routers import segment, inpaint
+from routers import segment, inpaint, extract
 app.include_router(segment.router, prefix="/api/segment", tags=["Segment"])
-app.include_router(inpaint.router, prefix="/api/inpaint", tags=["Inpaint"])
+app.include_router(inpaint.router,  prefix="/api/inpaint",  tags=["Inpaint"])
+app.include_router(extract.router,  prefix="/api/extract",  tags=["Extract"])
 
 @app.get("/")
 def root():
@@ -60,7 +70,8 @@ def root():
 @app.get("/health")
 def health():
     return {
-        "sam2": "loaded" if app.state.sam2 else "not_loaded",
-        "lama": "loaded" if app.state.lama else "not_loaded",
-        "sd":   "loaded" if app.state.sd   else "not_loaded",
+        "sam2":    "loaded" if app.state.sam2    else "not_loaded",
+        "lama":    "loaded" if app.state.lama    else "not_loaded",
+        "sd":      "loaded" if app.state.sd      else "not_loaded",
+        "extract": "loaded" if app.state.extract else "not_loaded",
     }
