@@ -1,17 +1,16 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import toast from 'react-hot-toast'
 
 export default function SegmentStep() {
   const {
-    originalUrl,
+    originalFile, originalUrl,
     clickPoints, addPoint, clearPoints,
-    setStep, setLoading
+    setStep, setLoading, setInpainted
   } = useStore()
 
   const canvasRef = useRef(null)
 
-  // 이미지 캔버스에 그리기
   useEffect(() => {
     if (!originalUrl) return
     const canvas = canvasRef.current
@@ -25,7 +24,6 @@ export default function SegmentStep() {
     }
   }, [originalUrl])
 
-  // 클릭 포인트 그리기
   useEffect(() => {
     if (!originalUrl) return
     const canvas = canvasRef.current
@@ -46,7 +44,6 @@ export default function SegmentStep() {
     }
   }, [clickPoints, originalUrl])
 
-  // 캔버스 클릭 핸들러
   const handleClick = (e) => {
     const canvas = canvasRef.current
     const rect = canvas.getBoundingClientRect()
@@ -58,16 +55,69 @@ export default function SegmentStep() {
     toast.success(`포인트 ${clickPoints.length + 1} 추가!`)
   }
 
-  // 가구 제거 실행
   const handleRemove = async () => {
     if (clickPoints.length === 0) {
       toast.error('가구를 먼저 클릭해서 선택하세요!')
       return
     }
-    setLoading(true, 'AI가 가구 영역을 분석중...')
-    toast.success('백엔드 연결 후 실제 AI가 실행됩니다!')
-    setLoading(false)
-    setStep('result')
+
+    setLoading(true, 'SAM2가 가구 영역 분석중...')
+
+    try {
+      // 1단계: SAM2로 마스크 생성
+      const form1 = new FormData()
+      form1.append('image', originalFile)
+      form1.append('points', JSON.stringify(clickPoints.map(p => [p.x, p.y])))
+
+      const res1 = await fetch('http://127.0.0.1:8000/api/segment/mask', {
+        method: 'POST',
+        body: form1,
+      })
+      const data1 = await res1.json()
+      if (!data1.success) throw new Error('마스크 생성 실패')
+
+      toast.success('마스크 생성 완료! LaMa 인페인팅 중...')
+      setLoading(true, 'LaMa가 가구 제거중...')
+
+      // 마스크 파일 변환
+      const maskBlob = await fetch(
+        `data:image/png;base64,${data1.mask_b64}`
+      ).then(r => r.blob())
+      const maskFile = new File([maskBlob], 'mask.png', { type: 'image/png' })
+
+      // 리사이즈된 이미지 파일 변환
+      const resizedBlob = await fetch(
+        `data:image/png;base64,${data1.resized_image_b64}`
+      ).then(r => r.blob())
+      const resizedFile = new File([resizedBlob], 'resized.png', { type: 'image/png' })
+
+      // 2단계: LaMa + SD로 가구 제거
+      const form2 = new FormData()
+      form2.append('image', resizedFile)
+      form2.append('mask', maskFile)
+
+      const res2 = await fetch('http://127.0.0.1:8000/api/inpaint/remove', {
+        method: 'POST',
+        body: form2,
+      })
+      const data2 = await res2.json()
+      if (!data2.success) throw new Error('인페인팅 실패')
+
+      // 결과 이미지 URL 생성
+      const resultBlob = await fetch(
+        `data:image/jpeg;base64,${data2.result_b64}`
+      ).then(r => r.blob())
+      const resultUrl = URL.createObjectURL(resultBlob)
+
+      setInpainted(resultUrl)
+      setStep('result')
+      toast.success('가구 제거 완료! 🎉')
+
+    } catch (e) {
+      toast.error(`오류 발생: ${e.message}`)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -78,8 +128,6 @@ export default function SegmentStep() {
       </p>
 
       <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
-
-        {/* 캔버스 */}
         <div style={{ flex: 1 }}>
           <canvas
             ref={canvasRef}
@@ -93,7 +141,6 @@ export default function SegmentStep() {
           />
         </div>
 
-        {/* 사이드 패널 */}
         <div style={{
           width: '220px',
           background: '#1a1a1a',
@@ -107,12 +154,7 @@ export default function SegmentStep() {
             선택된 포인트 {clickPoints.length > 0 && `(${clickPoints.length}개)`}
           </h3>
 
-          {/* 스크롤 가능한 포인트 리스트 */}
-          <div style={{
-            flex: 1,
-            overflowY: 'auto',
-            marginBottom: '10px',
-          }}>
+          <div style={{ flex: 1, overflowY: 'auto', marginBottom: '10px' }}>
             {clickPoints.length === 0 ? (
               <p style={{ color: '#666', fontSize: '14px' }}>
                 이미지를 클릭해서 가구를 선택하세요
@@ -133,7 +175,6 @@ export default function SegmentStep() {
             )}
           </div>
 
-          {/* 버튼들 - 항상 하단에 고정 */}
           <div>
             <button
               onClick={clearPoints}
