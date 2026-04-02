@@ -35,7 +35,7 @@ async def remove_furniture(
     if mask_np.shape != (h, w):
         mask_np = cv2.resize(mask_np, (w, h), interpolation=cv2.INTER_NEAREST)
 
-    # 친구 코드 셀 5: LaMa 인페인팅
+    # 친구 코드 셀 5: LaMa
     print("LaMa 시작...")
     lama_result = lama.inpaint(image_np, mask_np)
     print("LaMa 완료!")

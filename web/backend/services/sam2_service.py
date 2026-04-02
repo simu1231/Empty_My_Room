@@ -26,27 +26,33 @@ class SAM2Service:
         print('SAM2 로드 완료!')
 
     def predict(self, image_np, points):
-        # 친구 코드 셀 4 완전 그대로
-        input_points = np.array(points)
-        input_labels = np.array([1] * len(points))
-        USE_MULTI_MASK = len(input_points) == 1
+        # 친구 코드 셀 4 그대로
+        # 포인트마다 따로 마스크 만들고 합치기
+        combined_mask = np.zeros(image_np.shape[:2], dtype=np.uint8)
 
-        self.predictor.set_image(image_np)
-        masks, scores, _ = self.predictor.predict(
-            point_coords=input_points,
-            point_labels=input_labels,
-            multimask_output=USE_MULTI_MASK,
-        )
+        for point in points:
+            input_points = np.array([point])
+            input_labels = np.array([1])
 
-        best_idx  = np.argmax(scores)
-        best_mask = masks[best_idx].astype(bool)
+            self.predictor.set_image(image_np)
+            masks, scores, _ = self.predictor.predict(
+                point_coords=input_points,
+                point_labels=input_labels,
+                multimask_output=True,
+            )
 
-        # 친구 코드 셀 4 dilate 완전 그대로
-        mask_np = (best_mask * 255).astype(np.uint8)
-        kernel  = np.ones((40, 40), np.uint8)
-        expanded_mask = cv2.dilate(mask_np, kernel, iterations=2)
+            best_idx  = np.argmax(scores)
+            best_mask = masks[best_idx].astype(bool)
+
+            # 친구 코드 셀 4 dilate 그대로
+            mask_np = (best_mask * 255).astype(np.uint8)
+            kernel  = np.ones((40, 40), np.uint8)
+            mask_np = cv2.dilate(mask_np, kernel, iterations=2)
+
+            # 마스크 합치기
+            combined_mask = np.maximum(combined_mask, mask_np)
 
         return {
-            "mask": expanded_mask,
-            "score": float(scores[best_idx]),
+            "mask": combined_mask,
+            "score": 1.0,
         }

@@ -40,6 +40,8 @@ async def create_mask(
     pts_raw = json.loads(points)
     pts = [[int(p[0]*scale), int(p[1]*scale)] for p in pts_raw]
 
+    print(f"포인트 개수: {len(pts)}, 포인트: {pts}")
+
     # 친구 코드 셀 4 그대로
     result = sam2.predict(image_np, pts)
 
