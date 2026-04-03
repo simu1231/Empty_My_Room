@@ -324,6 +324,35 @@ export default function RelocateStep() {
             style={{ width: '100%', padding: '10px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
             🔄 처음부터
           </button>
+          <button
+            onClick={() => {
+              // 선택 해제 후 저장
+              const prevSelected = selectedId
+              setSelectedId(null)
+              
+              setTimeout(() => {
+                const canvas = canvasRef.current
+                const link = document.createElement('a')
+                link.download = 'furniture_relocate.png'
+                link.href = canvas.toDataURL('image/png')
+                link.click()
+                toast.success('이미지 저장됐어요! 🎉')
+                setSelectedId(prevSelected)
+              }, 100)
+            }}
+            style={{
+              width: '100%',
+              padding: '10px',
+              marginTop: '8px',
+              background: '#27ae60',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+            }}
+          >
+            💾 사진 저장
+          </button>
         </div>
       </div>
     </div>
