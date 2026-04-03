@@ -4,16 +4,11 @@ import json
 import numpy as np
 import cv2
 from PIL import Image
+from collections import defaultdict
 from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
-
-def image_to_base64(image_np):
-    img_pil = Image.fromarray(image_np)
-    buf = io.BytesIO()
-    img_pil.save(buf, format="PNG")
-    return base64.b64encode(buf.getvalue()).decode()
 
 def pil_to_base64(pil_img):
     buf = io.BytesIO()
@@ -25,6 +20,7 @@ async def extract_furniture(
     request: Request,
     image: UploadFile = File(...),
     points: str = Form(...),
+    labels: str = Form(...),
 ):
     sam2    = request.app.state.sam2
     extract = request.app.state.extract
@@ -43,41 +39,53 @@ async def extract_furniture(
         scale = MAX_SIZE / max(h, w)
         image_np = cv2.resize(image_np, (int(w*scale), int(h*scale)))
 
-    pts_raw = json.loads(points)
+    pts_raw    = json.loads(points)
+    labels_raw = json.loads(labels)
+
+    # 예진이 코드 셀 8 그대로 - 레이블별 포인트 그룹화
+    label_to_points = defaultdict(list)
+    for pt, lbl in zip(pts_raw, labels_raw):
+        label_to_points[lbl].append([int(pt[0]*scale), int(pt[1]*scale)])
 
     furniture_list = []
 
-    # 친구 코드 셀 8 그대로 - 포인트마다 따로 추출
-    for i, point in enumerate(pts_raw):
-        scaled_point = [int(point[0]*scale), int(point[1]*scale)]
-
-        # SAM2로 정밀 마스크 생성 (dilate 없이)
-        input_points = np.array([scaled_point])
-        input_labels = np.array([1])
+    for idx, (label, points_group) in enumerate(label_to_points.items()):
+        print(f'[{idx+1}] "{label}" 처리 중 (포인트 {len(points_group)}개)...')
 
         sam2.predictor.set_image(image_np)
+
+        # 예진이 코드 그대로 - 여러 포인트 한번에 전달
         masks, scores, _ = sam2.predictor.predict(
-            point_coords=input_points,
-            point_labels=input_labels,
+            point_coords=np.array(points_group),
+            point_labels=np.array([1] * len(points_group)),
             multimask_output=True,
         )
 
-        best_idx  = np.argmax(scores)
+        # 면적이 가장 큰 마스크 선택 (예진이 코드)
+        areas = [np.sum(mask) for mask in masks]
+        best_idx  = int(np.argmax(areas))
         best_mask = masks[best_idx].astype(bool)
-        mask_raw  = (best_mask * 255).astype(np.uint8)
+        best_score = float(scores[best_idx])
 
-        # 친구 코드 셀 8 refine_mask 적용
+        mask_raw = (best_mask * 255).astype(np.uint8)
+
+        # 예진이 코드 - 구멍 메우기
+        close_kernel = np.ones((25, 25), np.uint8)
+        mask_raw = cv2.morphologyEx(mask_raw, cv2.MORPH_CLOSE, close_kernel)
+        contours, _ = cv2.findContours(mask_raw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(mask_raw, contours, -1, 255, thickness=cv2.FILLED)
+
         mask_refined = extract.refine_mask(mask_raw, edge_blur=3)
 
-        # 가구 추출
         furniture_img, bbox = extract.extract_furniture(image_np, mask_refined)
         if furniture_img is None:
             continue
 
         furniture_list.append({
-            "id":    int(i),
+            "id":    idx,
+            "name":  label,
             "b64":   pil_to_base64(furniture_img),
-            "score": float(scores[best_idx]),
+            "score": best_score,
             "bbox":  [int(x) for x in bbox],
         })
 
