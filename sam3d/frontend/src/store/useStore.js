@@ -18,8 +18,13 @@ export const useStore = create((set) => ({
   maskB64: null,
   setMask: (b64) => set({ maskB64: b64 }),
 
-  inpaintedUrl: null,
-  setInpainted: (url) => set({ inpaintedUrl: url }),
+  // 추출된 가구 리스트
+  furnitureList: [],
+  setFurnitureList: (list) => set({ furnitureList: list }),
+
+  // 방 크기 설정
+  roomSize: { width: 5, depth: 4, height: 2.5 },
+  setRoomSize: (size) => set({ roomSize: size }),
 
   loading: false,
   loadingMsg: '',
@@ -31,7 +36,8 @@ export const useStore = create((set) => ({
     originalUrl: null,
     clickPoints: [],
     maskB64: null,
-    inpaintedUrl: null,
+    furnitureList: [],
+    roomSize: { width: 5, depth: 4, height: 2.5 },
     loading: false,
     loadingMsg: '',
   }),
