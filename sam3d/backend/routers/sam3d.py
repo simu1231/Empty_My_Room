@@ -44,6 +44,13 @@ async def generate_mesh(
 
         vertices = mesh.vertices.cpu().numpy().tolist()
         faces = mesh.faces.cpu().numpy().tolist()
+
+        # 색상 추출
+        if mesh.vertex_attrs is not None:
+            colors = mesh.vertex_attrs[:, :3].cpu().numpy().tolist()
+        else:
+            colors = [[0.8, 0.8, 0.8]] * len(vertices)
+
         print(f"메쉬 생성 완료! 버텍스: {len(vertices)}개, 페이스: {len(faces)}개")
 
         return JSONResponse({
@@ -51,7 +58,7 @@ async def generate_mesh(
             "mesh": {
                 "vertices": vertices,
                 "faces": faces,
-                "colors": [[0.8, 0.8, 0.8]] * len(vertices),
+                "colors": colors,
             },
             "vertices": len(vertices),
             "faces": len(faces),
