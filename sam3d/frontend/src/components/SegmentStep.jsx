@@ -6,9 +6,9 @@ const FURNITURE_LIST = ['소파', '침대', '책상', '의자', '테이블', '�
 
 export default function SegmentStep() {
   const {
-    originalFile, originalUrl,
-    clickPoints, addPoint, clearPoints,
-    setStep, setLoading, setMask, setFurnitureList
+  originalFile, originalUrl,
+  clickPoints, addPoint, clearPoints,
+  setStep, setLoading, setMask, setFurnitureList, setEmptyRoom
   } = useStore()
 
   const canvasRef = useRef(null)
@@ -65,51 +65,74 @@ export default function SegmentStep() {
     toast.success(`${label} 포인트 추가!`)
   }
 
-  const handleExtract = async () => {
-    if (clickPoints.length === 0) {
-      toast.error('가구를 먼저 클릭해서 선택하세요!')
-      return
-    }
-    setLoading(true, 'SAM2가 가구 영역 분석중...')
-    try {
-      // SAM2로 마스크 생성
-      const form1 = new FormData()
-      form1.append('image', originalFile)
-      form1.append('points', JSON.stringify(clickPoints.map(p => [p.x, p.y])))
-      form1.append('labels', JSON.stringify(clickPoints.map(p => p.label)))
-
-      const res1 = await fetch('http://127.0.0.1:8001/api/segment/mask', {
-        method: 'POST',
-        body: form1,
-      })
-      const data1 = await res1.json()
-      if (!data1.success) throw new Error('마스크 생성 실패')
-      setMask(data1.mask_b64)
-
-      // 가구 추출
-      setLoading(true, '가구 추출중...')
-      const form2 = new FormData()
-      form2.append('image', originalFile)
-      form2.append('points', JSON.stringify(clickPoints.map(p => [p.x, p.y])))
-      form2.append('labels', JSON.stringify(clickPoints.map(p => p.label || '기타')))
-
-      const res2 = await fetch('http://127.0.0.1:8001/api/extract/furniture', {
-        method: 'POST',
-        body: form2,
-      })
-      const data2 = await res2.json()
-      if (!data2.success) throw new Error('가구 추출 실패')
-
-      setFurnitureList(data2.furniture)
-      toast.success(`가구 ${data2.furniture.length}개 추출 완료! 🎉`)
-      setStep('roomsetup')
-
-    } catch (e) {
-      toast.error(`오류 발생: ${e.message}`)
-    } finally {
-      setLoading(false)
-    }
+   const handleExtract = async () => {
+  if (clickPoints.length === 0) {
+    toast.error('가구를 먼저 클릭해서 선택하세요!')
+    return
   }
+  setLoading(true, 'SAM2가 가구 영역 분석중...')
+  try {
+    // SAM2로 마스크 생성
+    const form1 = new FormData()
+    form1.append('image', originalFile)
+    form1.append('points', JSON.stringify(clickPoints.map(p => [p.x, p.y])))
+    form1.append('labels', JSON.stringify(clickPoints.map(p => p.label)))
+
+    const res1 = await fetch('http://127.0.0.1:8001/api/segment/mask', {
+      method: 'POST',
+      body: form1,
+    })
+    const data1 = await res1.json()
+    if (!data1.success) throw new Error('마스크 생성 실패')
+    setMask(data1.mask_b64)
+
+    // LaMa로 빈방 만들기
+    setLoading(true, 'LaMa가 가구 제거중...')
+    const maskBlob = await fetch(`data:image/png;base64,${data1.mask_b64}`).then(r => r.blob())
+    const maskFile = new File([maskBlob], 'mask.png', { type: 'image/png' })
+    const resizedBlob = await fetch(`data:image/png;base64,${data1.resized_image_b64}`).then(r => r.blob())
+    const resizedFile = new File([resizedBlob], 'resized.png', { type: 'image/png' })
+
+    const form2 = new FormData()
+    form2.append('image', resizedFile)
+    form2.append('mask', maskFile)
+
+    const res2 = await fetch('http://127.0.0.1:8001/api/inpaint/remove', {
+      method: 'POST',
+      body: form2,
+    })
+    const data2 = await res2.json()
+    if (!data2.success) throw new Error('가구 제거 실패')
+
+    const resultBlob = await fetch(`data:image/jpeg;base64,${data2.result_b64}`).then(r => r.blob())
+    const resultUrl = URL.createObjectURL(resultBlob)
+    const resultFile = new File([resultBlob], 'empty_room.jpg', { type: 'image/jpeg' })
+    setEmptyRoom(resultUrl, resultFile)
+
+    // 가구 추출
+    setLoading(true, '가구 추출중...')
+    const form3 = new FormData()
+    form3.append('image', originalFile)
+    form3.append('points', JSON.stringify(clickPoints.map(p => [p.x, p.y])))
+    form3.append('labels', JSON.stringify(clickPoints.map(p => p.label || '기타')))
+
+    const res3 = await fetch('http://127.0.0.1:8001/api/extract/furniture', {
+      method: 'POST',
+      body: form3,
+    })
+    const data3 = await res3.json()
+    if (!data3.success) throw new Error('가구 추출 실패')
+
+    setFurnitureList(data3.furniture)
+    toast.success(`완료! 빈방 생성 + 가구 ${data3.furniture.length}개 추출 🎉`)
+    setStep('roommaking')
+
+  } catch (e) {
+    toast.error(`오류 발생: ${e.message}`)
+  } finally {
+    setLoading(false)
+  }
+}
 
   const labelCounts = clickPoints.reduce((acc, pt) => {
     acc[pt.label] = (acc[pt.label] || 0) + 1
@@ -140,6 +163,8 @@ export default function SegmentStep() {
           </button>
         ))}
       </div>
+
+      
 
       {selectedLabel === '기타' && (
         <div style={{ marginBottom: '16px' }}>
@@ -186,13 +211,13 @@ export default function SegmentStep() {
             )}
           </div>
           <div>
-            <button onClick={clearPoints} style={{ width: '100%', padding: '10px', marginBottom: '8px', background: '#333', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
-              🗑️ 초기화
-            </button>
-            <button onClick={handleExtract} style={{ width: '100%', padding: '12px', background: '#3498db', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold' }}>
-              🪄 가구 추출
-            </button>
-          </div>
+              <button onClick={clearPoints} style={{ width: '100%', padding: '10px', marginBottom: '8px', background: '#333', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                🗑️ 초기화
+              </button>
+              <button onClick={handleExtract} style={{ width: '100%', padding: '12px', background: '#3498db', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold' }}>
+                🪄 가구 추출
+              </button>
+            </div>
         </div>
       </div>
     </div>

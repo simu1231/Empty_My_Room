@@ -1,7 +1,7 @@
 import { useStore } from './store/useStore'
 import UploadStep from './components/UploadStep'
 import SegmentStep from './components/SegmentStep'
-import RoomSetupStep from './components/RoomSetupStep'
+import RoomMakingStep from './components/RoomMakingStep'
 import Interior3DStep from './components/Interior3DStep'
 import { Toaster } from 'react-hot-toast'
 import './App.css'
@@ -25,10 +25,10 @@ function App() {
       </header>
       <div className="steps-bar">
         {[
-          { key: 'upload',    label: '사진 업로드' },
-          { key: 'segment',   label: '가구 선택' },
-          { key: 'roomsetup', label: '방 설정' },
-          { key: 'interior3d', label: '3D 배치' },
+          { key: 'upload',      label: '사진 업로드' },
+          { key: 'segment',     label: '가구 선택' },
+          { key: 'roommaking',  label: '방 만들기' },
+          { key: 'interior3d',  label: '3D 배치' },
         ].map((s, i) => (
           <div key={s.key} className={`step-item ${step === s.key ? 'active' : ''}`}>
             <span className="step-num">{i + 1}</span>
@@ -39,7 +39,7 @@ function App() {
       <main className="main">
         {step === 'upload'     && <UploadStep />}
         {step === 'segment'    && <SegmentStep />}
-        {step === 'roomsetup'  && <RoomSetupStep />}
+        {step === 'roommaking' && <RoomMakingStep />}
         {step === 'interior3d' && <Interior3DStep />}
       </main>
     </div>

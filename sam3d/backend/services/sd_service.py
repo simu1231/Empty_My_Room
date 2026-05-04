@@ -27,8 +27,6 @@ class SDService:
             torch_dtype=torch.float16,
             safety_checker=None
         ).to('cuda')
-        self.pipe.enable_xformers_memory_efficient_attention() # xformers가 설치되어 있다면
-        self.pipe.enable_attention_slicing() # VRAM 사용량 최적화
         self.pipe.scheduler = DDIMScheduler.from_config(self.pipe.scheduler.config)
         print('ControlNet 로드 완료!')
 
@@ -63,7 +61,7 @@ class SDService:
             image=image_pil,
             mask_image=mask_pil,
             control_image=canny_pil,
-            num_inference_steps=20,
+            num_inference_steps=50,
             guidance_scale=8.0,
             controlnet_conditioning_scale=1.0,
             strength=0.8,

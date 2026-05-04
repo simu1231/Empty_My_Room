@@ -2,7 +2,6 @@ import os
 import sys
 os.environ['CUDA_HOME'] = os.environ.get('CONDA_PREFIX', '')
 os.environ['LIDRA_SKIP_INIT'] = 'true'
-
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +18,24 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"SAM2 로드 실패: {e}")
         app.state.sam2 = None
+
+    # LaMa 로드
+    try:
+        from services.lama_service import LamaService
+        app.state.lama = LamaService()
+        print("LaMa 로드 완료!")
+    except Exception as e:
+        print(f"LaMa 로드 실패: {e}")
+        app.state.lama = None
+
+    # SD 로드
+    try:
+        from services.sd_service import SDService
+        app.state.sd = SDService()
+        print("SD 로드 완료!")
+    except Exception as e:
+        print(f"SD 로드 실패: {e}")
+        app.state.sd = None
 
     # Extract 서비스 로드
     try:
@@ -48,7 +65,6 @@ async def lifespan(app: FastAPI):
     yield
     print("서버 종료")
 
-
 app = FastAPI(title="SAM3D Interior API", lifespan=lifespan)
 
 app.add_middleware(
@@ -59,11 +75,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from routers import segment, extract, sam3d
+from routers import segment, extract, sam3d, inpaint, room
 app.include_router(segment.router, prefix="/api/segment", tags=["Segment"])
 app.include_router(extract.router, prefix="/api/extract", tags=["Extract"])
 app.include_router(sam3d.router,   prefix="/api/sam3d",   tags=["SAM3D"])
-
+app.include_router(inpaint.router, prefix="/api/inpaint", tags=["Inpaint"])
+app.include_router(room.router, prefix="/api/room", tags=["Room"])
 @app.get("/")
 def root():
     return {"message": "SAM3D Interior API 작동중!"}
@@ -72,6 +89,8 @@ def root():
 def health():
     return {
         "sam2":    "loaded" if getattr(app.state, 'sam2',    None) else "not_loaded",
+        "lama":    "loaded" if getattr(app.state, 'lama',    None) else "not_loaded",
+        "sd":      "loaded" if getattr(app.state, 'sd',      None) else "not_loaded",
         "extract": "loaded" if getattr(app.state, 'extract', None) else "not_loaded",
         "sam3d":   "loaded" if getattr(app.state, 'sam3d',   None) else "not_loaded",
     }
