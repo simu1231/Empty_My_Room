@@ -111,6 +111,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
   useEffect(() => {
     if (!mountRef.current) return
     const THREE = window.THREE
+    console.log(roomSize)
     const el = mountRef.current
     const width = el.clientWidth || window.innerWidth
     const height = el.clientHeight || window.innerHeight
