@@ -4,6 +4,10 @@
   box-sizing: border-box;
 }
 
+body, html {
+  overflow-x: hidden;
+}
+
 body {
   background: #0d0d0d;
   color: white;

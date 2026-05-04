@@ -50,13 +50,13 @@ async def generate_pointcloud(
     print("가구 포인트 클라우드 생성 중...")
     h, w = depth_np.shape
     cx, cy = w / 2, h / 2
-    fx, fy = 500, 500
+    fx = fy = max(h, w) * 1.2  # 초점 거리 (픽셀 단위), 경험적으로 1.2배 정도가 적당
 
     points = []
     colors = []
 
-    for v in range(0, h, 2):
-        for u in range(0, w, 2):
+    for v in range(0, h, 1):
+        for u in range(0, w, 1):
             # 알파 마스크로 가구 부분만
             if alpha[v, u] < 127:
                 continue

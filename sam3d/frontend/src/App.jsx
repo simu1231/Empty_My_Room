@@ -7,7 +7,9 @@ import { Toaster } from 'react-hot-toast'
 import './App.css'
 
 function App() {
+  
   const { step, loading, loadingMsg } = useStore()
+  
   return (
     <div className="app">
       <Toaster position="top-center" />

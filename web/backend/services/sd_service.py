@@ -63,7 +63,7 @@ class SDService:
             image=image_pil,
             mask_image=mask_pil,
             control_image=canny_pil,
-            num_inference_steps=20,
+            num_inference_steps=40,
             guidance_scale=8.0,
             controlnet_conditioning_scale=1.0,
             strength=0.8,
