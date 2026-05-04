@@ -232,7 +232,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
       const currentId = Object.entries(placedGroupsRef.current)
         .find(([, g]) => g === selectedObjRef.current)?.[0]
 
-      Object.entries(placedGroupsRef.current).forEach(([id, otherGroup]) => {
+      /*Object.entries(placedGroupsRef.current).forEach(([id, otherGroup]) => {
         if (id === currentId) return
         const dx = newX - otherGroup.position.x
         const dz = newZ - otherGroup.position.z
@@ -244,7 +244,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
           newX = otherGroup.position.x + nx * minDist
           newZ = otherGroup.position.z + nz * minDist
         }
-      })
+      })*/
 
       selectedObjRef.current.position.x = newX
       selectedObjRef.current.position.z = newZ
