@@ -220,8 +220,9 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     raycaster.setFromCamera(mouse, camera)
     const intersects = raycaster.intersectObject(floorRef.current)
     if (intersects.length > 0) {
-      const halfW = roomSize.width / 2 - 0.8
-      const halfD = roomSize.depth / 2 - 0.8
+      const furnitureHalf = selectedObjRef.current.userData.halfSize || 0.5
+      const halfW = roomSize.width / 2 - furnitureHalf
+      const halfD = roomSize.depth / 2 - furnitureHalf
 
       // 벽 통과 방지 클램프
       let newX = Math.max(-halfW, Math.min(halfW, intersects[0].point.x))
@@ -334,6 +335,7 @@ useEffect(() => {
     const group = new THREE.Group()
     group.add(mesh)
     group.position.set(position.x, -roomSize.height / 2 + scaledHalfHeight, position.z)  // ← 수정
+    group.userData.halfSize = (size.z * scale) / 2 // 가구의 절반 크기를 userData에 저장 (충돌 방지용)
     sceneRef.current.add(group)
     placedGroupsRef.current[instanceId] = group
   })
