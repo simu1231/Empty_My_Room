@@ -4,11 +4,18 @@ import toast from 'react-hot-toast'
 
 function Room3DViewer({ roomSize, wallColor, floorColor }) {
   const mountRef = useRef(null)
+  const cameraRef = useRef(null)
+  const wallMatRef = useRef(null)
+  const floorMatRef = useRef(null)
+  const meshesRef = useRef({})
+  const animRef = useRef(null)
 
+  // 씬/렌더러/카메라/조명/컨트롤 — 마운트 시 1회만 생성
   useEffect(() => {
     if (!mountRef.current) return
     const THREE = window.THREE
     const el = mountRef.current
+    const { width: w, depth: d, height: h } = roomSize
     const width = el.clientWidth
     const height = 400
 
@@ -16,8 +23,9 @@ function Room3DViewer({ roomSize, wallColor, floorColor }) {
     scene.background = new THREE.Color(0x2a2a2a)
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 1000)
-    camera.position.set(roomSize.width * 0.8, roomSize.height * 1.2, roomSize.depth * 1.5)
+    camera.position.set(w * 0.8, h * 1.2, d * 1.5)
     camera.lookAt(0, 0, 0)
+    cameraRef.current = camera
 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(width, height)
@@ -28,48 +36,39 @@ function Room3DViewer({ roomSize, wallColor, floorColor }) {
     dir.position.set(5, 10, 5)
     scene.add(dir)
 
-    const w = roomSize.width
-    const h = roomSize.height
-    const d = roomSize.depth
-
+    // 공유 재질 (색상만 나중에 업데이트)
     const wallMat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(wallColor[0], wallColor[1], wallColor[2]),
-      side: THREE.BackSide,
+      side: THREE.DoubleSide,
     })
     const floorMat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(floorColor[0], floorColor[1], floorColor[2]),
     })
+    wallMatRef.current = wallMat
+    floorMatRef.current = floorMat
 
-    // 바닥
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), floorMat)
+    const floor    = new THREE.Mesh(new THREE.PlaneGeometry(w, d), floorMat)
     floor.rotation.x = -Math.PI / 2
     floor.position.y = -h / 2
-    scene.add(floor)
 
-    // 뒷벽
-    const backWall = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ color: new THREE.Color(wallColor[0], wallColor[1], wallColor[2]) }))
+    const backWall  = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMat)
     backWall.position.z = -d / 2
-    scene.add(backWall)
 
-    // 왼쪽 벽
-    const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(d, h), new THREE.MeshStandardMaterial({ color: new THREE.Color(wallColor[0], wallColor[1], wallColor[2]) }))
+    const leftWall  = new THREE.Mesh(new THREE.PlaneGeometry(d, h), wallMat)
     leftWall.rotation.y = Math.PI / 2
     leftWall.position.x = -w / 2
-    scene.add(leftWall)
 
-    // 오른쪽 벽
-    const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(d, h), new THREE.MeshStandardMaterial({ color: new THREE.Color(wallColor[0], wallColor[1], wallColor[2]) }))
+    const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(d, h), wallMat)
     rightWall.rotation.y = -Math.PI / 2
     rightWall.position.x = w / 2
-    scene.add(rightWall)
 
-    // 천장
-    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color: 0xffffff }))
+    const ceiling   = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color: 0xffffff }))
     ceiling.rotation.x = Math.PI / 2
     ceiling.position.y = h / 2
-    scene.add(ceiling)
 
-    // 카메라 회전
+    meshesRef.current = { floor, backWall, leftWall, rightWall, ceiling }
+    Object.values(meshesRef.current).forEach(m => scene.add(m))
+
     let isDragging = false, prevX = 0, prevY = 0
     const onDown = (e) => { isDragging = true; prevX = e.clientX; prevY = e.clientY }
     const onMove = (e) => {
@@ -78,8 +77,7 @@ function Room3DViewer({ roomSize, wallColor, floorColor }) {
       const dy = e.clientY - prevY
       const spherical = new THREE.Spherical().setFromVector3(camera.position)
       spherical.theta -= dx * 0.01
-      spherical.phi -= dy * 0.005
-      spherical.phi = Math.max(0.1, Math.min(Math.PI / 2, spherical.phi))
+      spherical.phi = Math.max(0.1, Math.min(Math.PI / 2, spherical.phi - dy * 0.005))
       camera.position.setFromSpherical(spherical)
       camera.lookAt(0, 0, 0)
       prevX = e.clientX; prevY = e.clientY
@@ -97,16 +95,45 @@ function Room3DViewer({ roomSize, wallColor, floorColor }) {
     renderer.domElement.addEventListener('mouseleave', onUp)
     renderer.domElement.addEventListener('wheel', onWheel, { passive: false })
 
-    let animId
-    const animate = () => { animId = requestAnimationFrame(animate); renderer.render(scene, camera) }
+    const animate = () => { animRef.current = requestAnimationFrame(animate); renderer.render(scene, camera) }
     animate()
 
     return () => {
-      cancelAnimationFrame(animId)
+      cancelAnimationFrame(animRef.current)
       renderer.dispose()
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement)
     }
-  }, [roomSize, wallColor, floorColor])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 방 크기 변경 시 — 지오메트리·카메라만 교체
+  useEffect(() => {
+    const m = meshesRef.current
+    if (!m.floor) return
+    const THREE = window.THREE
+    const { width: w, depth: d, height: h } = roomSize
+
+    const replace = (mesh, geom) => { mesh.geometry.dispose(); mesh.geometry = geom }
+    replace(m.floor,    new THREE.PlaneGeometry(w, d))
+    replace(m.backWall, new THREE.PlaneGeometry(w, h))
+    replace(m.leftWall, new THREE.PlaneGeometry(d, h))
+    replace(m.rightWall,new THREE.PlaneGeometry(d, h))
+    replace(m.ceiling,  new THREE.PlaneGeometry(w, d))
+
+    m.floor.position.y    = -h / 2
+    m.backWall.position.z = -d / 2
+    m.leftWall.position.x = -w / 2
+    m.rightWall.position.x = w / 2
+    m.ceiling.position.y  =  h / 2
+
+    cameraRef.current.position.set(w * 0.8, h * 1.2, d * 1.5)
+    cameraRef.current.lookAt(0, 0, 0)
+  }, [roomSize])
+
+  // 색상 변경 시 — 재질 color만 업데이트
+  useEffect(() => {
+    if (wallMatRef.current)  wallMatRef.current.color.setRGB(wallColor[0], wallColor[1], wallColor[2])
+    if (floorMatRef.current) floorMatRef.current.color.setRGB(floorColor[0], floorColor[1], floorColor[2])
+  }, [wallColor, floorColor])
 
   return <div ref={mountRef} style={{ width: '100%', height: '400px', borderRadius: '12px', overflow: 'hidden', cursor: 'grab' }} />
 }

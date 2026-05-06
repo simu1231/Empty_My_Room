@@ -44,14 +44,6 @@ async def lifespan(app: FastAPI):
         print(f"Extract 로드 실패: {e}")
         app.state.extract = None
 
-    # SAM3D 로드
-    try:
-        from services.sam3d_service import SAM3DService
-        app.state.sam3d = SAM3DService()
-        print("SAM3D 로드 완료!")
-    except Exception as e:
-        print(f"SAM3D 로드 실패: {e}")
-        app.state.sam3d = None
 
     # Zero123 로드
     try:
@@ -71,18 +63,6 @@ async def lifespan(app: FastAPI):
         print(f"Gaussian 로드 실패: {e}")
         app.state.gaussian = None
 
-    # TripoSR 로드
-    try:
-        from services.triposr_service import TripoSRService
-        app.state.triposr = TripoSRService()
-        print("TripoSR 로드 완료!")
-    except Exception as e:
-        print(f"TripoSR 로드 실패: {e}")
-        app.state.triposr = None
-        
-    print("서버 준비 완료!")
-    yield
-    print("서버 종료")
 
 
 app = FastAPI(title="Furniture Remover API", lifespan=lifespan)

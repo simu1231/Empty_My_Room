@@ -25,9 +25,9 @@ function MiniMeshViewer({ data }) {
     scene.add(dir)
 
     const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(data.vertices.flat()), 3))
-    geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(data.colors.flat()), 3))
-    geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(data.faces.flat()), 1))
+    geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices, 3))
+    geometry.setAttribute('color',    new THREE.BufferAttribute(data.colors,   3))
+    geometry.setIndex(new THREE.BufferAttribute(data.faces, 1))
     geometry.computeVertexNormals()
     geometry.center()
 
@@ -38,7 +38,12 @@ function MiniMeshViewer({ data }) {
     camera.position.set(0, maxDim * 0.5, maxDim * 1.5)
     camera.lookAt(0, 0, 0)
 
-    const material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide })
+    const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    side: THREE.DoubleSide,
+    roughness: 0.7,
+    metalness: 0.05,
+  })
     const group = new THREE.Group()
     const mesh = new THREE.Mesh(geometry, material)
     mesh.rotation.x = -Math.PI / 2
@@ -112,6 +117,8 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     if (!mountRef.current) return
     const THREE = window.THREE
     console.log(roomSize)
+    console.log('wallColor:', roomColors.wall)  
+    console.log('floorColor:', roomColors.floor)  
     const el = mountRef.current
     const width = el.clientWidth || window.innerWidth
     const height = el.clientHeight || window.innerHeight
@@ -121,20 +128,38 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     sceneRef.current = scene
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 1000)
-    camera.position.set(roomSize.width, roomSize.height * 2, roomSize.depth * 2)
+    camera.position.set(0, roomSize.height * 1.5, roomSize.depth * 2.5)
     camera.lookAt(0, 0, 0)
     cameraRef.current = camera
 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(width, height)
+    renderer.shadowMap.enabled = true
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 0.7
+    renderer.outputColorSpace = THREE.SRGBColorSpace
     el.appendChild(renderer.domElement)
-
     const raycaster = new THREE.Raycaster()
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.9))
-    const dir1 = new THREE.DirectionalLight(0xffffff, 0.5)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.3))
+    const dir1 = new THREE.DirectionalLight(0xffffff, 2.0)
     dir1.position.set(5, 10, 5)
+    dir1.castShadow = true
+    dir1.shadow.mapSize.width = 2048
+    dir1.shadow.mapSize.height = 2048
+    dir1.shadow.camera.near = 0.1
+    dir1.shadow.camera.far = 50
+    dir1.shadow.bias = -0.001
     scene.add(dir1)
+
+    const fill = new THREE.DirectionalLight(0x8eb4ff, 0.4)
+    fill.position.set(-5, 3, -5)
+    scene.add(fill)
+
+    const top = new THREE.PointLight(0xffffff, 0.6, 20)
+    top.position.set(0, roomSize.height / 2 - 0.1, 0)
+    scene.add(top)
 
     const w = roomSize.width
     const h = roomSize.height
@@ -143,18 +168,23 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     const fc = roomColors.floor
     const fColor = `rgb(${fc[0]*255}, ${fc[1]*255}, ${fc[2]*255})`
 
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, d),
-      new THREE.MeshStandardMaterial({ map: createDynamicTexture(fColor, 'plank'), roughness: 0.8 })
-    )
+  const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(w, d),
+  new THREE.MeshStandardMaterial({ map: createDynamicTexture(fColor, 'plank'), roughness: 0.8 })
+)
     floor.rotation.x = -Math.PI / 2
+    floor.receiveShadow = true
     floor.position.y = -h / 2
     floor.name = 'floor'
     scene.add(floor)
     floorRef.current = floor
-
-    const wallMaterial = new THREE.MeshStandardMaterial({ color: new THREE.Color(wc[0], wc[1], wc[2]), roughness: 1.0 })
-
+    console.log('wc:', wc)
+    console.log('fc:', fc)
+    
+    const wallMaterial = new THREE.MeshStandardMaterial({ 
+  color: new THREE.Color(wc[0], wc[1], wc[2]), 
+  roughness: 1.0 
+})
     const backWall = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMaterial)
     backWall.position.z = -d / 2
     scene.add(backWall)
@@ -264,6 +294,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
 }
 
     const onMouseUp = (e) => {
+
       const movedX = Math.abs(e.clientX - mouseDownX)
       const movedY = Math.abs(e.clientY - mouseDownY)
       const wasDrag = movedX > 5 || movedY > 5
@@ -313,9 +344,9 @@ useEffect(() => {
     if (placedGroupsRef.current[instanceId]) return
 
     const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(data.vertices.flat()), 3))
-    geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(data.colors.flat()), 3))
-    geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(data.faces.flat()), 1))
+    geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices, 3))
+    geometry.setAttribute('color',    new THREE.BufferAttribute(data.colors,   3))
+    geometry.setIndex(new THREE.BufferAttribute(data.faces, 1))
     geometry.computeVertexNormals()
     geometry.center()
 
@@ -327,8 +358,15 @@ useEffect(() => {
 
     const scaledHalfHeight = (size.z * scale) / 2  // ← 추가
 
-    const material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide })
+    const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    side: THREE.DoubleSide,
+    roughness: 0.7,
+    metalness: 0.05,
+  })
     const mesh = new THREE.Mesh(geometry, material)
+    mesh.castShadow = true
+    mesh.receiveShadow = true
     mesh.rotation.x = -Math.PI / 2
     mesh.scale.set(scale, scale, scale)
 
@@ -473,7 +511,14 @@ export default function Interior3DStep() {
       const res = await fetch('http://127.0.0.1:8001/api/sam3d/mesh', { method: 'POST', body: form })
       const data = await res.json()
       if (!data.success) throw new Error(data.error || '3D 생성 실패')
-      setFurnitureMeshes(prev => ({ ...prev, [furniture.id]: data.mesh }))
+      // API 응답 시점에 typed array로 변환 — 이후 배치할 때마다 .flat() 재연산 없음
+      const raw = data.mesh
+      const processed = {
+        vertices: new Float32Array(raw.vertices.flat()),
+        faces:    new Uint32Array(raw.faces.flat()),
+        colors:   new Float32Array(raw.colors.flat()),
+      }
+      setFurnitureMeshes(prev => ({ ...prev, [furniture.id]: processed }))
       toast.success('3D 변환 완료! 드래그해서 방에 배치하세요 🎉')
     } catch (e) {
       toast.error(`3D 생성 실패: ${e.message}`)

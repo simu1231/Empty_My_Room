@@ -46,20 +46,7 @@ async def lifespan(app: FastAPI):
         print(f"Extract 로드 실패: {e}")
         app.state.extract = None
 
-    # Meta SAM3D 로드
-    try:
-        from omegaconf import OmegaConf
-        from hydra.utils import instantiate
-        PIPELINE_CONFIG = '/home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints/pipeline.yaml'
-        config = OmegaConf.load(PIPELINE_CONFIG)
-        config.rendering_engine = 'pytorch3d'
-        config.compile_model = False
-        config.workspace_dir = '/home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints'
-        app.state.sam3d = instantiate(config)
-        print("Meta SAM3D 로드 완료!")
-    except Exception as e:
-        print(f"Meta SAM3D 로드 실패: {e}")
-        app.state.sam3d = None
+    
 
     print("서버 준비 완료!")
     yield

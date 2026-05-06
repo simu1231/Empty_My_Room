@@ -49,10 +49,11 @@ async def extract_furniture(
 
     furniture_list = []
 
+    # 이미지 인코딩은 가구 개수와 무관하게 1회만 수행
+    sam2.predictor.set_image(image_np)
+
     for idx, (label, points_group) in enumerate(label_to_points.items()):
         print(f'[{idx+1}] "{label}" 처리 중 (포인트 {len(points_group)}개)...')
-
-        sam2.predictor.set_image(image_np)
 
         # 예진이 코드 그대로 - 여러 포인트 한번에 전달
         masks, scores, _ = sam2.predictor.predict(
