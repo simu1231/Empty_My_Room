@@ -120,8 +120,8 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     console.log('wallColor:', roomColors.wall)  
     console.log('floorColor:', roomColors.floor)  
     const el = mountRef.current
-    const width = el.clientWidth || window.innerWidth
-    const height = el.clientHeight || window.innerHeight
+    const width = window.innerWidth
+    const height = window.innerHeight - 110  // 헤더/스텝바 높이
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x2a2a2a)
