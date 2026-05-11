@@ -236,9 +236,10 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     raycaster.setFromCamera(mouse, camera)
     const intersects = raycaster.intersectObject(floorRef.current)
     if (intersects.length > 0) {
-      const furnitureHalf = selectedObjRef.current.userData.halfSize || 0.5
-      const halfW = roomSize.width / 2 - furnitureHalf
-      const halfD = roomSize.depth / 2 - furnitureHalf
+      const halfFX = selectedObjRef.current.userData.halfFX || selectedObjRef.current.userData.halfSize || 0.5
+      const halfFZ = selectedObjRef.current.userData.halfFZ || selectedObjRef.current.userData.halfSize || 0.5
+      const halfW = roomSize.width / 2 - halfFX
+      const halfD = roomSize.depth / 2 - halfFZ
 
       // 벽 통과 방지 클램프
       let newX = Math.max(-halfW, Math.min(halfW, intersects[0].point.x))
@@ -351,25 +352,58 @@ useEffect(() => {
     const size = new THREE.Vector3()
     geometry.boundingBox.getSize(size)
     const maxDim = Math.max(size.x, size.y, size.z)
-    // estimatedRealSize: 가구의 추정 실제 크기(m). 없으면 방 폭의 20%로 fallback
-    const targetSize = estimatedRealSize || roomSize.width * 0.2
-    const scale = targetSize / maxDim
 
-    // textured: to_glb에서 이미 y-up 변환됨, vertex_color: z-up이라 보정 필요
-    const scaledHalfHeight = data.type === 'textured'
-      ? (size.y * scale) / 2
-      : (size.z * scale) / 2
+    // 가구 이름으로 표준 크기 검색 → 비표준이면 픽셀 기반 uniform scale fallback
+    const std = findStdSize(data.name)
+    let scaleX, scaleY, scaleZ, scaledHalfHeight
+
+    if (std && data.type !== 'textured') {
+      // vertex_color: rotation.x = -PI/2 적용 후
+      //   local X → world X (폭)
+      //   local Y → world Z (깊이)
+      //   local Z → world Y (높이)
+      scaleX = size.x > 0 ? std.w / size.x : 1
+      scaleY = size.y > 0 ? std.d / size.y : 1
+      scaleZ = size.z > 0 ? std.h / size.z : 1
+      scaledHalfHeight = std.h / 2
+    } else if (std && data.type === 'textured') {
+      // textured: 이미 y-up (local X→worldX, local Y→worldY, local Z→worldZ)
+      scaleX = size.x > 0 ? std.w / size.x : 1
+      scaleY = size.y > 0 ? std.h / size.y : 1
+      scaleZ = size.z > 0 ? std.d / size.z : 1
+      scaledHalfHeight = std.h / 2
+    } else {
+      // fallback: 픽셀 크기 기반 uniform scale
+      const targetSize = estimatedRealSize || roomSize.width * 0.2
+      const s = targetSize / maxDim
+      scaleX = s; scaleY = s; scaleZ = s
+      scaledHalfHeight = data.type === 'textured'
+        ? (size.y * s) / 2
+        : (size.z * s) / 2
+    }
 
     const mesh = new THREE.Mesh(geometry, material)
     mesh.castShadow = true
     mesh.receiveShadow = true
     if (data.type !== 'textured') mesh.rotation.x = -Math.PI / 2
-    mesh.scale.set(scale, scale, scale)
+    mesh.scale.set(scaleX, scaleY, scaleZ)
+
+    // 벽 충돌용 발자국: X축(폭)과 Z축(깊이)을 따로 저장
+    // vertex_color: local.x→worldX, local.y→worldZ(rotation 후)
+    // textured: local.x→worldX, local.z→worldZ
+    const halfFX = data.type !== 'textured'
+      ? (size.x * scaleX) / 2
+      : (size.x * scaleX) / 2
+    const halfFZ = data.type !== 'textured'
+      ? (size.y * scaleY) / 2   // local.y → world Z
+      : (size.z * scaleZ) / 2   // local.z → world Z
 
     const group = new THREE.Group()
     group.add(mesh)
-    group.position.set(position.x, -roomSize.height / 2 + scaledHalfHeight, position.z)  // ← 수정
+    group.position.set(position.x, -roomSize.height / 2 + scaledHalfHeight, position.z)
     group.userData.halfSize = scaledHalfHeight
+    group.userData.halfFX = halfFX
+    group.userData.halfFZ = halfFZ
     sceneRef.current.add(group)
     placedGroupsRef.current[instanceId] = group
   })
@@ -427,7 +461,8 @@ useEffect(() => {
       group.scale.multiplyScalar(factor)
       const newHs = (group.userData.halfSize || 0.5) * factor
       group.userData.halfSize = newHs
-      // 크기 변경 시 바닥 기준 y 위치도 함께 보정
+      group.userData.halfFX = (group.userData.halfFX || newHs) * factor
+      group.userData.halfFZ = (group.userData.halfFZ || newHs) * factor
       group.position.y = -roomSize.height / 2 + newHs
     }
   }
@@ -470,6 +505,41 @@ useEffect(() => {
       )}
     </div>
   )
+}
+
+// 가구별 표준 크기 (단위: 미터)
+// vertex_color 메쉬 기준: local.x→worldX(폭), local.y→worldZ(깊이), local.z→worldY(높이)
+const FURNITURE_STD_SIZES = {
+  '킹침대':    { w: 1.8, d: 2.1, h: 0.55 },
+  '퀸침대':    { w: 1.6, d: 2.0, h: 0.55 },
+  '더블침대':  { w: 1.4, d: 2.0, h: 0.55 },
+  '싱글침대':  { w: 1.0, d: 2.0, h: 0.55 },
+  '침대':      { w: 1.6, d: 2.0, h: 0.55 },
+  '3인소파':   { w: 2.1, d: 0.9, h: 0.85 },
+  '2인소파':   { w: 1.5, d: 0.85, h: 0.85 },
+  '1인소파':   { w: 0.85, d: 0.85, h: 0.85 },
+  '소파':      { w: 2.0, d: 0.9, h: 0.85 },
+  '옷장':      { w: 1.2, d: 0.6, h: 2.0 },
+  '책장':      { w: 0.9, d: 0.3, h: 1.8 },
+  '책상':      { w: 1.2, d: 0.6, h: 0.75 },
+  '식탁':      { w: 1.4, d: 0.8, h: 0.75 },
+  '테이블':    { w: 1.2, d: 0.7, h: 0.75 },
+  '협탁':      { w: 0.5, d: 0.4, h: 0.6 },
+  '화장대':    { w: 1.0, d: 0.5, h: 0.75 },
+  '의자':      { w: 0.5, d: 0.5, h: 0.9 },
+  '텔레비전':  { w: 1.2, d: 0.1, h: 0.7 },
+  'TV':        { w: 1.2, d: 0.1, h: 0.7 },
+}
+
+// 가구 이름에서 표준 크기 검색 (긴 키 우선으로 부분 매칭)
+function findStdSize(name) {
+  if (!name) return null
+  if (FURNITURE_STD_SIZES[name]) return FURNITURE_STD_SIZES[name]
+  const sorted = Object.entries(FURNITURE_STD_SIZES).sort((a, b) => b[0].length - a[0].length)
+  for (const [key, val] of sorted) {
+    if (name.includes(key)) return val
+  }
+  return null
 }
 
 // b64 이미지에서 픽셀 크기를 비동기로 읽어옴
@@ -518,7 +588,7 @@ export default function Interior3DStep() {
       return {
         ...prev,
         [newId]: {
-          data: original.data,
+          ...original,
           position: { x: original.position.x + 0.5, z: original.position.z + 0.5 }
         }
       }
@@ -554,7 +624,7 @@ export default function Interior3DStep() {
             faces:    new Uint32Array(raw.faces.flat()),
             colors:   new Float32Array(raw.colors.flat()),
           }
-      setFurnitureMeshes(prev => ({ ...prev, [furniture.id]: processed }))
+      setFurnitureMeshes(prev => ({ ...prev, [furniture.id]: { ...processed, name: furniture.name } }))
       toast.success('3D 변환 완료! 드래그해서 방에 배치하세요 🎉')
     } catch (e) {
       toast.error(`3D 생성 실패: ${e.message}`)

@@ -110,6 +110,12 @@ async def generate_mesh(
     mask      = alpha > 127
 
     rgb, mask = _crop_and_resize(rgb, mask)
+
+    # 배경을 회색으로 채움 → MoGe 깊이 추정 개선
+    rgb_bg = rgb.copy()
+    rgb_bg[~mask] = 128
+    rgb = rgb_bg
+
     print("Meta SAM3D 3D 메쉬 생성 중...")
 
     pipeline = getattr(request.app.state, 'sam3d_pipeline', None) if CACHE_SAM3D_PIPELINE else None
@@ -130,7 +136,7 @@ async def generate_mesh(
 
     try:
         result = pipeline.run(
-            rgb, mask, seed=42,
+            rgb, mask, seed=123,
             stage1_only=False,
             with_mesh_postprocess=False,
             with_texture_baking=False,
