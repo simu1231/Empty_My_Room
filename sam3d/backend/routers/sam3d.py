@@ -1,6 +1,5 @@
 import io
 import gc
-import base64
 import torch
 import numpy as np
 import orjson
@@ -14,21 +13,38 @@ PIPELINE_CONFIG = '/home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints/pi
 WORKSPACE_DIR   = '/home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints'
 
 CACHE_SAM3D_PIPELINE = True
-MAX_INPUT_SIZE = 768
+MIN_INPUT_SIZE = 512   # 너무 작은 이미지는 업스케일 (깊이 추정 정확도)
+MAX_INPUT_SIZE = 1024  # 너무 큰 이미지는 다운스케일 (속도)
 TARGET_FACES   = 80000
 
-# utils3d 1.7에서 함수명 변경 (_xy 접미사 제거 + 키워드 인수화)
-# SAM3D 내부 코드가 구버전 이름을 사용하므로 alias 패치
+# utils3d 1.7 함수명 변경 호환 패치
 import utils3d.torch as _u3d
 from utils3d.torch.transforms import intrinsics_from_fov as _intr_fov, perspective_from_fov as _persp_fov
+from utils3d.torch.mesh import (
+    mesh_connected_components  as _mesh_cc,
+    mesh_dual_graph            as _mesh_dg,
+    mesh_edges                 as _mesh_edges,
+    graph_connected_components as _graph_cc,
+    remove_unused_vertices     as _rm_unused,
+)
 if not hasattr(_u3d, 'intrinsics_from_fov_xy'):
     _u3d.intrinsics_from_fov_xy = lambda fx, fy: _intr_fov(fov_x=fx, fov_y=fy)
 if not hasattr(_u3d, 'perspective_from_fov_xy'):
     _u3d.perspective_from_fov_xy = lambda fx, fy, near, far: _persp_fov(fov_x=fx, fov_y=fy, near=near, far=far)
+if not hasattr(_u3d, 'compute_connected_components'):
+    _u3d.compute_connected_components = _mesh_cc
+if not hasattr(_u3d, 'compute_dual_graph'):
+    _u3d.compute_dual_graph = _mesh_dg
+if not hasattr(_u3d, 'compute_edges'):
+    _u3d.compute_edges = _mesh_edges
+if not hasattr(_u3d, 'compute_edge_connected_components'):
+    _u3d.compute_edge_connected_components = _graph_cc
+if not hasattr(_u3d, 'remove_unreferenced_vertices'):
+    _u3d.remove_unreferenced_vertices = _rm_unused
 
 
 def _crop_and_resize(rgb: np.ndarray, mask: np.ndarray):
-    """마스크 바운딩박스로 크롭 후 MAX_INPUT_SIZE 이하로 리사이즈."""
+    """마스크 bbox 크롭 후 MIN~MAX 범위로 리사이즈 (소형 이미지 업스케일 포함)."""
     rows = np.any(mask, axis=1)
     cols = np.any(mask, axis=0)
     if not rows.any() or not cols.any():
@@ -46,33 +62,38 @@ def _crop_and_resize(rgb: np.ndarray, mask: np.ndarray):
     mask = mask[rmin:rmax, cmin:cmax]
 
     h, w = rgb.shape[:2]
-    if max(h, w) > MAX_INPUT_SIZE:
-        scale = MAX_INPUT_SIZE / max(h, w)
-        new_w, new_h = int(w * scale), int(h * scale)
+    cur_max = max(h, w)
+
+    if cur_max < MIN_INPUT_SIZE:
+        # 작은 이미지 업스케일 → 깊이 추정 품질 향상
+        scale = MIN_INPUT_SIZE / cur_max
+    elif cur_max > MAX_INPUT_SIZE:
+        # 큰 이미지 다운스케일 → 속도
+        scale = MAX_INPUT_SIZE / cur_max
+    else:
+        scale = 1.0
+
+    if scale != 1.0:
+        new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
         rgb  = np.array(Image.fromarray(rgb).resize((new_w, new_h), Image.LANCZOS))
         mask = np.array(Image.fromarray(mask.astype(np.uint8) * 255).resize((new_w, new_h), Image.NEAREST)) > 127
 
-    print(f"[전처리] 입력 크기: {w}x{h} → {rgb.shape[1]}x{rgb.shape[0]}")
+    print(f"[전처리] {w}x{h} → {rgb.shape[1]}x{rgb.shape[0]}")
     return rgb, mask
 
 
 def _decimate_mesh(vertices: np.ndarray, faces: np.ndarray, colors: np.ndarray):
-    """폴리곤 수를 TARGET_FACES 이하로 줄여 전송량과 렌더링 부하를 낮춤."""
     if len(faces) <= TARGET_FACES:
         return vertices, faces, colors
-
     import trimesh
     from scipy.spatial import cKDTree
-
     m = trimesh.Trimesh(vertices=vertices, faces=faces)
     m = m.simplify_quadric_decimation(face_count=TARGET_FACES)
-
     new_verts  = np.asarray(m.vertices, dtype=np.float32)
     new_faces  = np.asarray(m.faces,    dtype=np.int32)
     _, idx     = cKDTree(vertices).query(new_verts)
     new_colors = colors[idx].astype(np.float32)
-
-    print(f"[메쉬 감소] {len(faces)} → {len(new_faces)} 페이스")
+    print(f"[decimation] {len(faces)} → {len(new_faces)} faces")
     return new_verts, new_faces, new_colors
 
 
@@ -81,12 +102,12 @@ async def generate_mesh(
     request: Request,
     image: UploadFile = File(...),
 ):
-    img_bytes  = await image.read()
-    image_pil  = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-    image_np   = np.array(image_pil)
-    alpha      = image_np[..., 3]
-    rgb        = image_np[..., :3]
-    mask       = alpha > 127
+    img_bytes = await image.read()
+    image_pil = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+    image_np  = np.array(image_pil)
+    alpha     = image_np[..., 3]
+    rgb       = image_np[..., :3]
+    mask      = alpha > 127
 
     rgb, mask = _crop_and_resize(rgb, mask)
     print("Meta SAM3D 3D 메쉬 생성 중...")
@@ -96,9 +117,12 @@ async def generate_mesh(
         from omegaconf import OmegaConf
         from hydra.utils import instantiate
         config = OmegaConf.load(PIPELINE_CONFIG)
-        config.rendering_engine = 'pytorch3d'
-        config.compile_model    = False
-        config.workspace_dir    = WORKSPACE_DIR
+        config.rendering_engine   = 'pytorch3d'
+        config.compile_model      = False
+        config.workspace_dir      = WORKSPACE_DIR
+        config.ss_inference_steps   = 50  # 초기 3D 포인트 밀도
+        config.slat_inference_steps = 75  # 3D 잠재 구조 정확도
+        config.slat_cfg_strength    = 5   # YAML이 1로 낮춰놓은 것을 기본값(5)으로 복원
         pipeline = instantiate(config)
         if CACHE_SAM3D_PIPELINE:
             request.app.state.sam3d_pipeline = pipeline
@@ -127,8 +151,10 @@ async def generate_mesh(
                       if mesh.vertex_attrs is not None \
                       else np.full((len(vertices_np), 3), 0.8, dtype=np.float32)
 
-        print(f"메쉬 생성 완료! 버텍스: {len(vertices_np)}개, 페이스: {len(faces_np)}개")
+        # 감마 보정으로 그림자 아티팩트 완화
+        colors_np = np.power(np.clip(colors_np, 0, 1), 0.65).astype(np.float32)
 
+        print(f"[완료] 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")
         vertices_np, faces_np, colors_np = _decimate_mesh(vertices_np, faces_np, colors_np)
 
         body = orjson.dumps({
@@ -139,8 +165,6 @@ async def generate_mesh(
                 "faces":    faces_np.tolist(),
                 "colors":   colors_np.tolist(),
             },
-            "vertices": len(vertices_np),
-            "faces":    len(faces_np),
         })
         return Response(content=body, media_type="application/json")
 

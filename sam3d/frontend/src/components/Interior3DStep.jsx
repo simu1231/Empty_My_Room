@@ -26,8 +26,19 @@ function MiniMeshViewer({ data }) {
 
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices, 3))
-    geometry.setAttribute('color',    new THREE.BufferAttribute(data.colors,   3))
     geometry.setIndex(new THREE.BufferAttribute(data.faces, 1))
+
+    let material
+    if (data.type === 'textured') {
+      geometry.setAttribute('uv', new THREE.BufferAttribute(data.uvs, 2))
+      const texture = new THREE.TextureLoader().load(`data:image/jpeg;base64,${data.textureB64}`)
+      texture.flipY = true
+      material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
+    } else {
+      geometry.setAttribute('color', new THREE.BufferAttribute(data.colors, 3))
+      material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 1.0, metalness: 0.0 })
+    }
+
     geometry.computeVertexNormals()
     geometry.center()
 
@@ -38,15 +49,10 @@ function MiniMeshViewer({ data }) {
     camera.position.set(0, maxDim * 0.5, maxDim * 1.5)
     camera.lookAt(0, 0, 0)
 
-    const material = new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    side: THREE.DoubleSide,
-    roughness: 0.7,
-    metalness: 0.05,
-  })
     const group = new THREE.Group()
     const mesh = new THREE.Mesh(geometry, material)
-    mesh.rotation.x = -Math.PI / 2
+    // textured 메쉬는 to_glb 내부에서 z-up→y-up 변환이 이미 적용됨 → 추가 회전 불필요
+    if (data.type !== 'textured') mesh.rotation.x = -Math.PI / 2
     group.add(mesh)
     scene.add(group)
 
@@ -134,32 +140,12 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(width, height)
-    renderer.shadowMap.enabled = true
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap
-    renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 0.7
+    renderer.shadowMap.enabled = false
     renderer.outputColorSpace = THREE.SRGBColorSpace
     el.appendChild(renderer.domElement)
     const raycaster = new THREE.Raycaster()
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.3))
-    const dir1 = new THREE.DirectionalLight(0xffffff, 2.0)
-    dir1.position.set(5, 10, 5)
-    dir1.castShadow = true
-    dir1.shadow.mapSize.width = 2048
-    dir1.shadow.mapSize.height = 2048
-    dir1.shadow.camera.near = 0.1
-    dir1.shadow.camera.far = 50
-    dir1.shadow.bias = -0.001
-    scene.add(dir1)
-
-    const fill = new THREE.DirectionalLight(0x8eb4ff, 0.4)
-    fill.position.set(-5, 3, -5)
-    scene.add(fill)
-
-    const top = new THREE.PointLight(0xffffff, 0.6, 20)
-    top.position.set(0, roomSize.height / 2 - 0.1, 0)
-    scene.add(top)
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0))
 
     const w = roomSize.width
     const h = roomSize.height
@@ -340,13 +326,24 @@ useEffect(() => {
   if (!sceneRef.current) return
   const THREE = window.THREE
 
-  Object.entries(placedMeshes).forEach(([instanceId, { data, position }]) => {
+  Object.entries(placedMeshes).forEach(([instanceId, { data, position, estimatedRealSize }]) => {
     if (placedGroupsRef.current[instanceId]) return
 
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices, 3))
-    geometry.setAttribute('color',    new THREE.BufferAttribute(data.colors,   3))
     geometry.setIndex(new THREE.BufferAttribute(data.faces, 1))
+
+    let material
+    if (data.type === 'textured') {
+      geometry.setAttribute('uv', new THREE.BufferAttribute(data.uvs, 2))
+      const texture = new THREE.TextureLoader().load(`data:image/jpeg;base64,${data.textureB64}`)
+      texture.flipY = true
+      material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
+    } else {
+      geometry.setAttribute('color', new THREE.BufferAttribute(data.colors, 3))
+      material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 1.0, metalness: 0.0 })
+    }
+
     geometry.computeVertexNormals()
     geometry.center()
 
@@ -354,26 +351,25 @@ useEffect(() => {
     const size = new THREE.Vector3()
     geometry.boundingBox.getSize(size)
     const maxDim = Math.max(size.x, size.y, size.z)
-    const scale = 1.0 / maxDim
+    // estimatedRealSize: 가구의 추정 실제 크기(m). 없으면 방 폭의 20%로 fallback
+    const targetSize = estimatedRealSize || roomSize.width * 0.2
+    const scale = targetSize / maxDim
 
-    const scaledHalfHeight = (size.z * scale) / 2  // ← 추가
+    // textured: to_glb에서 이미 y-up 변환됨, vertex_color: z-up이라 보정 필요
+    const scaledHalfHeight = data.type === 'textured'
+      ? (size.y * scale) / 2
+      : (size.z * scale) / 2
 
-    const material = new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    side: THREE.DoubleSide,
-    roughness: 0.7,
-    metalness: 0.05,
-  })
     const mesh = new THREE.Mesh(geometry, material)
     mesh.castShadow = true
     mesh.receiveShadow = true
-    mesh.rotation.x = -Math.PI / 2
+    if (data.type !== 'textured') mesh.rotation.x = -Math.PI / 2
     mesh.scale.set(scale, scale, scale)
 
     const group = new THREE.Group()
     group.add(mesh)
     group.position.set(position.x, -roomSize.height / 2 + scaledHalfHeight, position.z)  // ← 수정
-    group.userData.halfSize = (size.z * scale) / 2 // 가구의 절반 크기를 userData에 저장 (충돌 방지용)
+    group.userData.halfSize = scaledHalfHeight
     sceneRef.current.add(group)
     placedGroupsRef.current[instanceId] = group
   })
@@ -425,6 +421,17 @@ useEffect(() => {
     setContextMenu(null)
   }
 
+  const handleScale = (factor) => {
+    if (selectedObjRef.current) {
+      const group = selectedObjRef.current
+      group.scale.multiplyScalar(factor)
+      const newHs = (group.userData.halfSize || 0.5) * factor
+      group.userData.halfSize = newHs
+      // 크기 변경 시 바닥 기준 y 위치도 함께 보정
+      group.position.y = -roomSize.height / 2 + newHs
+    }
+  }
+
   const btnStyle = (color) => ({
     width: '48px', height: '48px', borderRadius: '50%',
     background: color, border: 'none', cursor: 'pointer',
@@ -456,11 +463,23 @@ useEffect(() => {
         }}>
           <button style={btnStyle('#3498db')} onClick={handleRotate} title="회전">🔄</button>
           <button style={btnStyle('#27ae60')} onClick={handleCopy} title="복사">📋</button>
+          <button style={btnStyle('#e67e22')} onClick={() => handleScale(1.2)} title="크게">＋</button>
+          <button style={btnStyle('#e67e22')} onClick={() => handleScale(1/1.2)} title="작게">－</button>
           <button style={btnStyle('#e74c3c')} onClick={handleDelete} title="삭제">🗑️</button>
         </div>
       )}
     </div>
   )
+}
+
+// b64 이미지에서 픽셀 크기를 비동기로 읽어옴
+function getImageSize(b64) {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight })
+    img.onerror = () => resolve({ w: 100, h: 100 })
+    img.src = `data:image/png;base64,${b64}`
+  })
 }
 
 export default function Interior3DStep() {
@@ -474,6 +493,14 @@ export default function Interior3DStep() {
   const [placedMeshes, setPlacedMeshes] = useState({})
   const [generating, setGenerating] = useState(false)
   const [generatingId, setGeneratingId] = useState(null)
+  // { id → { w, h } } — 각 가구 b64 이미지의 픽셀 크기 (상대 크기 기준)
+  const [furniturePxSizes, setFurniturePxSizes] = useState({})
+
+  useEffect(() => {
+    if (!furnitureList?.length) return
+    Promise.all(furnitureList.map(f => getImageSize(f.b64).then(s => [f.id, s])))
+      .then(entries => setFurniturePxSizes(Object.fromEntries(entries)))
+  }, [furnitureList])
 
     const handleDelete = (instanceId) => {
     setPlacedMeshes(prev => {
@@ -513,11 +540,20 @@ export default function Interior3DStep() {
       if (!data.success) throw new Error(data.error || '3D 생성 실패')
       // API 응답 시점에 typed array로 변환 — 이후 배치할 때마다 .flat() 재연산 없음
       const raw = data.mesh
-      const processed = {
-        vertices: new Float32Array(raw.vertices.flat()),
-        faces:    new Uint32Array(raw.faces.flat()),
-        colors:   new Float32Array(raw.colors.flat()),
-      }
+      const processed = data.type === 'textured'
+        ? {
+            type: 'textured',
+            vertices:   new Float32Array(raw.vertices.flat()),
+            faces:      new Uint32Array(raw.faces.flat()),
+            uvs:        new Float32Array(raw.uvs.flat()),
+            textureB64: raw.texture,
+          }
+        : {
+            type: 'vertex_color',
+            vertices: new Float32Array(raw.vertices.flat()),
+            faces:    new Uint32Array(raw.faces.flat()),
+            colors:   new Float32Array(raw.colors.flat()),
+          }
       setFurnitureMeshes(prev => ({ ...prev, [furniture.id]: processed }))
       toast.success('3D 변환 완료! 드래그해서 방에 배치하세요 🎉')
     } catch (e) {
@@ -531,8 +567,24 @@ export default function Interior3DStep() {
   const handleDrop = (furnitureId, position) => {
     const meshData = furnitureMeshes[furnitureId]
     if (!meshData) { toast.error('먼저 3D 변환을 해주세요!'); return }
+
+    // 모든 가구 픽셀 크기 중 최대값 → 상대 크기 기준
+    const allSizes = Object.values(furniturePxSizes)
+    const maxPxDim = allSizes.length
+      ? Math.max(...allSizes.map(s => Math.max(s.w, s.h)))
+      : 100
+    const thisPxDim = furniturePxSizes[furnitureId]
+      ? Math.max(furniturePxSizes[furnitureId].w, furniturePxSizes[furnitureId].h)
+      : maxPxDim
+    // 가장 큰 가구 = 방 폭의 40%, 나머지는 비례
+    const referenceRealSize = roomSize.width * 0.4
+    const estimatedRealSize = referenceRealSize * (thisPxDim / maxPxDim)
+
     const instanceId = `${furnitureId}_${Date.now()}`
-    setPlacedMeshes(prev => ({ ...prev, [instanceId]: { data: meshData, position } }))
+    setPlacedMeshes(prev => ({
+      ...prev,
+      [instanceId]: { data: meshData, position, estimatedRealSize }
+    }))
     toast.success('가구 배치 완료! 🎉')
   }
 
