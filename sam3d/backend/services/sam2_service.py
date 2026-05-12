@@ -30,11 +30,13 @@ class SAM2Service:
         # 포인트마다 따로 마스크 만들고 합치기
         combined_mask = np.zeros(image_np.shape[:2], dtype=np.uint8)
 
+        # 이미지 인코딩 1회만 수행 (포인트 수와 무관)
+        self.predictor.set_image(image_np)
+
         for point in points:
             input_points = np.array([point])
             input_labels = np.array([1])
 
-            self.predictor.set_image(image_np)
             masks, scores, _ = self.predictor.predict(
                 point_coords=input_points,
                 point_labels=input_labels,

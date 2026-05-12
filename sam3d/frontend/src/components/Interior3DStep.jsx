@@ -85,7 +85,7 @@ function MiniMeshViewer({ data }) {
   return <div ref={mountRef} style={{ width: '100%', height: '120px', borderRadius: '6px', overflow: 'hidden' }} />
 }
 
-function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, onDelete, onCopy }) {
+function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, onDelete, onCopy, viewMode }) {
   const createDynamicTexture = (baseColor, type = 'plank') => {
     const canvas = document.createElement('canvas')
     canvas.width = 512
@@ -122,12 +122,15 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
   const mountRef = useRef(null)
   const sceneRef = useRef(null)
   const cameraRef = useRef(null)
+  const rendererRef = useRef(null)
   const placedGroupsRef = useRef({})
   const selectedObjRef = useRef(null)
   const floorRef = useRef(null)
   const backWallRef = useRef(null)
   const leftWallRef = useRef(null)
   const rightWallRef = useRef(null)
+  const viewModeRef = useRef('3d')
+  const camTargetRef = useRef({ x: 0, y: 0, z: 0 })
   const [contextMenu, setContextMenu] = useState(null)
   // contextMenu: { screenX, screenY, instanceId }
 
@@ -150,11 +153,12 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     camera.lookAt(0, 0, 0)
     cameraRef.current = camera
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true })
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
     renderer.setSize(width, height)
     renderer.shadowMap.enabled = false
     renderer.outputColorSpace = THREE.SRGBColorSpace
     el.appendChild(renderer.domElement)
+    rendererRef.current = renderer
     const raycaster = new THREE.Raycaster()
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.75))
@@ -276,10 +280,9 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
 
     const intersects = raycaster.intersectObject(floorRef.current)
     if (intersects.length > 0) {
-      const halfFX = selectedObjRef.current.userData.halfFX || selectedObjRef.current.userData.halfSize || 0.5
-      const halfFZ = selectedObjRef.current.userData.halfFZ || selectedObjRef.current.userData.halfSize || 0.5
-      const halfW = roomSize.width / 2 - halfFX
-      const halfD = roomSize.depth / 2 - halfFZ
+      // 벽 딱 붙이기: 아주 작은 여백(2cm)만 남김
+      const halfW = roomSize.width / 2 - 0.02
+      const halfD = roomSize.depth / 2 - 0.02
 
       // 벽 통과 방지 클램프
       let newX = Math.max(-halfW, Math.min(halfW, intersects[0].point.x))
@@ -309,12 +312,21 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
   } else if (isRotating) {
     const dx = e.clientX - prevX
     const dy = e.clientY - prevY
-    const spherical = new THREE.Spherical().setFromVector3(camera.position)
-    spherical.theta -= dx * 0.01
-    spherical.phi -= dy * 0.005
-    spherical.phi = Math.max(0.1, Math.min(Math.PI / 2, spherical.phi))
-    camera.position.setFromSpherical(spherical)
-    camera.lookAt(0, 0, 0)
+    if (viewModeRef.current === '2d') {
+      const s = 0.02
+      camTargetRef.current.x -= dx * s
+      camTargetRef.current.z -= dy * s
+      camera.position.x -= dx * s
+      camera.position.z -= dy * s
+      camera.lookAt(camTargetRef.current.x, 0, camTargetRef.current.z)
+    } else {
+      const spherical = new THREE.Spherical().setFromVector3(camera.position)
+      spherical.theta -= dx * 0.01
+      spherical.phi -= dy * 0.005
+      spherical.phi = Math.max(0.1, Math.min(Math.PI / 2, spherical.phi))
+      camera.position.setFromSpherical(spherical)
+      camera.lookAt(0, 0, 0)
+    }
     prevX = e.clientX
     prevY = e.clientY
   }
@@ -366,6 +378,14 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
 useEffect(() => {
   if (!sceneRef.current) return
   const THREE = window.THREE
+
+  // undo/redo 시 사라진 가구 Three.js 씬에서도 제거
+  Object.entries(placedGroupsRef.current).forEach(([instanceId, group]) => {
+    if (!placedMeshes[instanceId]) {
+      sceneRef.current.remove(group)
+      delete placedGroupsRef.current[instanceId]
+    }
+  })
 
   Object.entries(placedMeshes).forEach(([instanceId, { data, position, estimatedRealSize }]) => {
     if (placedGroupsRef.current[instanceId]) return
@@ -475,6 +495,21 @@ useEffect(() => {
     placedGroupsRef.current[instanceId] = group
   })
 }, [placedMeshes])
+
+  // 2D/3D 전환 시 카메라 재배치
+  useEffect(() => {
+    viewModeRef.current = viewMode
+    if (!cameraRef.current) return
+    if (viewMode === '2d') {
+      const h = Math.max(roomSize.width, roomSize.depth) * 1.5
+      cameraRef.current.position.set(camTargetRef.current.x, h, camTargetRef.current.z + 0.001)
+      cameraRef.current.lookAt(camTargetRef.current.x, 0, camTargetRef.current.z)
+    } else {
+      camTargetRef.current = { x: 0, y: 0, z: 0 }
+      cameraRef.current.position.set(0, roomSize.height * 1.5, roomSize.depth * 2.5)
+      cameraRef.current.lookAt(0, 0, 0)
+    }
+  }, [viewMode])
 
   const handleDragOver = (e) => e.preventDefault()
 
@@ -782,19 +817,95 @@ function getImageSize(b64) {
   })
 }
 
+// IndexedDB 헬퍼
+const DB_NAME = 'EmptyMyRoomDesigns', DB_VER = 1, STORE = 'designs'
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VER)
+    req.onupgradeneeded = e => e.target.result.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true })
+    req.onsuccess = e => res(e.target.result)
+    req.onerror = e => rej(e.target.error)
+  })
+}
+async function dbSaveDesign(data) {
+  const db = await openDB()
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite')
+    const req = tx.objectStore(STORE).add(data)
+    req.onsuccess = () => res(req.result)
+    req.onerror = e => rej(e.target.error)
+  })
+}
+async function dbLoadDesigns() {
+  const db = await openDB()
+  return new Promise((res, rej) => {
+    const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAll()
+    req.onsuccess = () => res(req.result)
+    req.onerror = e => rej(e.target.error)
+  })
+}
+async function dbDeleteDesign(id) {
+  const db = await openDB()
+  return new Promise((res, rej) => {
+    const req = db.transaction(STORE, 'readwrite').objectStore(STORE).delete(id)
+    req.onsuccess = () => res()
+    req.onerror = e => rej(e.target.error)
+  })
+}
+
 export default function Interior3DStep() {
-  const { furnitureList, roomSize, roomColors, roomTextures, reset } = useStore()
+  const { furnitureList, roomSize, roomColors, roomTextures, reset,
+          savedDesignToLoad, clearSavedDesignToLoad, setSavedDesignToLoad, setStep } = useStore()
   const roomColorsMemo = useMemo(() => ({
     wall: roomColors?.wall || [0.9, 0.9, 0.9],
     floor: roomColors?.floor || [0.6, 0.4, 0.2]
   }), [roomColors])
 
   const [furnitureMeshes, setFurnitureMeshes] = useState({})
-  const [placedMeshes, setPlacedMeshes] = useState({})
+  // ─── Undo/Redo ───────────────────────────────────────────────────────────
+  const [undoState, setUndoState] = useState({ snapshots: [{}], idx: 0 })
+  const placedMeshes = undoState.snapshots[undoState.idx]
+  const setPlacedMeshes = (updater) => setUndoState(prev => {
+    const cur = prev.snapshots[prev.idx]
+    const next = typeof updater === 'function' ? updater(cur) : updater
+    const snaps = [...prev.snapshots.slice(0, prev.idx + 1), next].slice(-30)
+    return { snapshots: snaps, idx: snaps.length - 1 }
+  })
+  const undo = () => setUndoState(p => p.idx > 0 ? { ...p, idx: p.idx - 1 } : p)
+  const redo = () => setUndoState(p => p.idx < p.snapshots.length - 1 ? { ...p, idx: p.idx + 1 } : p)
+  const canUndo = undoState.idx > 0
+  const canRedo = undoState.idx < undoState.snapshots.length - 1
+  // ─────────────────────────────────────────────────────────────────────────
+  const [viewMode, setViewMode] = useState('3d')
   const [generating, setGenerating] = useState(false)
   const [generatingId, setGeneratingId] = useState(null)
-  // { id → { w, h } } — 각 가구 b64 이미지의 픽셀 크기 (상대 크기 기준)
   const [furniturePxSizes, setFurniturePxSizes] = useState({})
+
+  // 저장된 디자인 불러오기
+  useEffect(() => {
+    if (!savedDesignToLoad) return
+    setFurnitureMeshes(savedDesignToLoad.furnitureMeshes)
+    setUndoState({ snapshots: [savedDesignToLoad.placedMeshes], idx: 0 })
+    clearSavedDesignToLoad()
+  }, [savedDesignToLoad])
+
+  // 저장 함수
+  const handleSave = async () => {
+    const canvas = document.querySelector('#room-viewer-wrap canvas')
+    if (!canvas) { toast.error('뷰어를 찾을 수 없습니다'); return }
+    const thumbnail = canvas.toDataURL('image/jpeg', 0.6)
+    try {
+      await dbSaveDesign({
+        timestamp: Date.now(),
+        thumbnail,
+        furnitureMeshes,
+        placedMeshes,
+      })
+      toast.success('디자인 저장 완료! 업로드 화면에서 불러올 수 있습니다')
+    } catch (e) {
+      toast.error('저장 실패: ' + e.message)
+    }
+  }
 
   useEffect(() => {
     if (!furnitureList?.length) return
@@ -850,7 +961,7 @@ export default function Interior3DStep() {
     }
     setGenerating(true)
     setGeneratingId(furniture.id)
-    toast.success('SAM3D로 3D 메쉬 생성 중... (20~30분 소요)')
+    toast.success('SAM3D로 3D 메쉬 생성 중...')
     try {
       const imgBlob = await fetch(`data:image/png;base64,${furniture.b64}`).then(r => r.blob())
       const imgFile = new File([imgBlob], 'furniture.png', { type: 'image/png' })
@@ -920,15 +1031,16 @@ export default function Interior3DStep() {
 }}>
 
       {/* 3D 뷰어 - 전체 배경 */}
-      <div style={{ position: 'absolute', inset: 0 }}>
+      <div id="room-viewer-wrap" style={{ position: 'absolute', inset: 0 }}>
         <RoomViewer
           roomSize={roomSize}
           roomColors={roomColorsMemo}
           roomTextures={roomTextures}
           placedMeshes={placedMeshes}
           onDrop={handleDrop}
-          onDelete={handleDelete}   // ← 추가
-          onCopy={handleCopy}       // ← 추가
+          onDelete={handleDelete}
+          onCopy={handleCopy}
+          viewMode={viewMode}
         />
       </div>
 
@@ -942,9 +1054,21 @@ export default function Interior3DStep() {
         <span style={{ color: '#aaa', fontSize: '13px' }}>
           방 크기: {roomSize.width}m × {roomSize.depth}m × {roomSize.height}m
         </span>
-        <span style={{ color: '#aaa', fontSize: '13px', marginLeft: 'auto' }}>
+        <span style={{ color: '#aaa', fontSize: '13px' }}>
           변환 {Object.keys(furnitureMeshes).length}개 · 배치 {Object.keys(placedMeshes).length}개
         </span>
+        {/* 2D / 3D 토글 */}
+        <div style={{ marginLeft: 'auto', display: 'flex', background: 'rgba(0,0,0,0.5)', borderRadius: '20px', padding: '3px' }}>
+          {['2D','3D'].map(m => (
+            <button key={m} onClick={() => setViewMode(m.toLowerCase())}
+              style={{
+                padding: '5px 16px', border: 'none', borderRadius: '16px', cursor: 'pointer',
+                fontWeight: 700, fontSize: '13px', transition: 'all 0.2s',
+                background: viewMode === m.toLowerCase() ? '#27ae60' : 'transparent',
+                color: viewMode === m.toLowerCase() ? '#fff' : '#aaa',
+              }}>{m}</button>
+          ))}
+        </div>
       </div>
 
       {/* 상단 중앙 안내 메시지 */}
@@ -1038,28 +1162,36 @@ export default function Interior3DStep() {
         position: 'absolute', bottom: '24px', right: '24px', zIndex: 10,
         display: 'flex', flexDirection: 'column', gap: '8px',
       }}>
-        <button
-          onClick={() => setPlacedMeshes({})}
-          style={{
-            padding: '10px 16px',
-            background: 'rgba(30,30,30,0.85)', backdropFilter: 'blur(8px)',
-            color: '#ddd', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '10px', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
-          }}
-        >
-          🗑️ 배치 초기화
-        </button>
-        <button
-          onClick={reset}
-          style={{
-            padding: '10px 16px',
-            background: 'rgba(231,76,60,0.85)', backdropFilter: 'blur(8px)',
-            color: 'white', border: 'none',
-            borderRadius: '10px', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
-          }}
-        >
-          🔄 처음부터
-        </button>
+        {/* Undo / Redo */}
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button onClick={undo} disabled={!canUndo} style={{
+            flex: 1, padding: '10px 12px', borderRadius: '10px', border: 'none',
+            background: canUndo ? 'rgba(52,152,219,0.85)' : 'rgba(30,30,30,0.5)',
+            backdropFilter: 'blur(8px)', color: 'white', fontWeight: 700, fontSize: '13px',
+            cursor: canUndo ? 'pointer' : 'not-allowed',
+          }}>↩ 취소</button>
+          <button onClick={redo} disabled={!canRedo} style={{
+            flex: 1, padding: '10px 12px', borderRadius: '10px', border: 'none',
+            background: canRedo ? 'rgba(52,152,219,0.85)' : 'rgba(30,30,30,0.5)',
+            backdropFilter: 'blur(8px)', color: 'white', fontWeight: 700, fontSize: '13px',
+            cursor: canRedo ? 'pointer' : 'not-allowed',
+          }}>↪ 다시</button>
+        </div>
+        <button onClick={handleSave} style={{
+          padding: '10px 16px', background: 'rgba(39,174,96,0.85)', backdropFilter: 'blur(8px)',
+          color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer',
+          fontSize: '12px', fontWeight: 600,
+        }}>💾 디자인 저장</button>
+        <button onClick={() => setPlacedMeshes({})} style={{
+          padding: '10px 16px', background: 'rgba(30,30,30,0.85)', backdropFilter: 'blur(8px)',
+          color: '#ddd', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '10px', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+        }}>🗑️ 배치 초기화</button>
+        <button onClick={reset} style={{
+          padding: '10px 16px', background: 'rgba(231,76,60,0.85)', backdropFilter: 'blur(8px)',
+          color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer',
+          fontSize: '12px', fontWeight: 600,
+        }}>🔄 처음부터</button>
       </div>
 
     </div>

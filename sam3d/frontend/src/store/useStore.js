@@ -32,6 +32,10 @@ export const useStore = create((set) => ({
   loading: false,
   loadingMsg: '',
   setLoading: (loading, msg = '') => set({ loading, loadingMsg: msg }),
+  // 저장된 디자인 불러오기용
+  savedDesignToLoad: null,
+  setSavedDesignToLoad: (design) => set({ savedDesignToLoad: design }),
+  clearSavedDesignToLoad: () => set({ savedDesignToLoad: null }),
   reset: () => set({
     step: 'upload',
     originalFile: null,
