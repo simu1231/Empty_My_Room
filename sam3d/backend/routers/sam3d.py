@@ -128,15 +128,45 @@ async def generate_mesh(
         config.workspace_dir      = WORKSPACE_DIR
         config.ss_inference_steps   = 50  # 초기 3D 포인트 밀도
         config.slat_inference_steps = 75  # 3D 잠재 구조 정확도
-        config.slat_cfg_strength    = 5   # YAML이 1로 낮춰놓은 것을 기본값(5)으로 복원
+        config.slat_cfg_strength    = 1   # YAML 기본값
         pipeline = instantiate(config)
         if CACHE_SAM3D_PIPELINE:
             request.app.state.sam3d_pipeline = pipeline
             print("SAM3D 파이프라인 캐시 완료!")
 
     try:
+        import random
+
+        NUM_STAGE1_TRIES = 10
+
+        # Stage 1만 빠르게 여러 번 → 가장 입체적인 seed 선택
+        best_seed = None
+        best_stage1_score = -1.0
+
+        for attempt in range(NUM_STAGE1_TRIES):
+            seed = random.randint(0, 2**31)
+            r1 = pipeline.run(
+                rgb, mask, seed=seed,
+                stage1_only=True,
+                with_mesh_postprocess=False,
+                with_texture_baking=False,
+                with_layout_postprocess=False,
+                use_vertex_color=True,
+                pointmap=None,
+            )
+            voxel = r1['voxel'].cpu().numpy()  # (N, 3) 정규화된 복셀 좌표
+            ranges = voxel.max(axis=0) - voxel.min(axis=0)
+            score = float(ranges.min())
+            print(f"[Stage1 시도 {attempt+1}/{NUM_STAGE1_TRIES}] seed={seed} score={score:.4f}")
+            if score > best_stage1_score:
+                best_stage1_score = score
+                best_seed = seed
+
+        print(f"[최적 seed 선택] seed={best_seed} score={best_stage1_score:.4f}")
+
+        # 최적 seed로 full 파이프라인 실행
         result = pipeline.run(
-            rgb, mask, seed=123,
+            rgb, mask, seed=best_seed,
             stage1_only=False,
             with_mesh_postprocess=False,
             with_texture_baking=False,

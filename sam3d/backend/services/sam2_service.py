@@ -48,8 +48,8 @@ class SAM2Service:
 
             # 친구 코드 셀 4 dilate 그대로
             mask_np = (best_mask * 255).astype(np.uint8)
-            kernel  = np.ones((40, 40), np.uint8)
-            mask_np = cv2.dilate(mask_np, kernel, iterations=2)
+            kernel  = np.ones((15, 15), np.uint8)
+            mask_np = cv2.dilate(mask_np, kernel, iterations=1)
 
             # 마스크 합치기
             combined_mask = np.maximum(combined_mask, mask_np)

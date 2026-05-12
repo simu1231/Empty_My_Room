@@ -953,9 +953,8 @@ export default function Interior3DStep() {
   }
 
   const generate3DMesh = async (furniture) => {
-    // 창문·조명·액자는 SAM3D로 생성해도 유리/투명부분이 안 나옴 → 기본 모델 자동 사용
-    const isWall = [...WALL_ITEM_NAMES].some(k => (furniture.name || '').includes(k))
-    if (isWall) {
+    // 창문만 자동 기본 모델 (유리는 SAM3D로 표현 불가)
+    if ((furniture.name || '').includes('창문')) {
       const def = findProceduralDef(furniture.name)
       if (def) { useProceduralMesh(furniture); return }
     }
