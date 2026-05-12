@@ -19,42 +19,51 @@ function MiniMeshViewer({ data }) {
     renderer.setSize(width, height)
     el.appendChild(renderer.domElement)
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.8))
-    const dir = new THREE.DirectionalLight(0xffffff, 1.0)
-    dir.position.set(5, 10, 5)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+    const dir = new THREE.DirectionalLight(0xffffff, 0.6)
+    dir.position.set(4, 8, 5)
     scene.add(dir)
 
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices, 3))
-    geometry.setIndex(new THREE.BufferAttribute(data.faces, 1))
-
-    let material
-    if (data.type === 'textured') {
-      geometry.setAttribute('uv', new THREE.BufferAttribute(data.uvs, 2))
-      const texture = new THREE.TextureLoader().load(`data:image/jpeg;base64,${data.textureB64}`)
-      texture.flipY = true
-      material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
+    let group
+    if (data.type === 'procedural') {
+      group = buildProceduralGroup(THREE, data)
+      scene.add(group)
+      const box = new THREE.Box3().setFromObject(group)
+      const sz = box.getSize(new THREE.Vector3())
+      const maxDim = Math.max(sz.x, sz.y, sz.z)
+      camera.position.set(0, maxDim * 0.5, maxDim * 1.8)
+      camera.lookAt(0, 0, 0)
     } else {
-      geometry.setAttribute('color', new THREE.BufferAttribute(data.colors, 3))
-      material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 1.0, metalness: 0.0 })
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices, 3))
+      geometry.setIndex(new THREE.BufferAttribute(data.faces, 1))
+
+      let material
+      if (data.type === 'textured') {
+        geometry.setAttribute('uv', new THREE.BufferAttribute(data.uvs, 2))
+        const texture = new THREE.TextureLoader().load(`data:image/jpeg;base64,${data.textureB64}`)
+        texture.flipY = true
+        material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
+      } else {
+        geometry.setAttribute('color', new THREE.BufferAttribute(data.colors, 3))
+        material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.0 })
+      }
+
+      geometry.computeVertexNormals()
+      geometry.center()
+      geometry.computeBoundingBox()
+      const size = new THREE.Vector3()
+      geometry.boundingBox.getSize(size)
+      const maxDim = Math.max(size.x, size.y, size.z)
+      camera.position.set(0, maxDim * 0.5, maxDim * 1.5)
+      camera.lookAt(0, 0, 0)
+
+      const mesh = new THREE.Mesh(geometry, material)
+      if (data.type !== 'textured') mesh.rotation.x = -Math.PI / 2
+      group = new THREE.Group()
+      group.add(mesh)
+      scene.add(group)
     }
-
-    geometry.computeVertexNormals()
-    geometry.center()
-
-    geometry.computeBoundingBox()
-    const size = new THREE.Vector3()
-    geometry.boundingBox.getSize(size)
-    const maxDim = Math.max(size.x, size.y, size.z)
-    camera.position.set(0, maxDim * 0.5, maxDim * 1.5)
-    camera.lookAt(0, 0, 0)
-
-    const group = new THREE.Group()
-    const mesh = new THREE.Mesh(geometry, material)
-    // textured 메쉬는 to_glb 내부에서 z-up→y-up 변환이 이미 적용됨 → 추가 회전 불필요
-    if (data.type !== 'textured') mesh.rotation.x = -Math.PI / 2
-    group.add(mesh)
-    scene.add(group)
 
     let animId
     let angle = 0
@@ -116,6 +125,9 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
   const placedGroupsRef = useRef({})
   const selectedObjRef = useRef(null)
   const floorRef = useRef(null)
+  const backWallRef = useRef(null)
+  const leftWallRef = useRef(null)
+  const rightWallRef = useRef(null)
   const [contextMenu, setContextMenu] = useState(null)
   // contextMenu: { screenX, screenY, instanceId }
 
@@ -145,7 +157,10 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     el.appendChild(renderer.domElement)
     const raycaster = new THREE.Raycaster()
 
-    scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+    scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+    const sunLight = new THREE.DirectionalLight(0xfff8f0, 0.5)
+    sunLight.position.set(5, 10, 8)
+    scene.add(sunLight)
 
     const w = roomSize.width
     const h = roomSize.height
@@ -173,17 +188,23 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
 })
     const backWall = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMaterial)
     backWall.position.z = -d / 2
+    backWall.name = 'wall_back'
     scene.add(backWall)
+    backWallRef.current = backWall
 
     const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(d, h), wallMaterial)
     leftWall.rotation.y = Math.PI / 2
     leftWall.position.x = -w / 2
+    leftWall.name = 'wall_left'
     scene.add(leftWall)
+    leftWallRef.current = leftWall
 
     const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(d, h), wallMaterial)
     rightWall.rotation.y = -Math.PI / 2
     rightWall.position.x = w / 2
+    rightWall.name = 'wall_right'
     scene.add(rightWall)
+    rightWallRef.current = rightWall
 
     const ceiling = new THREE.Mesh(
       new THREE.PlaneGeometry(w, d),
@@ -234,6 +255,25 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
   if (isDraggingFurniture && selectedObjRef.current) {
     const mouse = getMousePos(e)
     raycaster.setFromCamera(mouse, camera)
+
+    // 벽 아이템: 해당 벽면에서만 이동
+    if (selectedObjRef.current.userData.isWallItem) {
+      const wn = selectedObjRef.current.userData.wallNormal
+      const wallMesh = wn === 'back' ? backWallRef.current
+        : wn === 'left'  ? leftWallRef.current
+        : rightWallRef.current
+      if (wallMesh) {
+        const hits = raycaster.intersectObject(wallMesh)
+        if (hits.length > 0) {
+          const pt = hits[0].point
+          if (wn === 'back')        { selectedObjRef.current.position.x = pt.x; selectedObjRef.current.position.y = pt.y }
+          else if (wn === 'left')   { selectedObjRef.current.position.z = pt.z; selectedObjRef.current.position.y = pt.y }
+          else if (wn === 'right')  { selectedObjRef.current.position.z = pt.z; selectedObjRef.current.position.y = pt.y }
+        }
+      }
+      return
+    }
+
     const intersects = raycaster.intersectObject(floorRef.current)
     if (intersects.length > 0) {
       const halfFX = selectedObjRef.current.userData.halfFX || selectedObjRef.current.userData.halfSize || 0.5
@@ -330,80 +370,107 @@ useEffect(() => {
   Object.entries(placedMeshes).forEach(([instanceId, { data, position, estimatedRealSize }]) => {
     if (placedGroupsRef.current[instanceId]) return
 
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices, 3))
-    geometry.setIndex(new THREE.BufferAttribute(data.faces, 1))
+    let group
 
-    let material
-    if (data.type === 'textured') {
-      geometry.setAttribute('uv', new THREE.BufferAttribute(data.uvs, 2))
-      const texture = new THREE.TextureLoader().load(`data:image/jpeg;base64,${data.textureB64}`)
-      texture.flipY = true
-      material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
+    if (data.type === 'procedural') {
+      group = buildProceduralGroup(THREE, data)
+      if (position.wallNormal) {
+        // 벽 부착
+        const wn = position.wallNormal
+        const wallOffset = 0.04
+        group.position.set(
+          wn === 'left'  ? -roomSize.width / 2 + wallOffset
+            : wn === 'right' ? roomSize.width / 2 - wallOffset : position.x,
+          position.y,
+          wn === 'back'  ? -roomSize.depth / 2 + wallOffset : position.z
+        )
+        group.rotation.y = wn === 'left' ? Math.PI / 2 : wn === 'right' ? -Math.PI / 2 : 0
+        group.userData.isWallItem = true
+        group.userData.wallNormal = wn
+        group.userData.halfSize = 0
+      } else {
+        group.position.set(position.x, -roomSize.height / 2 + data.halfH, position.z)
+        group.userData.halfSize = data.halfH
+      }
+      group.userData.halfFX = data.halfFX
+      group.userData.halfFZ = data.halfFZ
     } else {
-      geometry.setAttribute('color', new THREE.BufferAttribute(data.colors, 3))
-      material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 1.0, metalness: 0.0 })
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices, 3))
+      geometry.setIndex(new THREE.BufferAttribute(data.faces, 1))
+
+      let material
+      if (data.type === 'textured') {
+        geometry.setAttribute('uv', new THREE.BufferAttribute(data.uvs, 2))
+        const texture = new THREE.TextureLoader().load(`data:image/jpeg;base64,${data.textureB64}`)
+        texture.flipY = true
+        material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
+      } else {
+        geometry.setAttribute('color', new THREE.BufferAttribute(data.colors, 3))
+        material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.0 })
+      }
+
+      geometry.computeVertexNormals()
+      geometry.center()
+      geometry.computeBoundingBox()
+      const size = new THREE.Vector3()
+      geometry.boundingBox.getSize(size)
+      const maxDim = Math.max(size.x, size.y, size.z)
+
+      const std = findStdSize(data.name)
+      let scaleX, scaleY, scaleZ, scaledHalfHeight
+
+      if (std && data.type !== 'textured') {
+        scaleX = size.x > 0 ? std.w / size.x : 1
+        scaleY = size.y > 0 ? std.d / size.y : 1
+        scaleZ = size.z > 0 ? std.h / size.z : 1
+        scaledHalfHeight = std.h / 2
+      } else if (std && data.type === 'textured') {
+        scaleX = size.x > 0 ? std.w / size.x : 1
+        scaleY = size.y > 0 ? std.h / size.y : 1
+        scaleZ = size.z > 0 ? std.d / size.z : 1
+        scaledHalfHeight = std.h / 2
+      } else {
+        const targetSize = estimatedRealSize || roomSize.width * 0.2
+        const s = targetSize / maxDim
+        scaleX = s; scaleY = s; scaleZ = s
+        scaledHalfHeight = data.type === 'textured' ? (size.y * s) / 2 : (size.z * s) / 2
+      }
+
+      const mesh = new THREE.Mesh(geometry, material)
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+      if (data.type !== 'textured') mesh.rotation.x = -Math.PI / 2
+      mesh.scale.set(scaleX, scaleY, scaleZ)
+
+      const halfFX = (size.x * scaleX) / 2
+      const halfFZ = data.type !== 'textured' ? (size.y * scaleY) / 2 : (size.z * scaleZ) / 2
+
+      group = new THREE.Group()
+      group.add(mesh)
+
+      if (position.wallNormal) {
+        const wn = position.wallNormal
+        const wallOffset = 0.04
+        group.position.set(
+          wn === 'left'  ? -roomSize.width / 2 + wallOffset
+            : wn === 'right' ? roomSize.width / 2 - wallOffset : position.x,
+          position.y,
+          wn === 'back'  ? -roomSize.depth / 2 + wallOffset : position.z
+        )
+        group.rotation.y = wn === 'left' ? Math.PI / 2 : wn === 'right' ? -Math.PI / 2 : 0
+        group.userData.isWallItem = true
+        group.userData.wallNormal = wn
+        group.userData.halfSize = 0
+      } else {
+        group.position.set(position.x, -roomSize.height / 2 + scaledHalfHeight, position.z)
+        group.userData.halfSize = scaledHalfHeight
+      }
+      group.userData.halfFX = halfFX
+      group.userData.halfFZ = halfFZ
+
     }
 
-    geometry.computeVertexNormals()
-    geometry.center()
-
-    geometry.computeBoundingBox()
-    const size = new THREE.Vector3()
-    geometry.boundingBox.getSize(size)
-    const maxDim = Math.max(size.x, size.y, size.z)
-
-    // 가구 이름으로 표준 크기 검색 → 비표준이면 픽셀 기반 uniform scale fallback
-    const std = findStdSize(data.name)
-    let scaleX, scaleY, scaleZ, scaledHalfHeight
-
-    if (std && data.type !== 'textured') {
-      // vertex_color: rotation.x = -PI/2 적용 후
-      //   local X → world X (폭)
-      //   local Y → world Z (깊이)
-      //   local Z → world Y (높이)
-      scaleX = size.x > 0 ? std.w / size.x : 1
-      scaleY = size.y > 0 ? std.d / size.y : 1
-      scaleZ = size.z > 0 ? std.h / size.z : 1
-      scaledHalfHeight = std.h / 2
-    } else if (std && data.type === 'textured') {
-      // textured: 이미 y-up (local X→worldX, local Y→worldY, local Z→worldZ)
-      scaleX = size.x > 0 ? std.w / size.x : 1
-      scaleY = size.y > 0 ? std.h / size.y : 1
-      scaleZ = size.z > 0 ? std.d / size.z : 1
-      scaledHalfHeight = std.h / 2
-    } else {
-      // fallback: 픽셀 크기 기반 uniform scale
-      const targetSize = estimatedRealSize || roomSize.width * 0.2
-      const s = targetSize / maxDim
-      scaleX = s; scaleY = s; scaleZ = s
-      scaledHalfHeight = data.type === 'textured'
-        ? (size.y * s) / 2
-        : (size.z * s) / 2
-    }
-
-    const mesh = new THREE.Mesh(geometry, material)
-    mesh.castShadow = true
-    mesh.receiveShadow = true
-    if (data.type !== 'textured') mesh.rotation.x = -Math.PI / 2
-    mesh.scale.set(scaleX, scaleY, scaleZ)
-
-    // 벽 충돌용 발자국: X축(폭)과 Z축(깊이)을 따로 저장
-    // vertex_color: local.x→worldX, local.y→worldZ(rotation 후)
-    // textured: local.x→worldX, local.z→worldZ
-    const halfFX = data.type !== 'textured'
-      ? (size.x * scaleX) / 2
-      : (size.x * scaleX) / 2
-    const halfFZ = data.type !== 'textured'
-      ? (size.y * scaleY) / 2   // local.y → world Z
-      : (size.z * scaleZ) / 2   // local.z → world Z
-
-    const group = new THREE.Group()
-    group.add(mesh)
-    group.position.set(position.x, -roomSize.height / 2 + scaledHalfHeight, position.z)
-    group.userData.halfSize = scaledHalfHeight
-    group.userData.halfFX = halfFX
-    group.userData.halfFZ = halfFZ
     sceneRef.current.add(group)
     placedGroupsRef.current[instanceId] = group
   })
@@ -414,16 +481,29 @@ useEffect(() => {
   const handleDrop = (e) => {
     e.preventDefault()
     const furnitureId = Number(e.dataTransfer.getData('furnitureId'))
+    const furnitureName = e.dataTransfer.getData('furnitureName') || ''
+    const isWallItem = [...WALL_ITEM_NAMES].some(k => furnitureName.includes(k))
     const THREE = window.THREE
     const raycaster = new THREE.Raycaster()
     const rect = mountRef.current.getBoundingClientRect()
-    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1
-    const y = -((e.clientY - rect.top) / rect.height) * 2 + 1
-    if (cameraRef.current && floorRef.current) {
-      raycaster.setFromCamera({ x, y }, cameraRef.current)
-      const intersects = raycaster.intersectObject(floorRef.current)
-      if (intersects.length > 0) {
-        onDrop(furnitureId, { x: intersects[0].point.x, z: intersects[0].point.z })
+    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1
+    const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1
+    if (!cameraRef.current) return
+    raycaster.setFromCamera({ x: nx, y: ny }, cameraRef.current)
+
+    if (isWallItem) {
+      const walls = [backWallRef.current, leftWallRef.current, rightWallRef.current].filter(Boolean)
+      const hits = raycaster.intersectObjects(walls)
+      if (hits.length > 0) {
+        const hit = hits[0]
+        const name = hit.object.name  // 'wall_back' | 'wall_left' | 'wall_right'
+        const wallNormal = name === 'wall_back' ? 'back' : name === 'wall_left' ? 'left' : 'right'
+        onDrop(furnitureId, { x: hit.point.x, y: hit.point.y, z: hit.point.z, wallNormal })
+      }
+    } else if (floorRef.current) {
+      const hits = raycaster.intersectObject(floorRef.current)
+      if (hits.length > 0) {
+        onDrop(furnitureId, { x: hits[0].point.x, z: hits[0].point.z })
       }
     }
   }
@@ -463,7 +543,10 @@ useEffect(() => {
       group.userData.halfSize = newHs
       group.userData.halfFX = (group.userData.halfFX || newHs) * factor
       group.userData.halfFZ = (group.userData.halfFZ || newHs) * factor
-      group.position.y = -roomSize.height / 2 + newHs
+      // 벽 아이템은 벽에서 떨어지지 않게 y 보정 안 함
+      if (!group.userData.isWallItem) {
+        group.position.y = -roomSize.height / 2 + newHs
+      }
     }
   }
 
@@ -542,6 +625,153 @@ function findStdSize(name) {
   return null
 }
 
+// 가구별 프로시저 모델 정의 (y=0이 바닥 기준, halfH만큼 내려서 중심으로 맞춤)
+const PROCEDURAL_FURNITURE = {
+  '의자': { w:0.5, d:0.5, h:0.9, parts:[
+    { size:[0.45,0.05,0.45], pos:[0,0.45,0],    c:[0.85,0.76,0.62] },
+    { size:[0.44,0.48,0.05], pos:[0,0.68,-0.2], c:[0.85,0.76,0.62] },
+    { size:[0.04,0.44,0.04], pos:[-0.19,0.22, 0.18], c:[0.68,0.58,0.44] },
+    { size:[0.04,0.44,0.04], pos:[ 0.19,0.22, 0.18], c:[0.68,0.58,0.44] },
+    { size:[0.04,0.44,0.04], pos:[-0.19,0.22,-0.18], c:[0.68,0.58,0.44] },
+    { size:[0.04,0.44,0.04], pos:[ 0.19,0.22,-0.18], c:[0.68,0.58,0.44] },
+  ]},
+  '침대': { w:1.6, d:2.0, h:0.55, parts:[
+    { size:[1.60,0.24,2.00], pos:[0,0.12, 0],        c:[0.58,0.48,0.38] }, // 프레임
+    { size:[1.50,0.20,1.85], pos:[0,0.34, 0.05],     c:[0.96,0.94,0.91] }, // 매트리스
+    { size:[1.60,0.52,0.09], pos:[0,0.40,-0.955],    c:[0.52,0.42,0.32] }, // 헤드보드
+    { shape:'pillow', size:[0.58,0.12,0.36], pos:[-0.34,0.47,-0.68], c:[0.97,0.96,0.94] }, // 베개 L
+    { shape:'pillow', size:[0.58,0.12,0.36], pos:[ 0.34,0.47,-0.68], c:[0.97,0.96,0.94] }, // 베개 R
+    { size:[1.48,0.11,1.15], pos:[0,0.43, 0.38],     c:[0.72,0.78,0.90] }, // 이불
+    { size:[1.46,0.06,0.30], pos:[0,0.50, 0.93],     c:[0.80,0.85,0.96] }, // 이불 접힌 부분
+  ]},
+  '소파': { w:2.0, d:0.9, h:0.85, parts:[
+    { size:[2.00,0.34,0.85], pos:[0,0.17, 0],     c:[0.40,0.36,0.52] },
+    { size:[2.00,0.20,0.70], pos:[0,0.44, 0.06],  c:[0.54,0.48,0.66] },
+    { size:[2.00,0.50,0.14], pos:[0,0.59,-0.38],  c:[0.46,0.41,0.58] },
+    { size:[0.15,0.50,0.85], pos:[-0.93,0.54, 0], c:[0.40,0.36,0.52] },
+    { size:[0.15,0.50,0.85], pos:[ 0.93,0.54, 0], c:[0.40,0.36,0.52] },
+  ]},
+  '옷장': { w:1.2, d:0.6, h:2.0, parts:[
+    { size:[1.18,1.96,0.56], pos:[0,0.98, 0],    c:[0.84,0.81,0.74] },
+    { size:[0.57,1.86,0.03], pos:[-0.29,0.95, 0.29], c:[0.91,0.88,0.82] },
+    { size:[0.57,1.86,0.03], pos:[ 0.29,0.95, 0.29], c:[0.91,0.88,0.82] },
+    { size:[1.20,0.04,0.60], pos:[0,1.98, 0],    c:[0.72,0.69,0.62] },
+    { size:[0.02,0.04,0.02], pos:[-0.08,0.95,0.32], c:[0.55,0.45,0.35] },
+    { size:[0.02,0.04,0.02], pos:[ 0.08,0.95,0.32], c:[0.55,0.45,0.35] },
+  ]},
+  '서랍장': { w:0.8, d:0.5, h:1.0, parts:[
+    { size:[0.78,0.96,0.48], pos:[0,0.48, 0],    c:[0.84,0.81,0.74] },
+    { size:[0.72,0.22,0.42], pos:[0,0.12,0.25],  c:[0.91,0.88,0.82] },
+    { size:[0.72,0.22,0.42], pos:[0,0.37,0.25],  c:[0.91,0.88,0.82] },
+    { size:[0.72,0.22,0.42], pos:[0,0.62,0.25],  c:[0.91,0.88,0.82] },
+    { size:[0.80,0.03,0.50], pos:[0,0.995,0],    c:[0.72,0.69,0.62] },
+    { size:[0.04,0.02,0.02], pos:[0,0.12,0.47],  c:[0.55,0.45,0.35] },
+    { size:[0.04,0.02,0.02], pos:[0,0.37,0.47],  c:[0.55,0.45,0.35] },
+    { size:[0.04,0.02,0.02], pos:[0,0.62,0.47],  c:[0.55,0.45,0.35] },
+  ]},
+  '책상': { w:1.2, d:0.6, h:0.75, parts:[
+    { size:[1.20,0.04,0.60], pos:[0,0.74, 0],    c:[0.72,0.62,0.48] },
+    { size:[0.04,0.72,0.04], pos:[-0.57,0.36, 0.27], c:[0.62,0.52,0.40] },
+    { size:[0.04,0.72,0.04], pos:[ 0.57,0.36, 0.27], c:[0.62,0.52,0.40] },
+    { size:[0.04,0.72,0.04], pos:[-0.57,0.36,-0.27], c:[0.62,0.52,0.40] },
+    { size:[0.04,0.72,0.04], pos:[ 0.57,0.36,-0.27], c:[0.62,0.52,0.40] },
+  ]},
+  '협탁': { w:0.5, d:0.4, h:0.6, parts:[
+    { size:[0.48,0.56,0.38], pos:[0,0.28, 0],    c:[0.84,0.81,0.74] },
+    { size:[0.42,0.24,0.32], pos:[0,0.15,0.20],  c:[0.91,0.88,0.82] },
+    { size:[0.50,0.03,0.40], pos:[0,0.595,0],    c:[0.72,0.69,0.62] },
+    { size:[0.03,0.02,0.02], pos:[0,0.15,0.38],  c:[0.55,0.45,0.35] },
+  ]},
+  '책장': { w:0.9, d:0.3, h:1.8, parts:[
+    { size:[0.88,1.76,0.28], pos:[0,0.88, 0],    c:[0.84,0.81,0.74] },
+    { size:[0.84,0.02,0.26], pos:[0,0.36, 0],    c:[0.91,0.88,0.82] },
+    { size:[0.84,0.02,0.26], pos:[0,0.72, 0],    c:[0.91,0.88,0.82] },
+    { size:[0.84,0.02,0.26], pos:[0,1.08, 0],    c:[0.91,0.88,0.82] },
+    { size:[0.84,0.02,0.26], pos:[0,1.44, 0],    c:[0.91,0.88,0.82] },
+    { size:[0.90,0.03,0.30], pos:[0,1.795,0],    c:[0.72,0.69,0.62] },
+  ]},
+  // 벽 부착 아이템 (parts y=0이 아이템 중심, wallItem: true)
+  // 창문: 프레임 5개 + 반투명 유리 2장 + 외부 스카이 힌트
+  '창문': { w:1.2, d:0.10, h:1.0, wallItem:true, parts:[
+    // ── 프레임 (불투명) ──
+    { size:[1.20,0.07,0.10], pos:[0, 0.465,0],  c:[0.90,0.90,0.90] }, // 상단 레일
+    { size:[1.20,0.07,0.10], pos:[0,-0.465,0],  c:[0.90,0.90,0.90] }, // 하단 레일
+    { size:[0.07,0.86,0.10], pos:[-0.565,0,0],  c:[0.90,0.90,0.90] }, // 좌측 기둥
+    { size:[0.07,0.86,0.10], pos:[ 0.565,0,0],  c:[0.90,0.90,0.90] }, // 우측 기둥
+    { size:[0.05,0.86,0.08], pos:[0,0,0],       c:[0.90,0.90,0.90] }, // 중간 멀리언
+    // ── 유리 (반투명 하늘색, 빛 방출로 외부 느낌) ──
+    { size:[0.47,0.84,0.01], pos:[-0.28,0,0.01], c:[0.72,0.88,0.97], transparent:true, opacity:0.30, emissive:[0.35,0.55,0.75], emissiveIntensity:0.25 },
+    { size:[0.47,0.84,0.01], pos:[ 0.28,0,0.01], c:[0.72,0.88,0.97], transparent:true, opacity:0.30, emissive:[0.35,0.55,0.75], emissiveIntensity:0.25 },
+    // ── 창틀 내측 깊이 (어두운 박스로 두께감) ──
+    { size:[1.06,0.86,0.02], pos:[0,0,-0.04],   c:[0.20,0.20,0.20] },
+  ]},
+  '액자': { w:0.8, d:0.06, h:0.6, wallItem:true, parts:[
+    { size:[0.80,0.60,0.06], pos:[0,0,0],     c:[0.35,0.26,0.18] },  // 바깥 틀
+    { size:[0.68,0.48,0.01], pos:[0,0,0.032], c:[0.92,0.86,0.74] },  // 그림 (따뜻한 크림)
+    { size:[0.04,0.48,0.04], pos:[-0.32,0,0.015], c:[0.30,0.22,0.14] }, // 내측 좌
+    { size:[0.04,0.48,0.04], pos:[ 0.32,0,0.015], c:[0.30,0.22,0.14] }, // 내측 우
+    { size:[0.72,0.04,0.04], pos:[0, 0.28,0.015], c:[0.30,0.22,0.14] }, // 내측 상
+    { size:[0.72,0.04,0.04], pos:[0,-0.28,0.015], c:[0.30,0.22,0.14] }, // 내측 하
+  ]},
+  '조명': { w:0.35, d:0.20, h:0.35, wallItem:true, parts:[
+    { size:[0.12,0.18,0.10], pos:[0, 0.10,-0.04], c:[0.75,0.72,0.65] }, // 브래킷
+    { size:[0.30,0.22,0.22], pos:[0,-0.02, 0.06], c:[0.95,0.92,0.85] }, // 갓
+    { size:[0.08,0.08,0.06], pos:[0,-0.02, 0.05], c:[1.0, 0.98,0.85]  }, // 전구
+  ]},
+}
+
+function findProceduralDef(name) {
+  if (!name) return null
+  if (PROCEDURAL_FURNITURE[name]) return PROCEDURAL_FURNITURE[name]
+  const sorted = Object.entries(PROCEDURAL_FURNITURE).sort((a, b) => b[0].length - a[0].length)
+  for (const [key, val] of sorted) {
+    if (name.includes(key)) return val
+  }
+  return null
+}
+
+// wallItem: parts y=0이 이미 중심 → halfH 보정 없음
+// 일반 가구: parts y=0이 바닥 → halfH만큼 내려서 중심 맞춤
+function buildProceduralGroup(THREE, data) {
+  const group = new THREE.Group()
+  const yOffset = data.wallItem ? 0 : -data.halfH
+  data.parts.forEach(p => {
+    // pillow: 구체를 눌러서 부드러운 베개 모양
+    const geo = p.shape === 'pillow'
+      ? new THREE.SphereGeometry(0.5, 24, 14)
+      : new THREE.BoxGeometry(...p.size)
+    let mat
+    if (p.transparent) {
+      // 유리 등 반투명 재질
+      mat = new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color(...p.c),
+        transparent: true,
+        opacity: p.opacity ?? 0.3,
+        roughness: 0.0,
+        metalness: 0.0,
+        emissive: p.emissive ? new THREE.Color(...p.emissive) : new THREE.Color(0, 0, 0),
+        emissiveIntensity: p.emissiveIntensity ?? 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    } else {
+      mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(...p.c),
+        roughness: 0.42,
+        metalness: 0.02,
+      })
+    }
+    const mesh = new THREE.Mesh(geo, mat)
+    mesh.position.set(p.pos[0], p.pos[1] + yOffset, p.pos[2])
+    if (p.shape === 'pillow') mesh.scale.set(p.size[0], p.size[1], p.size[2])
+    group.add(mesh)
+  })
+  return group
+}
+
+// 벽에 붙이는 아이템 이름 목록
+const WALL_ITEM_NAMES = new Set(['창문', '액자', '조명', '그림', '거울'])
+
 // b64 이미지에서 픽셀 크기를 비동기로 읽어옴
 function getImageSize(b64) {
   return new Promise(resolve => {
@@ -596,7 +826,28 @@ export default function Interior3DStep() {
   }
 
 
+  const useProceduralMesh = (furniture) => {
+    const def = findProceduralDef(furniture.name)
+    if (!def) { toast.error(`"${furniture.name}"의 기본 모델이 없습니다.`); return }
+    const processed = {
+      type: 'procedural',
+      name: furniture.name,
+      parts: def.parts,
+      halfH:  def.h / 2,
+      halfFX: def.w / 2,
+      halfFZ: def.d / 2,
+    }
+    setFurnitureMeshes(prev => ({ ...prev, [furniture.id]: processed }))
+    toast.success(`"${furniture.name}" 기본 모델 적용! 드래그해서 배치하세요`)
+  }
+
   const generate3DMesh = async (furniture) => {
+    // 창문·조명·액자는 SAM3D로 생성해도 유리/투명부분이 안 나옴 → 기본 모델 자동 사용
+    const isWall = [...WALL_ITEM_NAMES].some(k => (furniture.name || '').includes(k))
+    if (isWall) {
+      const def = findProceduralDef(furniture.name)
+      if (def) { useProceduralMesh(furniture); return }
+    }
     setGenerating(true)
     setGeneratingId(furniture.id)
     toast.success('SAM3D로 3D 메쉬 생성 중... (20~30분 소요)')
@@ -723,7 +974,10 @@ export default function Interior3DStep() {
               key={i}
               draggable={!!furnitureMeshes[f.id]}
               onDragStart={(e) => {
-                if (furnitureMeshes[f.id]) e.dataTransfer.setData('furnitureId', String(f.id))
+                if (furnitureMeshes[f.id]) {
+                  e.dataTransfer.setData('furnitureId', String(f.id))
+                  e.dataTransfer.setData('furnitureName', f.name || '')
+                }
               }}
               style={{
                 background: 'rgba(255,255,255,0.05)',
@@ -760,6 +1014,20 @@ export default function Interior3DStep() {
               >
                 {generating && generatingId === f.id ? '생성 중...' : furnitureMeshes[f.id] ? '🔄 재생성' : '🔷 3D 변환'}
               </button>
+              {findProceduralDef(f.name) && (
+                <button
+                  onClick={() => useProceduralMesh(f)}
+                  disabled={generating}
+                  style={{
+                    width: '100%', padding: '5px', marginTop: '4px',
+                    background: 'rgba(155,89,182,0.7)', color: 'white',
+                    border: '1px solid rgba(155,89,182,0.9)',
+                    borderRadius: '6px', cursor: 'pointer', fontSize: '10px', fontWeight: 600,
+                  }}
+                >
+                  📐 기본 모델 사용
+                </button>
+              )}
             </div>
           ))}
         </div>

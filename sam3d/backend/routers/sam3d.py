@@ -157,8 +157,9 @@ async def generate_mesh(
                       if mesh.vertex_attrs is not None \
                       else np.full((len(vertices_np), 3), 0.8, dtype=np.float32)
 
-        # 감마 보정으로 그림자 아티팩트 완화
-        colors_np = np.power(np.clip(colors_np, 0, 1), 0.65).astype(np.float32)
+        # 밝기 소폭 부스트 후 가벼운 감마 보정 (낡은 느낌 방지)
+        colors_np = np.clip(colors_np * 1.15, 0, 1)
+        colors_np = np.power(colors_np, 0.85).astype(np.float32)
 
         print(f"[완료] 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")
         vertices_np, faces_np, colors_np = _decimate_mesh(vertices_np, faces_np, colors_np)
