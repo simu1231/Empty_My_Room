@@ -35,8 +35,8 @@ function MiniMeshViewer({ data }) {
       camera.lookAt(0, 0, 0)
     } else {
       const geometry = new THREE.BufferGeometry()
-      geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices, 3))
-      geometry.setIndex(new THREE.BufferAttribute(data.faces, 1))
+      geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices.slice(), 3))
+      geometry.setIndex(new THREE.BufferAttribute(data.faces.slice(), 1))
 
       let material
       if (data.type === 'textured') {
@@ -45,7 +45,7 @@ function MiniMeshViewer({ data }) {
         texture.flipY = true
         material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
       } else {
-        geometry.setAttribute('color', new THREE.BufferAttribute(data.colors, 3))
+        geometry.setAttribute('color', new THREE.BufferAttribute(data.colors.slice(), 3))
         material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.0 })
       }
 
@@ -416,8 +416,8 @@ useEffect(() => {
       group.userData.halfFZ = data.halfFZ
     } else {
       const geometry = new THREE.BufferGeometry()
-      geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices, 3))
-      geometry.setIndex(new THREE.BufferAttribute(data.faces, 1))
+      geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices.slice(), 3))
+      geometry.setIndex(new THREE.BufferAttribute(data.faces.slice(), 1))
 
       let material
       if (data.type === 'textured') {
@@ -426,7 +426,7 @@ useEffect(() => {
         texture.flipY = true
         material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
       } else {
-        geometry.setAttribute('color', new THREE.BufferAttribute(data.colors, 3))
+        geometry.setAttribute('color', new THREE.BufferAttribute(data.colors.slice(), 3))
         material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.0 })
       }
 
@@ -889,8 +889,24 @@ export default function Interior3DStep() {
   // 저장된 디자인 불러오기
   useEffect(() => {
     if (!savedDesignToLoad) return
-    setFurnitureMeshes(savedDesignToLoad.furnitureMeshes)
-    setUndoState({ snapshots: [savedDesignToLoad.placedMeshes], idx: 0 })
+    const meshes = savedDesignToLoad.furnitureMeshes || {}
+    setFurnitureMeshes(meshes)
+    // placedMeshes: furnitureId 참조 방식이면 data 복원, 아니면 그대로 사용
+    const rawPlaced = savedDesignToLoad.placedMeshes || {}
+    const restored = {}
+    Object.entries(rawPlaced).forEach(([instanceId, item]) => {
+      const src = item.data ?? meshes[item.furnitureId] ?? meshes[parseInt(instanceId.split('_')[0])]
+      if (!src) return
+      // 인스턴스별로 데이터 복사 (Three.js BufferAttribute 공유 방지)
+      const data = src.type === 'procedural' ? { ...src } : {
+        ...src,
+        vertices: src.vertices instanceof Float32Array ? src.vertices.slice() : new Float32Array(src.vertices),
+        faces:    src.faces    instanceof Uint32Array  ? src.faces.slice()    : new Uint32Array(src.faces),
+        colors:   src.colors   instanceof Float32Array ? src.colors.slice()   : new Float32Array(src.colors),
+      }
+      restored[instanceId] = { data, position: item.position, estimatedRealSize: item.estimatedRealSize }
+    })
+    setUndoState({ snapshots: [restored], idx: 0 })
     clearSavedDesignToLoad()
   }, [savedDesignToLoad])
 
@@ -900,11 +916,18 @@ export default function Interior3DStep() {
     if (!canvas) { toast.error('뷰어를 찾을 수 없습니다'); return }
     const thumbnail = canvas.toDataURL('image/jpeg', 0.6)
     try {
+      // placedMeshes에서 data(대용량) 제거하고 furnitureId 참조만 저장
+      const placedRefs = {}
+      Object.entries(placedMeshes).forEach(([instanceId, item]) => {
+        const furnitureId = parseInt(instanceId.split('_')[0])
+        placedRefs[instanceId] = { furnitureId, position: item.position, estimatedRealSize: item.estimatedRealSize }
+      })
       await dbSaveDesign({
         timestamp: Date.now(),
         thumbnail,
         furnitureMeshes,
-        placedMeshes,
+        placedMeshes: placedRefs,
+        furnitureList,
       })
       toast.success('디자인 저장 완료! 업로드 화면에서 불러올 수 있습니다')
     } catch (e) {
@@ -958,11 +981,6 @@ export default function Interior3DStep() {
   }
 
   const generate3DMesh = async (furniture) => {
-    // 창문만 자동 기본 모델 (유리는 SAM3D로 표현 불가)
-    if ((furniture.name || '').includes('창문')) {
-      const def = findProceduralDef(furniture.name)
-      if (def) { useProceduralMesh(furniture); return }
-    }
     setGenerating(true)
     setGeneratingId(furniture.id)
     toast.success('SAM3D로 3D 메쉬 생성 중...')
@@ -1196,7 +1214,7 @@ export default function Interior3DStep() {
           padding: '10px 16px', background: 'rgba(231,76,60,0.85)', backdropFilter: 'blur(8px)',
           color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer',
           fontSize: '12px', fontWeight: 600,
-        }}>🔄 처음부터</button>
+        }}>홈으로</button>
       </div>
 
     </div>

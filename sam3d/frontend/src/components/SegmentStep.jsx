@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react'
 import { useStore } from '../store/useStore'
 import toast from 'react-hot-toast'
 
-const FURNITURE_LIST = ['소파', '침대', '책상', '의자', '테이블', '옷장', '서랍장', 'TV', 'TV 거치대', '책장', '창문', '액자', '조명', '기타']
+const FURNITURE_LIST = ['소파', '침대', '책상', '의자', '테이블', '옷장', '서랍장', 'TV', 'TV 거치대', '책장', '창문', '액자', '조명', '화분', '기타']
 
 export default function SegmentStep() {
   const {

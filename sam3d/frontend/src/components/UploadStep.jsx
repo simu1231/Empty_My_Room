@@ -29,7 +29,7 @@ async function dbDeleteDesign(id) {
 }
 
 export default function UploadStep() {
-  const { setOriginalImage, setStep, setSavedDesignToLoad } = useStore()
+  const { setOriginalImage, setStep, setSavedDesignToLoad, setFurnitureList } = useStore()
   const [savedDesigns, setSavedDesigns] = useState([])
 
   useEffect(() => {
@@ -37,6 +37,7 @@ export default function UploadStep() {
   }, [])
 
   const loadDesign = (design) => {
+    if (design.furnitureList) setFurnitureList(design.furnitureList)
     setSavedDesignToLoad({
       furnitureMeshes: design.furnitureMeshes,
       placedMeshes: design.placedMeshes,
