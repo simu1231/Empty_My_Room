@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import orjson
 from PIL import Image
-from fastapi import APIRouter, UploadFile, File, Request, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException
 from fastapi.responses import Response
 
 router = APIRouter()
@@ -82,6 +82,48 @@ def _crop_and_resize(rgb: np.ndarray, mask: np.ndarray):
     return rgb, mask
 
 
+# 납작한 물체 카테고리 → shape prior 적용
+FLAT_CATEGORIES  = {'시계', '액자', '그림', '거울'}
+THIN_CATEGORIES  = {'조명', '꽃', '화분'}
+
+def _make_shape_prior(mask: np.ndarray, category: str, base_z: float = 1.5) -> 'torch.Tensor | None':
+    """마스크 형태 기반 간단한 shape prior pointmap (H, W, 3)."""
+    cat = category.strip()
+    if not any(c in cat for c in FLAT_CATEGORIES | THIN_CATEGORIES):
+        return None
+
+    H, W = mask.shape
+    rows, cols = np.where(mask)
+    if len(rows) == 0:
+        return None
+
+    cy = rows.mean(); cx = cols.mean()
+    half_h = max((rows.max() - rows.min()) / 2, 1)
+    half_w = max((cols.max() - cols.min()) / 2, 1)
+    radius = max(half_h, half_w)
+
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    xn = (xx - cx) / radius   # [-1, 1] 정규화
+    yn = (yy - cy) / radius
+
+    if any(c in cat for c in FLAT_CATEGORIES):
+        # 원/사각형 디스크 → 가장자리가 약간 뒤로
+        r = np.sqrt(xn**2 + yn**2)
+        depth_offset = np.where(mask, 0.08 * (1.0 - np.clip(r, 0, 1)), 0)
+    else:
+        # 조명/꽃/화분 → 원뿔형 (아래쪽이 더 가까이)
+        depth_offset = np.where(mask, 0.12 * np.clip(1.0 - yn * 0.5, 0, 1), 0)
+
+    z = np.where(mask, base_z + depth_offset, np.nan).astype(np.float32)
+    scale = radius / max(H, W)
+    x3d = np.where(mask, xn * z * scale, np.nan).astype(np.float32)
+    y3d = np.where(mask, -yn * z * scale, np.nan).astype(np.float32)
+
+    pointmap = np.stack([x3d, y3d, z], axis=-1)  # (H, W, 3)
+    print(f"[shape prior] category={cat}, base_z={base_z:.2f}")
+    return torch.from_numpy(pointmap)
+
+
 def _decimate_mesh(vertices: np.ndarray, faces: np.ndarray, colors: np.ndarray):
     if len(faces) <= TARGET_FACES:
         return vertices, faces, colors
@@ -101,6 +143,7 @@ def _decimate_mesh(vertices: np.ndarray, faces: np.ndarray, colors: np.ndarray):
 async def generate_mesh(
     request: Request,
     image: UploadFile = File(...),
+    category: str = Form(''),
 ):
     img_bytes = await image.read()
     image_pil = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
@@ -154,9 +197,14 @@ async def generate_mesh(
                 use_vertex_color=True,
                 pointmap=None,
             )
-            voxel = r1['voxel'].cpu().numpy()  # (N, 3) 정규화된 복셀 좌표
-            ranges = voxel.max(axis=0) - voxel.min(axis=0)
-            score = float(ranges.min())
+            voxel = r1['voxel'].cpu().numpy()
+            if any(c in category for c in THIN_CATEGORIES):
+                # 조명/꽃/화분: 복셀 개수 많을수록 더 완전한 구조
+                score = float(len(voxel))
+            else:
+                # 일반 가구 + 시계/액자 등: 세 축 중 가장 얇은 축 크기 (납작함 방지)
+                ranges = voxel.max(axis=0) - voxel.min(axis=0)
+                score = float(ranges.min())
             print(f"[Stage1 시도 {attempt+1}/{NUM_STAGE1_TRIES}] seed={seed} score={score:.4f}")
             if score > best_stage1_score:
                 best_stage1_score = score
@@ -190,6 +238,18 @@ async def generate_mesh(
         # 밝기 소폭 부스트 후 가벼운 감마 보정 (낡은 느낌 방지)
         colors_np = np.clip(colors_np * 1.15, 0, 1)
         colors_np = np.power(colors_np, 0.85).astype(np.float32)
+
+        # 납작한 카테고리 → z축 강제 부풀리기
+        if any(c in category for c in FLAT_CATEGORIES | THIN_CATEGORIES):
+            ranges = vertices_np.max(axis=0) - vertices_np.min(axis=0)
+            min_range = ranges.min()
+            flat_axis = int(ranges.argmin())
+            target = max(ranges.max() * 0.25, 0.05)
+            if min_range < target:
+                center = (vertices_np[:, flat_axis].max() + vertices_np[:, flat_axis].min()) / 2
+                scale_factor = target / max(min_range, 1e-6)
+                vertices_np[:, flat_axis] = center + (vertices_np[:, flat_axis] - center) * scale_factor
+                print(f"[shape inflate] axis={flat_axis}, {min_range:.4f} → {target:.4f}")
 
         print(f"[완료] 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")
         vertices_np, faces_np, colors_np = _decimate_mesh(vertices_np, faces_np, colors_np)

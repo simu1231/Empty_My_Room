@@ -25,7 +25,7 @@ class SAM2Service:
         os.chdir('/home/tmvlem5671')
         print('SAM2 로드 완료!')
 
-    def predict(self, image_np, points):
+    def predict(self, image_np, points, dilation_px=15):
         # 친구 코드 셀 4 그대로
         # 포인트마다 따로 마스크 만들고 합치기
         combined_mask = np.zeros(image_np.shape[:2], dtype=np.uint8)
@@ -48,8 +48,9 @@ class SAM2Service:
 
             # 친구 코드 셀 4 dilate 그대로
             mask_np = (best_mask * 255).astype(np.uint8)
-            kernel  = np.ones((15, 15), np.uint8)
-            mask_np = cv2.dilate(mask_np, kernel, iterations=1)
+            if dilation_px > 0:
+                kernel  = np.ones((dilation_px, dilation_px), np.uint8)
+                mask_np = cv2.dilate(mask_np, kernel, iterations=1)
 
             # 마스크 합치기
             combined_mask = np.maximum(combined_mask, mask_np)

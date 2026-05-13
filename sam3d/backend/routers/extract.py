@@ -70,8 +70,10 @@ async def extract_furniture(
 
         mask_raw = (best_mask * 255).astype(np.uint8)
 
-        # 예진이 코드 - 구멍 메우기
-        close_kernel = np.ones((25, 25), np.uint8)
+        # 얇은/납작한 물체는 작은 커널 사용 (얇은 구조물 보존)
+        THIN_FLAT = {'조명', '시계', '화분', '꽃', '액자', '그림', '거울'}
+        close_size = 5 if any(k in label for k in THIN_FLAT) else 25
+        close_kernel = np.ones((close_size, close_size), np.uint8)
         mask_raw = cv2.morphologyEx(mask_raw, cv2.MORPH_CLOSE, close_kernel)
         contours, _ = cv2.findContours(mask_raw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cv2.drawContours(mask_raw, contours, -1, 255, thickness=cv2.FILLED)

@@ -531,9 +531,14 @@ useEffect(() => {
       const hits = raycaster.intersectObjects(walls)
       if (hits.length > 0) {
         const hit = hits[0]
-        const name = hit.object.name  // 'wall_back' | 'wall_left' | 'wall_right'
+        const name = hit.object.name
         const wallNormal = name === 'wall_back' ? 'back' : name === 'wall_left' ? 'left' : 'right'
         onDrop(furnitureId, { x: hit.point.x, y: hit.point.y, z: hit.point.z, wallNormal })
+      } else if (floorRef.current) {
+        // 벽 못 맞히면 바닥 fallback
+        const floorHits = raycaster.intersectObject(floorRef.current)
+        if (floorHits.length > 0)
+          onDrop(furnitureId, { x: floorHits[0].point.x, z: floorHits[0].point.z })
       }
     } else if (floorRef.current) {
       const hits = raycaster.intersectObject(floorRef.current)
@@ -966,6 +971,7 @@ export default function Interior3DStep() {
       const imgFile = new File([imgBlob], 'furniture.png', { type: 'image/png' })
       const form = new FormData()
       form.append('image', imgFile)
+      form.append('category', furniture.name || '')
       const res = await fetch('http://127.0.0.1:8001/api/sam3d/mesh', { method: 'POST', body: form })
       const data = await res.json()
       if (!data.success) throw new Error(data.error || '3D 생성 실패')
