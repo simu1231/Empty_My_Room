@@ -1,8 +1,10 @@
 import io
 import gc
+import json
 import torch
 import numpy as np
 import orjson
+from typing import Optional
 from PIL import Image
 from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException
 from fastapi.responses import Response
@@ -144,6 +146,8 @@ async def generate_mesh(
     request: Request,
     image: UploadFile = File(...),
     category: str = Form(''),
+    full_image: Optional[UploadFile] = File(None),
+    bbox: str = Form(''),
 ):
     img_bytes = await image.read()
     image_pil = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
@@ -152,12 +156,75 @@ async def generate_mesh(
     rgb       = image_np[..., :3]
     mask      = alpha > 127
 
-    rgb, mask = _crop_and_resize(rgb, mask)
+    is_thin_flat_cat = any(c in category for c in FLAT_CATEGORIES | THIN_CATEGORIES)
 
-    # 배경을 회색으로 채움 → MoGe 깊이 추정 개선
-    rgb_bg = rgb.copy()
-    rgb_bg[~mask] = 128
-    rgb = rgb_bg
+    # thin/flat 카테고리: 전체 방 이미지에서 컨텍스트 패딩 포함한 넓은 크롭 생성
+    full_scene_pointmap = None
+    if is_thin_flat_cat and full_image and bbox:
+        try:
+            full_bytes = await full_image.read()
+            full_pil   = Image.open(io.BytesIO(full_bytes)).convert('RGB')
+            full_np    = np.array(full_pil)
+            fh, fw     = full_np.shape[:2]
+
+            MAX_EXTRACT = 1024
+            fscale = 1.0
+            if max(fh, fw) > MAX_EXTRACT:
+                fscale = MAX_EXTRACT / max(fh, fw)
+                full_np = np.array(Image.fromarray(full_np).resize(
+                    (int(fw * fscale), int(fh * fscale)), Image.LANCZOS))
+                fh, fw = full_np.shape[:2]
+
+            bbox_list = json.loads(bbox)
+            x1, y1, x2, y2 = [int(c) for c in bbox_list]
+
+            # 가구 주변 15% 패딩 추가 → MoGe context 제공, 배경 shape 영향 최소화
+            bw, bh = x2 - x1, y2 - y1
+            pad_x, pad_y = int(bw * 0.15), int(bh * 0.15)
+            cx1 = max(0, x1 - pad_x)
+            cy1 = max(0, y1 - pad_y)
+            cx2 = min(fw, x2 + pad_x)
+            cy2 = min(fh, y2 + pad_y)
+
+            # 전체 방 이미지에서 컨텍스트 포함 크롭
+            ctx_rgb  = full_np[cy1:cy2, cx1:cx2]
+
+            # bbox 기준으로 컨텍스트 내 가구 위치 계산
+            mx1 = x1 - cx1;  my1 = y1 - cy1
+            mx2 = mx1 + (x2 - x1);  my2 = my1 + (y2 - y1)
+
+            # 컨텍스트 크롭 크기에 맞는 마스크 (가구 영역만 True)
+            ctx_h, ctx_w = ctx_rgb.shape[:2]
+            ctx_mask = np.zeros((ctx_h, ctx_w), dtype=bool)
+
+            # 원본 가구 마스크를 bbox 크기로 리사이즈 후 삽입
+            orig_mask_resized = np.array(
+                Image.fromarray(mask.astype(np.uint8) * 255).resize(
+                    (x2 - x1, y2 - y1), Image.NEAREST)) > 127
+            ctx_mask[my1:my2, mx1:mx2] = orig_mask_resized
+
+            # 크기 제한
+            if max(ctx_h, ctx_w) > MAX_INPUT_SIZE:
+                s = MAX_INPUT_SIZE / max(ctx_h, ctx_w)
+                ctx_rgb  = np.array(Image.fromarray(ctx_rgb).resize(
+                    (int(ctx_w*s), int(ctx_h*s)), Image.LANCZOS))
+                ctx_mask = np.array(Image.fromarray(ctx_mask.astype(np.uint8)*255).resize(
+                    (int(ctx_w*s), int(ctx_h*s)), Image.NEAREST)) > 127
+
+            # 배경 그대로 유지 — MoGe가 씬 컨텍스트로 depth 추정해야 함
+            rgb  = ctx_rgb
+            mask = ctx_mask
+            print(f"[컨텍스트 크롭] {rgb.shape[1]}x{rgb.shape[0]}, 가구영역 포함")
+            full_scene_pointmap = True
+        except Exception as e:
+            print(f"[컨텍스트 크롭 실패 → 기존 방식] {e}")
+            full_scene_pointmap = None
+
+    if not full_scene_pointmap:
+        rgb, mask = _crop_and_resize(rgb, mask)
+        rgb_bg = rgb.copy()
+        rgb_bg[~mask] = 128
+        rgb = rgb_bg
 
     print("Meta SAM3D 3D 메쉬 생성 중...")
 
@@ -177,8 +244,24 @@ async def generate_mesh(
             request.app.state.sam3d_pipeline = pipeline
             print("SAM3D 파이프라인 캐시 완료!")
 
+    # thin/flat 가구: 배경 살린 씬으로 MoGe 먼저 실행(depth), SAM3D엔 gray bg(shape 혼란 방지)
+    custom_pointmap = None
+    if is_thin_flat_cat and full_scene_pointmap:
+        # 1) 외부 MoGe: 실제 씬 컨텍스트로 valid depth 확보
+        mask_255 = mask.astype(np.uint8) * 255
+        rgba_ctx = np.concatenate([rgb, mask_255[..., None]], axis=-1)
+        with torch.no_grad():
+            pm_dict = pipeline.compute_pointmap(rgba_ctx)
+        custom_pointmap = pm_dict["pointmap"].cpu()  # (3, H, W)
+        finite = custom_pointmap.isfinite().all(dim=0).sum().item()
+        print(f"[외부 MoGe] shape={tuple(custom_pointmap.shape)}, valid_px={finite}")
+        # 2) SAM3D shape 모델엔 gray bg 이미지 전달 (배경 가구에 shape 영향 방지)
+        rgb[~mask] = 128
+        mask = mask_255  # 0/255 uint8로 교체
+
     try:
         import random
+
 
         NUM_STAGE1_TRIES = 10
 
@@ -195,7 +278,7 @@ async def generate_mesh(
                 with_texture_baking=False,
                 with_layout_postprocess=False,
                 use_vertex_color=True,
-                pointmap=None,
+                pointmap=custom_pointmap,
             )
             voxel = r1['voxel'].cpu().numpy()
             if any(c in category for c in THIN_CATEGORIES):
@@ -220,7 +303,7 @@ async def generate_mesh(
             with_texture_baking=False,
             with_layout_postprocess=False,
             use_vertex_color=True,
-            pointmap=None,
+            pointmap=custom_pointmap,
         )
 
         mesh = result.get('mesh')

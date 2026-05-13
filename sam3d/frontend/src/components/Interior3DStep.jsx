@@ -141,8 +141,8 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     console.log('wallColor:', roomColors.wall)  
     console.log('floorColor:', roomColors.floor)  
     const el = mountRef.current
-    const width = el.clientWidth || window.innerWidth
-    const height = el.clientHeight || window.innerHeight
+    const getSize = () => ({ w: el.offsetWidth || window.innerWidth, h: el.offsetHeight || window.innerHeight - 110 })
+    const { w: width, h: height } = getSize()
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x2a2a2a)
@@ -159,6 +159,15 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     renderer.outputColorSpace = THREE.SRGBColorSpace
     el.appendChild(renderer.domElement)
     rendererRef.current = renderer
+
+    const onResize = () => {
+      const { w, h } = getSize()
+      camera.aspect = w / h
+      camera.updateProjectionMatrix()
+      renderer.setSize(w, h)
+    }
+    const resizeObserver = new ResizeObserver(onResize)
+    resizeObserver.observe(el)
     const raycaster = new THREE.Raycaster()
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.75))
@@ -359,8 +368,8 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     }
 
     renderer.domElement.addEventListener('mousedown', onMouseDown)
-    renderer.domElement.addEventListener('mousemove', onMouseMove)
-    renderer.domElement.addEventListener('mouseup', onMouseUp)
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
     renderer.domElement.addEventListener('wheel', onWheel, { passive: false })
 
     let animId
@@ -370,6 +379,9 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     return () => {
       cancelAnimationFrame(animId)
       renderer.domElement.removeEventListener('wheel', onWheel)
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      resizeObserver.disconnect()
       renderer.dispose()
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement)
     }
@@ -859,7 +871,7 @@ async function dbDeleteDesign(id) {
 }
 
 export default function Interior3DStep() {
-  const { furnitureList, roomSize, roomColors, roomTextures, reset,
+  const { furnitureList, roomSize, roomColors, roomTextures, reset, originalFile,
           savedDesignToLoad, clearSavedDesignToLoad, setSavedDesignToLoad, setStep } = useStore()
   const roomColorsMemo = useMemo(() => ({
     wall: roomColors?.wall || [0.9, 0.9, 0.9],
@@ -990,6 +1002,14 @@ export default function Interior3DStep() {
       const form = new FormData()
       form.append('image', imgFile)
       form.append('category', furniture.name || '')
+
+      // thin/flat 카테고리는 원본 방 이미지 + bbox 전송 → 씬 컨텍스트 기반 pointmap
+      const THIN_FLAT = ['조명', '꽃', '화분', '시계', '액자', '그림', '거울']
+      if (THIN_FLAT.some(k => (furniture.name || '').includes(k)) && originalFile && furniture.bbox) {
+        form.append('full_image', originalFile)
+        form.append('bbox', JSON.stringify(furniture.bbox))
+      }
+
       const res = await fetch('http://127.0.0.1:8001/api/sam3d/mesh', { method: 'POST', body: form })
       const data = await res.json()
       if (!data.success) throw new Error(data.error || '3D 생성 실패')

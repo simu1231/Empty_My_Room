@@ -1,0 +1,8 @@
+{
+  "editor.formatOnSave": false,
+  "python.formatting.provider": "none",
+  "[python]": {
+    "editor.formatOnSave": false,
+    "editor.defaultFormatter": null
+  }
+}
