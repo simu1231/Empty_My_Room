@@ -1,5 +1,6 @@
 import io
 import gc
+import time
 import json
 import torch
 import numpy as np
@@ -225,6 +226,7 @@ async def generate_mesh(
         rgb_bg = rgb.copy()
         rgb_bg[~mask] = 128
         rgb = rgb_bg
+        mask = mask.astype(np.uint8) * 255  # bool → 0/255 (scale calibration 정상화)
 
     print("Meta SAM3D 3D 메쉬 생성 중...")
 
@@ -262,12 +264,13 @@ async def generate_mesh(
     try:
         import random
 
-
+        _t_sam3d_total = time.time()
         NUM_STAGE1_TRIES = 10
 
         # Stage 1만 빠르게 여러 번 → 가장 입체적인 seed 선택
         best_seed = None
         best_stage1_score = -1.0
+        _t_stage1 = time.time()
 
         for attempt in range(NUM_STAGE1_TRIES):
             seed = random.randint(0, 2**31)
@@ -282,10 +285,8 @@ async def generate_mesh(
             )
             voxel = r1['voxel'].cpu().numpy()
             if any(c in category for c in THIN_CATEGORIES):
-                # 조명/꽃/화분: 복셀 개수 많을수록 더 완전한 구조
                 score = float(len(voxel))
             else:
-                # 일반 가구 + 시계/액자 등: 세 축 중 가장 얇은 축 크기 (납작함 방지)
                 ranges = voxel.max(axis=0) - voxel.min(axis=0)
                 score = float(ranges.min())
             print(f"[Stage1 시도 {attempt+1}/{NUM_STAGE1_TRIES}] seed={seed} score={score:.4f}")
@@ -293,9 +294,11 @@ async def generate_mesh(
                 best_stage1_score = score
                 best_seed = seed
 
+        print(f"[⏱ 처리시간] SAM3D Stage1 탐색 ({NUM_STAGE1_TRIES}회): {time.time()-_t_stage1:.2f}초")
         print(f"[최적 seed 선택] seed={best_seed} score={best_stage1_score:.4f}")
 
         # 최적 seed로 full 파이프라인 실행
+        _t_stage2 = time.time()
         result = pipeline.run(
             rgb, mask, seed=best_seed,
             stage1_only=False,
@@ -305,6 +308,8 @@ async def generate_mesh(
             use_vertex_color=True,
             pointmap=custom_pointmap,
         )
+        print(f"[⏱ 처리시간] SAM3D Stage2 (메쉬 생성): {time.time()-_t_stage2:.2f}초")
+        print(f"[⏱ 처리시간] SAM3D 전체: {time.time()-_t_sam3d_total:.2f}초")
 
         mesh = result.get('mesh')
         if mesh is None:

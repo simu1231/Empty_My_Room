@@ -1,4 +1,5 @@
 import io
+import time
 import base64
 import numpy as np
 import cv2
@@ -35,19 +36,25 @@ async def remove_furniture(
     if mask_np.shape != (h, w):
         mask_np = cv2.resize(mask_np, (w, h), interpolation=cv2.INTER_NEAREST)
 
-    # 친구 코드 셀 5: LaMa
+    # LaMa
     print("LaMa 시작...")
+    _t0 = time.time()
     lama_result = lama.inpaint(image_np, mask_np)
-    print("LaMa 완료!")
+    _lama_time = time.time() - _t0
+    print(f"[⏱ 처리시간] LaMa 인페인팅: {_lama_time:.2f}초")
 
-    # 친구 코드 셀 7: SD ControlNet
+    # SD ControlNet
+    _sd_time = 0.0
     if sd is not None:
         print("SD 시작...")
+        _t1 = time.time()
         final_result = sd.inpaint(lama_result, mask_np)
-        print("SD 완료!")
+        _sd_time = time.time() - _t1
+        print(f"[⏱ 처리시간] SD Inpainting: {_sd_time:.2f}초")
     else:
         final_result = lama_result
 
+    print(f"[⏱ 처리시간] 인페인팅 전체: {_lama_time + _sd_time:.2f}초")
     return JSONResponse({
         "success": True,
         "result_b64": np_to_b64(final_result),

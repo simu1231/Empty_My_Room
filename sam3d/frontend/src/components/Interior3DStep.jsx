@@ -453,10 +453,11 @@ useEffect(() => {
       let scaleX, scaleY, scaleZ, scaledHalfHeight
 
       if (std && data.type !== 'textured') {
-        scaleX = size.x > 0 ? std.w / size.x : 1
-        scaleY = size.y > 0 ? std.d / size.y : 1
-        scaleZ = size.z > 0 ? std.h / size.z : 1
-        scaledHalfHeight = std.h / 2
+        // 축별 독립 스케일 대신 균일 스케일 — rotation.x=-π/2 후 축 매핑 혼란 방지
+        const stdMaxDim = Math.max(std.w, std.d, std.h)
+        const s = stdMaxDim / maxDim
+        scaleX = s; scaleY = s; scaleZ = s
+        scaledHalfHeight = (size.z * s) / 2  // visual height = local Z after rotation
       } else if (std && data.type === 'textured') {
         scaleX = size.x > 0 ? std.w / size.x : 1
         scaleY = size.y > 0 ? std.h / size.y : 1
@@ -770,6 +771,11 @@ const PROCEDURAL_FURNITURE = {
     { size:[0.30,0.22,0.22], pos:[0,-0.02, 0.06], c:[0.95,0.92,0.85] }, // 갓
     { size:[0.08,0.08,0.06], pos:[0,-0.02, 0.05], c:[1.0, 0.98,0.85]  }, // 전구
   ]},
+  '에어컨': { w:0.80, d:0.22, h:0.28, wallItem:true, parts:[
+    { size:[0.80,0.28,0.20], pos:[0, 0, 0.01], c:[0.95,0.95,0.95] }, // 본체
+    { size:[0.70,0.04,0.18], pos:[0,-0.10, 0.01], c:[0.85,0.85,0.85] }, // 하단 루버
+    { size:[0.06,0.06,0.06], pos:[0.30, 0.08, 0.11], c:[0.4,0.8,1.0]  }, // 전원 표시등
+  ]},
 }
 
 function findProceduralDef(name) {
@@ -822,7 +828,7 @@ function buildProceduralGroup(THREE, data) {
 }
 
 // 벽에 붙이는 아이템 이름 목록
-const WALL_ITEM_NAMES = new Set(['창문', '액자', '조명', '그림', '거울'])
+const WALL_ITEM_NAMES = new Set(['창문', '액자', '조명', '그림', '거울', '에어컨'])
 
 // b64 이미지에서 픽셀 크기를 비동기로 읽어옴
 function getImageSize(b64) {

@@ -1,4 +1,5 @@
 import io
+import time
 import base64
 import json
 import numpy as np
@@ -21,6 +22,7 @@ async def create_mask(
     image: UploadFile = File(...),
     points: str = Form(...),
 ):
+    _t0 = time.time()
     sam2 = request.app.state.sam2
     if sam2 is None:
         raise HTTPException(503, "SAM2 모델이 로드되지 않았습니다")
@@ -46,6 +48,7 @@ async def create_mask(
     result = sam2.predict(image_np, pts)
 
     h, w = image_np.shape[:2]
+    print(f"[⏱ 처리시간] SAM2 세그멘테이션: {time.time()-_t0:.2f}초")
     return JSONResponse({
         "success": True,
         "image_size": {"width": w, "height": h},

@@ -1,4 +1,5 @@
 import io
+import time
 import base64
 import json
 import numpy as np
@@ -47,6 +48,7 @@ async def extract_furniture(
     for pt, lbl in zip(pts_raw, labels_raw):
         label_to_points[lbl].append([int(pt[0]*scale), int(pt[1]*scale)])
 
+    _t0 = time.time()
     furniture_list = []
 
     # 이미지 인코딩은 가구 개수와 무관하게 1회만 수행
@@ -92,6 +94,7 @@ async def extract_furniture(
             "bbox":  [int(x) for x in bbox],
         })
 
+    print(f"[⏱ 처리시간] 가구 추출 (SAM2 × {len(furniture_list)}개): {time.time()-_t0:.2f}초")
     return JSONResponse({
         "success":   True,
         "furniture": furniture_list,
