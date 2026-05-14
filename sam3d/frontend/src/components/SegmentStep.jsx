@@ -1,8 +1,14 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { useStore } from '../store/useStore'
 import toast from 'react-hot-toast'
 
-const FURNITURE_LIST = ['소파', '침대', '책상', '의자', '테이블', '옷장', '서랍장', 'TV', 'TV 거치대', '책장', '창문', '에어컨', '액자', '조명', '화분', '기타']
+const LABEL_COLORS = [
+  'rgba(255,80,80,0.45)', 'rgba(80,160,255,0.45)', 'rgba(80,255,120,0.45)',
+  'rgba(255,200,80,0.45)', 'rgba(200,80,255,0.45)', 'rgba(80,255,220,0.45)',
+  'rgba(255,120,200,0.45)', 'rgba(160,255,80,0.45)',
+]
+
+const FURNITURE_LIST = ['소파', '침대', '책상', '의자', '테이블', '옷장', '서랍장', 'TV', 'TV 거치대', '책장', '창문', '에어컨', '액자', '시계', '조명', '스탠드 조명', '화분', '기타']
 
 export default function SegmentStep() {
   const {
@@ -14,6 +20,9 @@ export default function SegmentStep() {
   const canvasRef = useRef(null)
   const [selectedLabel, setSelectedLabel] = useState('소파')
   const [customLabel, setCustomLabel] = useState('')
+  const [maskPreviews, setMaskPreviews] = useState({}) // label → base64 mask
+  const [maskLoading, setMaskLoading] = useState(false)
+  const debounceRef = useRef(null)
 
   const getCurrentLabel = () => {
     if (selectedLabel === '기타') return customLabel.trim() || '기타'
@@ -33,7 +42,8 @@ export default function SegmentStep() {
     }
   }, [originalUrl])
 
-  useEffect(() => {
+  // 캔버스 다시 그리기 (이미지 + 마스크 오버레이 + 포인트)
+  const redrawCanvas = useCallback(() => {
     if (!originalUrl) return
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
@@ -41,17 +51,72 @@ export default function SegmentStep() {
     img.src = originalUrl
     img.onload = () => {
       ctx.drawImage(img, 0, 0)
-      clickPoints.forEach((pt, i) => {
-        ctx.beginPath()
-        ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2)
-        ctx.fillStyle = 'red'
-        ctx.fill()
-        ctx.fillStyle = 'white'
-        ctx.font = 'bold 11px Arial'
-        ctx.fillText(pt.label?.slice(0, 2) || (i + 1), pt.x - 6, pt.y + 4)
-      })
+
+      // 레이블별 색상으로 마스크 오버레이
+      const labels = [...new Set(clickPoints.map(p => p.label))]
+      let colorIdx = 0
+      const labelColorMap = {}
+      labels.forEach(l => { labelColorMap[l] = LABEL_COLORS[colorIdx++ % LABEL_COLORS.length] })
+
+      const drawMasks = async () => {
+        for (const [label, maskB64] of Object.entries(maskPreviews)) {
+          if (!maskB64) continue
+          const color = labelColorMap[label] || LABEL_COLORS[0]
+          const maskImg = new Image()
+          maskImg.src = `data:image/png;base64,${maskB64}`
+          await new Promise(res => { maskImg.onload = res })
+          // 마스크를 오프스크린 캔버스에 그려서 색상 적용
+          const off = document.createElement('canvas')
+          off.width = canvas.width; off.height = canvas.height
+          const offCtx = off.getContext('2d')
+          offCtx.drawImage(maskImg, 0, 0, canvas.width, canvas.height)
+          const imgData = offCtx.getImageData(0, 0, canvas.width, canvas.height)
+          const [r, g, b] = color.match(/\d+/g).map(Number)
+          for (let i = 0; i < imgData.data.length; i += 4) {
+            if (imgData.data[i] > 128) { // 마스크 흰 영역
+              imgData.data[i] = r; imgData.data[i+1] = g; imgData.data[i+2] = b; imgData.data[i+3] = 140
+            } else { imgData.data[i+3] = 0 }
+          }
+          offCtx.putImageData(imgData, 0, 0)
+          ctx.drawImage(off, 0, 0)
+        }
+
+        // 포인트 그리기
+        clickPoints.forEach((pt) => {
+          const color = labelColorMap[pt.label] || 'rgba(255,80,80,0.9)'
+          ctx.beginPath()
+          ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2)
+          ctx.fillStyle = color.replace('0.45', '0.9')
+          ctx.fill()
+          ctx.strokeStyle = 'white'
+          ctx.lineWidth = 2
+          ctx.stroke()
+          ctx.fillStyle = 'white'
+          ctx.font = 'bold 11px Arial'
+          ctx.fillText(pt.label?.slice(0, 2) || '', pt.x - 6, pt.y + 4)
+        })
+      }
+      drawMasks()
     }
-  }, [clickPoints, originalUrl])
+  }, [clickPoints, originalUrl, maskPreviews])
+
+  useEffect(() => { redrawCanvas() }, [redrawCanvas])
+
+  const fetchMaskPreview = useCallback(async (label, labelPoints, file) => {
+    if (!labelPoints.length || !file) return
+    setMaskLoading(true)
+    try {
+      const form = new FormData()
+      form.append('image', file)
+      form.append('points', JSON.stringify(labelPoints.map(p => [p.x, p.y])))
+      const res = await fetch('http://127.0.0.1:8001/api/segment/mask', { method: 'POST', body: form })
+      const data = await res.json()
+      if (data.success) {
+        setMaskPreviews(prev => ({ ...prev, [label]: data.mask_b64 }))
+      }
+    } catch (_) {}
+    setMaskLoading(false)
+  }, [])
 
   const handleClick = (e) => {
     const canvas = canvasRef.current
@@ -62,7 +127,13 @@ export default function SegmentStep() {
     const y = Math.round((e.clientY - rect.top) * scaleY)
     const label = getCurrentLabel()
     addPoint({ x, y, label })
-    toast.success(`${label} 포인트 추가!`)
+
+    // 300ms debounce 후 해당 레이블 마스크 미리보기
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      const labelPoints = [...clickPoints.filter(p => p.label === label), { x, y, label }]
+      fetchMaskPreview(label, labelPoints, originalFile)
+    }, 300)
   }
 
    const handleExtract = async () => {
@@ -188,12 +259,17 @@ export default function SegmentStep() {
       )}
 
       <div style={{ display: 'flex', gap: '20px', marginTop: '10px' }}>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, position: 'relative' }}>
           <canvas
             ref={canvasRef}
             onClick={handleClick}
-            style={{ width: '100%', cursor: 'crosshair', borderRadius: '12px', border: '2px solid #333' }}
+            style={{ width: '100%', cursor: 'crosshair', borderRadius: '12px', border: `2px solid ${maskLoading ? '#3498db' : '#333'}`, transition: 'border-color 0.2s' }}
           />
+          {maskLoading && (
+            <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', color: '#3498db', padding: '4px 10px', borderRadius: '12px', fontSize: '12px' }}>
+              마스크 분석중...
+            </div>
+          )}
         </div>
 
         <div style={{ width: '220px', background: '#1a1a1a', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', height: '600px' }}>
@@ -211,7 +287,7 @@ export default function SegmentStep() {
             )}
           </div>
           <div>
-              <button onClick={clearPoints} style={{ width: '100%', padding: '10px', marginBottom: '8px', background: '#333', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+              <button onClick={() => { clearPoints(); setMaskPreviews({}) }} style={{ width: '100%', padding: '10px', marginBottom: '8px', background: '#333', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
                 🗑️ 초기화
               </button>
               <button onClick={handleExtract} style={{ width: '100%', padding: '12px', background: '#3498db', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold' }}>

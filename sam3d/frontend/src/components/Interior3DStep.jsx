@@ -129,6 +129,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
   const backWallRef = useRef(null)
   const leftWallRef = useRef(null)
   const rightWallRef = useRef(null)
+  const ceilingRef = useRef(null)
   const viewModeRef = useRef('3d')
   const camTargetRef = useRef({ x: 0, y: 0, z: 0 })
   const [contextMenu, setContextMenu] = useState(null)
@@ -225,6 +226,8 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     )
     ceiling.rotation.x = Math.PI / 2
     ceiling.position.y = h / 2
+    ceiling.name = 'ceiling'
+    ceilingRef.current = ceiling
     scene.add(ceiling)
 
     const getMousePos = (e) => {
@@ -406,8 +409,11 @@ useEffect(() => {
 
     if (data.type === 'procedural') {
       group = buildProceduralGroup(THREE, data)
-      if (position.wallNormal) {
-        // 벽 부착
+      if (position.isCeiling) {
+        group.position.set(position.x, roomSize.height / 2 - data.halfH, position.z)
+        group.userData.isCeilingItem = true
+        group.userData.halfSize = 0
+      } else if (position.wallNormal) {
         const wn = position.wallNormal
         const wallOffset = 0.04
         group.position.set(
@@ -420,6 +426,9 @@ useEffect(() => {
         group.userData.isWallItem = true
         group.userData.wallNormal = wn
         group.userData.halfSize = 0
+      } else if (position.onFurniture) {
+        group.position.set(position.x, position.y + data.halfH, position.z)
+        group.userData.halfSize = data.halfH
       } else {
         group.position.set(position.x, -roomSize.height / 2 + data.halfH, position.z)
         group.userData.halfSize = data.halfH
@@ -482,7 +491,11 @@ useEffect(() => {
       group = new THREE.Group()
       group.add(mesh)
 
-      if (position.wallNormal) {
+      if (position.isCeiling) {
+        group.position.set(position.x, roomSize.height / 2 - scaledHalfHeight, position.z)
+        group.userData.isCeilingItem = true
+        group.userData.halfSize = 0
+      } else if (position.wallNormal) {
         const wn = position.wallNormal
         const wallOffset = 0.04
         group.position.set(
@@ -495,6 +508,9 @@ useEffect(() => {
         group.userData.isWallItem = true
         group.userData.wallNormal = wn
         group.userData.halfSize = 0
+      } else if (position.onFurniture) {
+        group.position.set(position.x, position.y + scaledHalfHeight, position.z)
+        group.userData.halfSize = scaledHalfHeight
       } else {
         group.position.set(position.x, -roomSize.height / 2 + scaledHalfHeight, position.z)
         group.userData.halfSize = scaledHalfHeight
@@ -531,6 +547,7 @@ useEffect(() => {
     const furnitureId = Number(e.dataTransfer.getData('furnitureId'))
     const furnitureName = e.dataTransfer.getData('furnitureName') || ''
     const isWallItem = [...WALL_ITEM_NAMES].some(k => furnitureName.includes(k))
+    const isCeilingItem = [...CEILING_ITEM_NAMES].some(k => furnitureName.includes(k))
     const THREE = window.THREE
     const raycaster = new THREE.Raycaster()
     const rect = mountRef.current.getBoundingClientRect()
@@ -539,7 +556,13 @@ useEffect(() => {
     if (!cameraRef.current) return
     raycaster.setFromCamera({ x: nx, y: ny }, cameraRef.current)
 
-    if (isWallItem) {
+    if (isCeilingItem) {
+      if (ceilingRef.current) {
+        const hits = raycaster.intersectObject(ceilingRef.current)
+        if (hits.length > 0)
+          onDrop(furnitureId, { x: hits[0].point.x, z: hits[0].point.z, isCeiling: true })
+      }
+    } else if (isWallItem) {
       const walls = [backWallRef.current, leftWallRef.current, rightWallRef.current].filter(Boolean)
       const hits = raycaster.intersectObjects(walls)
       if (hits.length > 0) {
@@ -548,15 +571,29 @@ useEffect(() => {
         const wallNormal = name === 'wall_back' ? 'back' : name === 'wall_left' ? 'left' : 'right'
         onDrop(furnitureId, { x: hit.point.x, y: hit.point.y, z: hit.point.z, wallNormal })
       } else if (floorRef.current) {
-        // 벽 못 맞히면 바닥 fallback
         const floorHits = raycaster.intersectObject(floorRef.current)
         if (floorHits.length > 0)
           onDrop(furnitureId, { x: floorHits[0].point.x, z: floorHits[0].point.z })
       }
-    } else if (floorRef.current) {
-      const hits = raycaster.intersectObject(floorRef.current)
-      if (hits.length > 0) {
-        onDrop(furnitureId, { x: hits[0].point.x, z: hits[0].point.z })
+    } else {
+      // 놓인 가구 위에 올리기 시도 → 안 되면 바닥 fallback
+      const placedMeshObjects = Object.values(placedGroupsRef.current).filter(Boolean)
+      let placed = false
+      if (placedMeshObjects.length > 0) {
+        const furnitureHits = raycaster.intersectObjects(placedMeshObjects, true)
+        const topHit = furnitureHits.find(h => {
+          const normal = h.face?.normal.clone().applyQuaternion(h.object.getWorldQuaternion(new THREE.Quaternion()))
+          return normal && normal.y > 0.5
+        })
+        if (topHit) {
+          onDrop(furnitureId, { x: topHit.point.x, y: topHit.point.y, z: topHit.point.z, onFurniture: true })
+          placed = true
+        }
+      }
+      if (!placed && floorRef.current) {
+        const hits = raycaster.intersectObject(floorRef.current)
+        if (hits.length > 0)
+          onDrop(furnitureId, { x: hits[0].point.x, z: hits[0].point.z })
       }
     }
   }
@@ -772,9 +809,19 @@ const PROCEDURAL_FURNITURE = {
     { size:[0.08,0.08,0.06], pos:[0,-0.02, 0.05], c:[1.0, 0.98,0.85]  }, // 전구
   ]},
   '에어컨': { w:0.80, d:0.22, h:0.28, wallItem:true, parts:[
-    { size:[0.80,0.28,0.20], pos:[0, 0, 0.01], c:[0.95,0.95,0.95] }, // 본체
-    { size:[0.70,0.04,0.18], pos:[0,-0.10, 0.01], c:[0.85,0.85,0.85] }, // 하단 루버
-    { size:[0.06,0.06,0.06], pos:[0.30, 0.08, 0.11], c:[0.4,0.8,1.0]  }, // 전원 표시등
+    { size:[0.80,0.28,0.20], pos:[0, 0, 0.01], c:[0.95,0.95,0.95] },
+    { size:[0.70,0.04,0.18], pos:[0,-0.10, 0.01], c:[0.85,0.85,0.85] },
+    { size:[0.06,0.06,0.06], pos:[0.30, 0.08, 0.11], c:[0.4,0.8,1.0]  },
+  ]},
+  '스탠드 조명': { w:0.35, d:0.35, h:1.60, parts:[
+    { size:[0.30,0.30,0.04], pos:[0,0,0],    c:[0.6,0.5,0.4] },   // 받침대
+    { size:[0.04,0.04,1.30], pos:[0,0,0.67], c:[0.7,0.6,0.5] },   // 기둥
+    { size:[0.35,0.35,0.20], pos:[0,0,1.50], c:[0.95,0.90,0.80] }, // 갓
+  ]},
+  '시계': { w:0.30, d:0.06, h:0.35, wallItem:true, parts:[
+    { size:[0.28,0.34,0.05], pos:[0, 0.02, 0], c:[0.85,0.90,0.85] },   // 본체
+    { size:[0.20,0.20,0.03], pos:[0,-0.04, 0.03], c:[0.95,0.92,0.85] }, // 시계판
+    { size:[0.04,0.04,0.04], pos:[0,-0.14, 0.04], c:[0.90,0.85,0.75] }, // 하단 다이얼
   ]},
 }
 
@@ -828,7 +875,8 @@ function buildProceduralGroup(THREE, data) {
 }
 
 // 벽에 붙이는 아이템 이름 목록
-const WALL_ITEM_NAMES = new Set(['창문', '액자', '조명', '그림', '거울', '에어컨'])
+const WALL_ITEM_NAMES = new Set(['창문', '액자', '그림', '거울', '에어컨', '시계'])
+const CEILING_ITEM_NAMES = new Set(['조명'])
 
 // b64 이미지에서 픽셀 크기를 비동기로 읽어옴
 function getImageSize(b64) {
@@ -1187,20 +1235,6 @@ export default function Interior3DStep() {
               >
                 {generating && generatingId === f.id ? '생성 중...' : furnitureMeshes[f.id] ? '🔄 재생성' : '🔷 3D 변환'}
               </button>
-              {findProceduralDef(f.name) && (
-                <button
-                  onClick={() => useProceduralMesh(f)}
-                  disabled={generating}
-                  style={{
-                    width: '100%', padding: '5px', marginTop: '4px',
-                    background: 'rgba(155,89,182,0.7)', color: 'white',
-                    border: '1px solid rgba(155,89,182,0.9)',
-                    borderRadius: '6px', cursor: 'pointer', fontSize: '10px', fontWeight: 600,
-                  }}
-                >
-                  📐 기본 모델 사용
-                </button>
-              )}
             </div>
           ))}
         </div>

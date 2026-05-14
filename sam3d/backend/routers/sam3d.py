@@ -1,11 +1,9 @@
 import io
 import gc
 import time
-import json
 import torch
 import numpy as np
 import orjson
-from typing import Optional
 from PIL import Image
 from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException
 from fastapi.responses import Response
@@ -23,27 +21,33 @@ TARGET_FACES   = 80000
 # utils3d 1.7 함수명 변경 호환 패치
 import utils3d.torch as _u3d
 from utils3d.torch.transforms import intrinsics_from_fov as _intr_fov, perspective_from_fov as _persp_fov
-from utils3d.torch.mesh import (
-    mesh_connected_components  as _mesh_cc,
-    mesh_dual_graph            as _mesh_dg,
-    mesh_edges                 as _mesh_edges,
-    graph_connected_components as _graph_cc,
-    remove_unused_vertices     as _rm_unused,
-)
+from utils3d.torch.mesh import remove_unused_vertices as _rm_unused
 if not hasattr(_u3d, 'intrinsics_from_fov_xy'):
     _u3d.intrinsics_from_fov_xy = lambda fx, fy: _intr_fov(fov_x=fx, fov_y=fy)
 if not hasattr(_u3d, 'perspective_from_fov_xy'):
     _u3d.perspective_from_fov_xy = lambda fx, fy, near, far: _persp_fov(fov_x=fx, fov_y=fy, near=near, far=far)
-if not hasattr(_u3d, 'compute_connected_components'):
-    _u3d.compute_connected_components = _mesh_cc
-if not hasattr(_u3d, 'compute_dual_graph'):
-    _u3d.compute_dual_graph = _mesh_dg
-if not hasattr(_u3d, 'compute_edges'):
-    _u3d.compute_edges = _mesh_edges
-if not hasattr(_u3d, 'compute_edge_connected_components'):
-    _u3d.compute_edge_connected_components = _graph_cc
 if not hasattr(_u3d, 'remove_unreferenced_vertices'):
     _u3d.remove_unreferenced_vertices = _rm_unused
+
+# rasterize_triangle_faces → rasterize_triangles 호환 래퍼
+if not hasattr(_u3d, 'rasterize_triangle_faces') and hasattr(_u3d, 'rasterize_triangles'):
+    def _rasterize_triangle_faces_compat(ctx, verts, faces, res_w, res_h, view=None, projection=None):
+        result = _u3d.rasterize_triangles(
+            (res_h, res_w),
+            vertices=verts,
+            faces=faces,
+            view=view,
+            projection=projection,
+            return_interpolation=True,
+            ctx=ctx,
+        )
+        interp_id = result.get('interpolation_id')
+        face_id = (interp_id + 1).clamp(min=0) if interp_id is not None else None
+        return {
+            'face_id': face_id,
+            'mask': result['mask'].float(),
+        }
+    _u3d.rasterize_triangle_faces = _rasterize_triangle_faces_compat
 
 
 def _crop_and_resize(rgb: np.ndarray, mask: np.ndarray):
@@ -86,8 +90,10 @@ def _crop_and_resize(rgb: np.ndarray, mask: np.ndarray):
 
 
 # 납작한 물체 카테고리 → shape prior 적용
+# context crop 쓸 카테고리 (주변 depth 컨텍스트가 도움이 되는 것만)
+# 시계는 주변에 식물/포스터 등이 섞여 depth 오염되므로 제외
 FLAT_CATEGORIES  = {'시계', '액자', '그림', '거울'}
-THIN_CATEGORIES  = {'조명', '꽃', '화분'}
+THIN_CATEGORIES  = {'조명', '스탠드 조명', '꽃', '화분'}
 
 def _make_shape_prior(mask: np.ndarray, category: str, base_z: float = 1.5) -> 'torch.Tensor | None':
     """마스크 형태 기반 간단한 shape prior pointmap (H, W, 3)."""
@@ -147,8 +153,6 @@ async def generate_mesh(
     request: Request,
     image: UploadFile = File(...),
     category: str = Form(''),
-    full_image: Optional[UploadFile] = File(None),
-    bbox: str = Form(''),
 ):
     img_bytes = await image.read()
     image_pil = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
@@ -157,76 +161,10 @@ async def generate_mesh(
     rgb       = image_np[..., :3]
     mask      = alpha > 127
 
-    is_thin_flat_cat = any(c in category for c in FLAT_CATEGORIES | THIN_CATEGORIES)
-
-    # thin/flat 카테고리: 전체 방 이미지에서 컨텍스트 패딩 포함한 넓은 크롭 생성
-    full_scene_pointmap = None
-    if is_thin_flat_cat and full_image and bbox:
-        try:
-            full_bytes = await full_image.read()
-            full_pil   = Image.open(io.BytesIO(full_bytes)).convert('RGB')
-            full_np    = np.array(full_pil)
-            fh, fw     = full_np.shape[:2]
-
-            MAX_EXTRACT = 1024
-            fscale = 1.0
-            if max(fh, fw) > MAX_EXTRACT:
-                fscale = MAX_EXTRACT / max(fh, fw)
-                full_np = np.array(Image.fromarray(full_np).resize(
-                    (int(fw * fscale), int(fh * fscale)), Image.LANCZOS))
-                fh, fw = full_np.shape[:2]
-
-            bbox_list = json.loads(bbox)
-            x1, y1, x2, y2 = [int(c) for c in bbox_list]
-
-            # 가구 주변 15% 패딩 추가 → MoGe context 제공, 배경 shape 영향 최소화
-            bw, bh = x2 - x1, y2 - y1
-            pad_x, pad_y = int(bw * 0.15), int(bh * 0.15)
-            cx1 = max(0, x1 - pad_x)
-            cy1 = max(0, y1 - pad_y)
-            cx2 = min(fw, x2 + pad_x)
-            cy2 = min(fh, y2 + pad_y)
-
-            # 전체 방 이미지에서 컨텍스트 포함 크롭
-            ctx_rgb  = full_np[cy1:cy2, cx1:cx2]
-
-            # bbox 기준으로 컨텍스트 내 가구 위치 계산
-            mx1 = x1 - cx1;  my1 = y1 - cy1
-            mx2 = mx1 + (x2 - x1);  my2 = my1 + (y2 - y1)
-
-            # 컨텍스트 크롭 크기에 맞는 마스크 (가구 영역만 True)
-            ctx_h, ctx_w = ctx_rgb.shape[:2]
-            ctx_mask = np.zeros((ctx_h, ctx_w), dtype=bool)
-
-            # 원본 가구 마스크를 bbox 크기로 리사이즈 후 삽입
-            orig_mask_resized = np.array(
-                Image.fromarray(mask.astype(np.uint8) * 255).resize(
-                    (x2 - x1, y2 - y1), Image.NEAREST)) > 127
-            ctx_mask[my1:my2, mx1:mx2] = orig_mask_resized
-
-            # 크기 제한
-            if max(ctx_h, ctx_w) > MAX_INPUT_SIZE:
-                s = MAX_INPUT_SIZE / max(ctx_h, ctx_w)
-                ctx_rgb  = np.array(Image.fromarray(ctx_rgb).resize(
-                    (int(ctx_w*s), int(ctx_h*s)), Image.LANCZOS))
-                ctx_mask = np.array(Image.fromarray(ctx_mask.astype(np.uint8)*255).resize(
-                    (int(ctx_w*s), int(ctx_h*s)), Image.NEAREST)) > 127
-
-            # 배경 그대로 유지 — MoGe가 씬 컨텍스트로 depth 추정해야 함
-            rgb  = ctx_rgb
-            mask = ctx_mask
-            print(f"[컨텍스트 크롭] {rgb.shape[1]}x{rgb.shape[0]}, 가구영역 포함")
-            full_scene_pointmap = True
-        except Exception as e:
-            print(f"[컨텍스트 크롭 실패 → 기존 방식] {e}")
-            full_scene_pointmap = None
-
-    if not full_scene_pointmap:
-        rgb, mask = _crop_and_resize(rgb, mask)
-        rgb_bg = rgb.copy()
-        rgb_bg[~mask] = 128
-        rgb = rgb_bg
-        mask = mask.astype(np.uint8) * 255  # bool → 0/255 (scale calibration 정상화)
+    # 모든 카테고리: 마스크 영역만 크롭, 배경은 gray(128) → SAM3D 원래 방식
+    rgb, mask = _crop_and_resize(rgb, mask)
+    rgb[~mask] = 128
+    mask = mask.astype(np.uint8) * 255  # bool → 0/255 (scale calibration 정상화)
 
     print("Meta SAM3D 3D 메쉬 생성 중...")
 
@@ -246,20 +184,7 @@ async def generate_mesh(
             request.app.state.sam3d_pipeline = pipeline
             print("SAM3D 파이프라인 캐시 완료!")
 
-    # thin/flat 가구: 배경 살린 씬으로 MoGe 먼저 실행(depth), SAM3D엔 gray bg(shape 혼란 방지)
     custom_pointmap = None
-    if is_thin_flat_cat and full_scene_pointmap:
-        # 1) 외부 MoGe: 실제 씬 컨텍스트로 valid depth 확보
-        mask_255 = mask.astype(np.uint8) * 255
-        rgba_ctx = np.concatenate([rgb, mask_255[..., None]], axis=-1)
-        with torch.no_grad():
-            pm_dict = pipeline.compute_pointmap(rgba_ctx)
-        custom_pointmap = pm_dict["pointmap"].cpu()  # (3, H, W)
-        finite = custom_pointmap.isfinite().all(dim=0).sum().item()
-        print(f"[외부 MoGe] shape={tuple(custom_pointmap.shape)}, valid_px={finite}")
-        # 2) SAM3D shape 모델엔 gray bg 이미지 전달 (배경 가구에 shape 영향 방지)
-        rgb[~mask] = 128
-        mask = mask_255  # 0/255 uint8로 교체
 
     try:
         import random
@@ -302,7 +227,7 @@ async def generate_mesh(
         result = pipeline.run(
             rgb, mask, seed=best_seed,
             stage1_only=False,
-            with_mesh_postprocess=False,
+            with_mesh_postprocess=True,
             with_texture_baking=False,
             with_layout_postprocess=False,
             use_vertex_color=True,
