@@ -548,6 +548,7 @@ useEffect(() => {
     const furnitureName = e.dataTransfer.getData('furnitureName') || ''
     const isWallItem = [...WALL_ITEM_NAMES].some(k => furnitureName.includes(k))
     const isCeilingItem = [...CEILING_ITEM_NAMES].some(k => furnitureName.includes(k))
+    const isCeilingOrFloor = [...CEILING_OR_FLOOR_NAMES].some(k => furnitureName.includes(k))
     const THREE = window.THREE
     const raycaster = new THREE.Raycaster()
     const rect = mountRef.current.getBoundingClientRect()
@@ -561,6 +562,21 @@ useEffect(() => {
         const hits = raycaster.intersectObject(ceilingRef.current)
         if (hits.length > 0)
           onDrop(furnitureId, { x: hits[0].point.x, z: hits[0].point.z, isCeiling: true })
+      }
+    } else if (isCeilingOrFloor) {
+      // 천장 맞으면 천장, 아니면 바닥
+      let placed = false
+      if (ceilingRef.current) {
+        const hits = raycaster.intersectObject(ceilingRef.current)
+        if (hits.length > 0) {
+          onDrop(furnitureId, { x: hits[0].point.x, z: hits[0].point.z, isCeiling: true })
+          placed = true
+        }
+      }
+      if (!placed && floorRef.current) {
+        const hits = raycaster.intersectObject(floorRef.current)
+        if (hits.length > 0)
+          onDrop(furnitureId, { x: hits[0].point.x, z: hits[0].point.z })
       }
     } else if (isWallItem) {
       const walls = [backWallRef.current, leftWallRef.current, rightWallRef.current].filter(Boolean)
@@ -605,6 +621,22 @@ useEffect(() => {
     }
     setContextMenu(null)
   }
+
+  const handleRotateX = () => {
+    const obj = selectedObjRef.current
+    if (!obj) return
+    obj.rotation.x += Math.PI / 2
+    // 회전 후 새 bounding box로 Y 위치 재조정 (바닥 관통 방지)
+    const THREE = window.THREE
+    const box = new THREE.Box3().setFromObject(obj)
+    const floorY = -roomSize.height / 2
+    const bottomY = box.min.y
+    if (bottomY < floorY) {
+      obj.position.y += floorY - bottomY
+    }
+    setContextMenu(null)
+  }
+
 
   const handleDelete = () => {
     if (contextMenu?.instanceId) {
@@ -669,7 +701,8 @@ useEffect(() => {
           padding: '8px 12px',
           border: '1px solid rgba(255,255,255,0.1)',
         }}>
-          <button style={btnStyle('#3498db')} onClick={handleRotate} title="회전">🔄</button>
+          <button style={btnStyle('#3498db')} onClick={handleRotate} title="좌우 회전">🔄</button>
+          <button style={btnStyle('#3498db')} onClick={handleRotateX} title="앞뒤 기울기">↕️</button>
           <button style={btnStyle('#27ae60')} onClick={handleCopy} title="복사">📋</button>
           <button style={btnStyle('#e67e22')} onClick={() => handleScale(1.2)} title="크게">＋</button>
           <button style={btnStyle('#e67e22')} onClick={() => handleScale(1/1.2)} title="작게">－</button>
@@ -818,6 +851,12 @@ const PROCEDURAL_FURNITURE = {
     { size:[0.04,0.04,1.30], pos:[0,0,0.67], c:[0.7,0.6,0.5] },   // 기둥
     { size:[0.35,0.35,0.20], pos:[0,0,1.50], c:[0.95,0.90,0.80] }, // 갓
   ]},
+  '커튼': { w:1.20, d:0.08, h:2.20, wallItem:true, parts:[
+    { size:[1.25,0.06,0.06], pos:[0, 1.10, 0.04],  c:[0.5,0.4,0.35] },  // 커튼봉
+    { size:[0.50,2.20,0.04], pos:[-0.34, 0, 0],    c:[0.80,0.65,0.55] }, // 왼쪽 패널
+    { size:[0.50,2.20,0.04], pos:[ 0.34, 0, 0],    c:[0.80,0.65,0.55] }, // 오른쪽 패널
+    { size:[0.10,2.20,0.04], pos:[ 0,    0, 0.02], c:[0.70,0.55,0.45] }, // 가운데 접힘
+  ]},
   '시계': { w:0.30, d:0.06, h:0.35, wallItem:true, parts:[
     { size:[0.28,0.34,0.05], pos:[0, 0.02, 0], c:[0.85,0.90,0.85] },   // 본체
     { size:[0.20,0.20,0.03], pos:[0,-0.04, 0.03], c:[0.95,0.92,0.85] }, // 시계판
@@ -875,8 +914,9 @@ function buildProceduralGroup(THREE, data) {
 }
 
 // 벽에 붙이는 아이템 이름 목록
-const WALL_ITEM_NAMES = new Set(['창문', '액자', '그림', '거울', '에어컨', '시계'])
+const WALL_ITEM_NAMES = new Set(['창문', '액자', '그림', '거울', '에어컨', '시계', '커튼'])
 const CEILING_ITEM_NAMES = new Set(['조명'])
+const CEILING_OR_FLOOR_NAMES = new Set(['화분']) // 천장/바닥 둘 다 가능
 
 // b64 이미지에서 픽셀 크기를 비동기로 읽어옴
 function getImageSize(b64) {
