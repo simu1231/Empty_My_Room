@@ -1,6 +1,7 @@
 import io
 import gc
 import time
+import base64
 import torch
 import numpy as np
 import orjson
@@ -17,37 +18,6 @@ CACHE_SAM3D_PIPELINE = True
 MIN_INPUT_SIZE = 512   # 너무 작은 이미지는 업스케일 (깊이 추정 정확도)
 MAX_INPUT_SIZE = 1024  # 너무 큰 이미지는 다운스케일 (속도)
 TARGET_FACES   = 80000
-
-# utils3d 1.7 함수명 변경 호환 패치
-import utils3d.torch as _u3d
-from utils3d.torch.transforms import intrinsics_from_fov as _intr_fov, perspective_from_fov as _persp_fov
-from utils3d.torch.mesh import remove_unused_vertices as _rm_unused
-if not hasattr(_u3d, 'intrinsics_from_fov_xy'):
-    _u3d.intrinsics_from_fov_xy = lambda fx, fy: _intr_fov(fov_x=fx, fov_y=fy)
-if not hasattr(_u3d, 'perspective_from_fov_xy'):
-    _u3d.perspective_from_fov_xy = lambda fx, fy, near, far: _persp_fov(fov_x=fx, fov_y=fy, near=near, far=far)
-if not hasattr(_u3d, 'remove_unreferenced_vertices'):
-    _u3d.remove_unreferenced_vertices = _rm_unused
-
-# rasterize_triangle_faces → rasterize_triangles 호환 래퍼
-if not hasattr(_u3d, 'rasterize_triangle_faces') and hasattr(_u3d, 'rasterize_triangles'):
-    def _rasterize_triangle_faces_compat(ctx, verts, faces, res_w, res_h, view=None, projection=None):
-        result = _u3d.rasterize_triangles(
-            (res_h, res_w),
-            vertices=verts,
-            faces=faces,
-            view=view,
-            projection=projection,
-            return_interpolation=True,
-            ctx=ctx,
-        )
-        interp_id = result.get('interpolation_id')
-        face_id = (interp_id + 1).clamp(min=0) if interp_id is not None else None
-        return {
-            'face_id': face_id,
-            'mask': result['mask'].float(),
-        }
-    _u3d.rasterize_triangle_faces = _rasterize_triangle_faces_compat
 
 
 def _crop_and_resize(rgb: np.ndarray, mask: np.ndarray):
@@ -176,8 +146,8 @@ async def generate_mesh(
         config.rendering_engine   = 'pytorch3d'
         config.compile_model      = False
         config.workspace_dir      = WORKSPACE_DIR
-        config.ss_inference_steps   = 50  # 초기 3D 포인트 밀도
-        config.slat_inference_steps = 75  # 3D 잠재 구조 정확도
+        config.ss_inference_steps   = 25  # 초기 3D 포인트 밀도
+        config.slat_inference_steps = 25  # 3D 잠재 구조 정확도
         config.slat_cfg_strength    = 1   # YAML 기본값
         pipeline = instantiate(config)
         if CACHE_SAM3D_PIPELINE:
@@ -190,7 +160,7 @@ async def generate_mesh(
         import random
 
         _t_sam3d_total = time.time()
-        NUM_STAGE1_TRIES = 10
+        NUM_STAGE1_TRIES = 5
 
         # Stage 1만 빠르게 여러 번 → 가장 입체적인 seed 선택
         best_seed = None
@@ -236,21 +206,20 @@ async def generate_mesh(
         print(f"[⏱ 처리시간] SAM3D Stage2 (메쉬 생성): {time.time()-_t_stage2:.2f}초")
         print(f"[⏱ 처리시간] SAM3D 전체: {time.time()-_t_sam3d_total:.2f}초")
 
-        mesh = result.get('mesh')
-        if mesh is None:
+        # GLB (trimesh) 에서 텍스처 추출, 없으면 raw mesh fallback
+        glb = result.get('glb')
+        raw_mesh = result.get('mesh')
+        if raw_mesh is None and glb is None:
             raise HTTPException(500, "메쉬 생성 실패")
-        if isinstance(mesh, list):
-            mesh = mesh[0]
 
-        vertices_np = mesh.vertices.cpu().float().numpy()
-        faces_np    = mesh.faces.cpu().numpy().astype(np.int32)
-        colors_np   = mesh.vertex_attrs[:, :3].cpu().float().numpy() \
-                      if mesh.vertex_attrs is not None \
-                      else np.full((len(vertices_np), 3), 0.8, dtype=np.float32)
-
-        # 밝기 소폭 부스트 후 가벼운 감마 보정 (낡은 느낌 방지)
-        colors_np = np.clip(colors_np * 1.15, 0, 1)
-        colors_np = np.power(colors_np, 0.85).astype(np.float32)
+        # trimesh glb에서 vertices/faces 추출
+        if glb is not None:
+            vertices_np = np.array(glb.vertices, dtype=np.float32)
+            faces_np    = np.array(glb.faces,    dtype=np.int32)
+        else:
+            if isinstance(raw_mesh, list): raw_mesh = raw_mesh[0]
+            vertices_np = raw_mesh.vertices.cpu().float().numpy()
+            faces_np    = raw_mesh.faces.cpu().numpy().astype(np.int32)
 
         # 납작한 카테고리 → z축 강제 부풀리기
         if any(c in category for c in FLAT_CATEGORIES | THIN_CATEGORIES):
@@ -264,18 +233,58 @@ async def generate_mesh(
                 vertices_np[:, flat_axis] = center + (vertices_np[:, flat_axis] - center) * scale_factor
                 print(f"[shape inflate] axis={flat_axis}, {min_range:.4f} → {target:.4f}")
 
-        print(f"[완료] 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")
-        vertices_np, faces_np, colors_np = _decimate_mesh(vertices_np, faces_np, colors_np)
-
-        body = orjson.dumps({
-            "success": True,
-            "type": "vertex_color",
-            "mesh": {
-                "vertices": vertices_np.tolist(),
-                "faces":    faces_np.tolist(),
-                "colors":   colors_np.tolist(),
-            },
-        })
+        # trimesh visual에서 UV + 텍스처 추출
+        has_texture = False
+        if glb is not None and hasattr(glb, 'visual'):
+            vis = glb.visual
+            print(f"[텍스처 확인] visual type={type(vis).__name__}, has_uv={hasattr(vis, 'uv')}")
+            try:
+                uv = vis.uv if hasattr(vis, 'uv') else None
+                mat = vis.material if hasattr(vis, 'material') else None
+                print(f"[텍스처 확인] uv={uv is not None}, material={type(mat).__name__ if mat else None}")
+                tex_img = getattr(mat, 'baseColorTexture', None) if mat else None
+                print(f"[텍스처 확인] baseColorTexture={tex_img is not None}")
+                if uv is not None and tex_img is not None:
+                    has_texture = True
+            except Exception as _te:
+                print(f"[텍스처 확인 실패] {_te}")
+        if has_texture:
+            uvs_np = np.array(glb.visual.uv, dtype=np.float32)
+            tex_img = glb.visual.material.baseColorTexture  # PIL Image
+            buf = io.BytesIO()
+            tex_img.save(buf, format='JPEG', quality=90)
+            tex_b64 = base64.b64encode(buf.getvalue()).decode()
+            print(f"[완료] UV 텍스처 베이킹 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")
+            body = orjson.dumps({
+                "success": True,
+                "type": "textured",
+                "mesh": {
+                    "vertices":   vertices_np.tolist(),
+                    "faces":      faces_np.tolist(),
+                    "uvs":        uvs_np.tolist(),
+                    "textureB64": tex_b64,
+                },
+            })
+        else:
+            # 버텍스 컬러 fallback (trimesh vertex_colors 또는 raw mesh attrs)
+            if glb is not None and hasattr(glb.visual, 'vertex_colors') and glb.visual.vertex_colors is not None:
+                colors_np = np.array(glb.visual.vertex_colors[:, :3], dtype=np.float32) / 255.0
+            elif raw_mesh is not None and hasattr(raw_mesh, 'vertex_attrs') and raw_mesh.vertex_attrs is not None:
+                colors_np = raw_mesh.vertex_attrs[:, :3].cpu().float().numpy()
+            else:
+                colors_np = np.full((len(vertices_np), 3), 0.8, dtype=np.float32)
+            colors_np = np.clip(colors_np * 1.15, 0, 1)
+            colors_np = np.power(colors_np, 0.85).astype(np.float32)
+            print(f"[완료] 버텍스 컬러 fallback, 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")
+            body = orjson.dumps({
+                "success": True,
+                "type": "vertex_color",
+                "mesh": {
+                    "vertices": vertices_np.tolist(),
+                    "faces":    faces_np.tolist(),
+                    "colors":   colors_np.tolist(),
+                },
+            })
         return Response(content=body, media_type="application/json")
 
     except Exception as e:

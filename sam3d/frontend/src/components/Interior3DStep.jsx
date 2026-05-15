@@ -59,7 +59,6 @@ function MiniMeshViewer({ data }) {
       camera.lookAt(0, 0, 0)
 
       const mesh = new THREE.Mesh(geometry, material)
-      if (data.type !== 'textured') mesh.rotation.x = -Math.PI / 2
       group = new THREE.Group()
       group.add(mesh)
       scene.add(group)
@@ -482,11 +481,10 @@ useEffect(() => {
       const mesh = new THREE.Mesh(geometry, material)
       mesh.castShadow = true
       mesh.receiveShadow = true
-      if (data.type !== 'textured') mesh.rotation.x = -Math.PI / 2
       mesh.scale.set(scaleX, scaleY, scaleZ)
 
       const halfFX = (size.x * scaleX) / 2
-      const halfFZ = data.type !== 'textured' ? (size.y * scaleY) / 2 : (size.z * scaleZ) / 2
+      const halfFZ = (size.z * scaleZ) / 2
 
       group = new THREE.Group()
       group.add(mesh)
@@ -522,6 +520,16 @@ useEffect(() => {
 
     sceneRef.current.add(group)
     placedGroupsRef.current[instanceId] = group
+
+    // 바닥 스냅: 실제 bounding box로 Y 보정 (메쉬에 빈 공간 있을 때)
+    if (!group.userData.isWallItem && !group.userData.isCeilingItem) {
+      const box = new THREE.Box3().setFromObject(group)
+      const floorY = -roomSize.height / 2
+      const bottomY = box.min.y
+      if (Math.abs(bottomY - floorY) > 0.02) {
+        group.position.y += floorY - bottomY
+      }
+    }
   })
 }, [placedMeshes])
 
@@ -1115,7 +1123,7 @@ export default function Interior3DStep() {
             vertices:   new Float32Array(raw.vertices.flat()),
             faces:      new Uint32Array(raw.faces.flat()),
             uvs:        new Float32Array(raw.uvs.flat()),
-            textureB64: raw.texture,
+            textureB64: raw.textureB64,
           }
         : {
             type: 'vertex_color',
@@ -1154,7 +1162,6 @@ export default function Interior3DStep() {
       ...prev,
       [instanceId]: { data: meshData, position, estimatedRealSize }
     }))
-    toast.success('가구 배치 완료! 🎉')
   }
 
   return (
@@ -1208,15 +1215,6 @@ export default function Interior3DStep() {
         </div>
       </div>
 
-      {/* 상단 중앙 안내 메시지 */}
-      <div style={{
-        position: 'absolute', top: '60px', left: '50%', transform: 'translateX(-50%)',
-        zIndex: 10, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
-        padding: '6px 16px', borderRadius: '20px',
-        fontSize: '11px', color: '#ccc', whiteSpace: 'nowrap',
-      }}>
-        ▪ 왼쪽 가구를 드래그해서 방에 놓으세요 · 배치된 가구 좌클릭으로 이동 · 드래그로 카메라 회전
-      </div>
 
       {/* 왼쪽 가구 패널 */}
       <div style={{
