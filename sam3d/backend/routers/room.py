@@ -202,6 +202,9 @@ async def generate_room_3d(
             # 2) 구멍 메우기
             trimesh.repair.fill_holes(mesh_tri)
 
+            # 3) 약한 Laplacian smoothing 1회 (이음새 거친 부분 완화)
+            trimesh.smoothing.filter_laplacian(mesh_tri, iterations=1, lamb=0.2)
+
             vertices_np = np.array(mesh_tri.vertices, dtype=np.float32)
             faces_np    = np.array(mesh_tri.faces, dtype=np.int32)
 
