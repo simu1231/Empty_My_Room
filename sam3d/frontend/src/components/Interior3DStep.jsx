@@ -461,11 +461,10 @@ useEffect(() => {
       let scaleX, scaleY, scaleZ, scaledHalfHeight
 
       if (std && data.type !== 'textured') {
-        // 축별 독립 스케일 대신 균일 스케일 — rotation.x=-π/2 후 축 매핑 혼란 방지
         const stdMaxDim = Math.max(std.w, std.d, std.h)
         const s = stdMaxDim / maxDim
         scaleX = s; scaleY = s; scaleZ = s
-        scaledHalfHeight = (size.z * s) / 2  // visual height = local Z after rotation
+        scaledHalfHeight = (size.y * s) / 2
       } else if (std && data.type === 'textured') {
         scaleX = size.x > 0 ? std.w / size.x : 1
         scaleY = size.y > 0 ? std.h / size.y : 1
@@ -475,7 +474,7 @@ useEffect(() => {
         const targetSize = estimatedRealSize || roomSize.width * 0.2
         const s = targetSize / maxDim
         scaleX = s; scaleY = s; scaleZ = s
-        scaledHalfHeight = data.type === 'textured' ? (size.y * s) / 2 : (size.z * s) / 2
+        scaledHalfHeight = (size.y * s) / 2
       }
 
       const mesh = new THREE.Mesh(geometry, material)
