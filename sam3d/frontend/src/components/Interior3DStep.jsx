@@ -84,7 +84,7 @@ function MiniMeshViewer({ data }) {
   return <div ref={mountRef} style={{ width: '100%', height: '120px', borderRadius: '6px', overflow: 'hidden' }} />
 }
 
-function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, onDelete, onCopy, viewMode }) {
+function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, roomMesh, placedMeshes, onDrop, onDelete, onCopy, viewMode }) {
   const createDynamicTexture = (baseColor, type = 'plank') => {
     const canvas = document.createElement('canvas')
     canvas.width = 512
@@ -170,8 +170,9 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     resizeObserver.observe(el)
     const raycaster = new THREE.Raycaster()
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.75))
-    const sunLight = new THREE.DirectionalLight(0xfff8f0, 0.5)
+    // roomMesh 있으면 버텍스 컬러가 잘 보이도록 ambient 강화
+    scene.add(new THREE.AmbientLight(0xffffff, roomMesh ? 2.0 : 0.75))
+    const sunLight = new THREE.DirectionalLight(0xfff8f0, roomMesh ? 0.3 : 0.5)
     sunLight.position.set(5, 10, 8)
     scene.add(sunLight)
 
@@ -182,52 +183,96 @@ function RoomViewer({ roomSize, roomColors, roomTextures, placedMeshes, onDrop, 
     const fc = roomColors.floor
     const fColor = `rgb(${fc[0]*255}, ${fc[1]*255}, ${fc[2]*255})`
 
-  const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(w, d),
-  new THREE.MeshStandardMaterial({ map: createDynamicTexture(fColor, 'plank'), roughness: 0.8 })
-)
-    floor.rotation.x = -Math.PI / 2
-    floor.receiveShadow = true
-    floor.position.y = -h / 2
-    floor.name = 'floor'
-    scene.add(floor)
-    floorRef.current = floor
-    console.log('wc:', wc)
-    console.log('fc:', fc)
-    
-    const wallMaterial = new THREE.MeshStandardMaterial({ 
-  color: new THREE.Color(wc[0], wc[1], wc[2]), 
-  roughness: 1.0 
-})
-    const backWall = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMaterial)
-    backWall.position.z = -d / 2
-    backWall.name = 'wall_back'
-    scene.add(backWall)
-    backWallRef.current = backWall
+    // 표면 텍스처 로더 (MoGe UV projection 결과)
+    const loader = new THREE.TextureLoader()
+    const makeSurfaceMat = (b64, fallbackColor, roughness = 0.8) => {
+      if (b64) {
+        const tex = loader.load(`data:image/jpeg;base64,${b64}`)
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+        return new THREE.MeshStandardMaterial({ map: tex, roughness, side: THREE.DoubleSide })
+      }
+      return new THREE.MeshStandardMaterial({ color: new THREE.Color(...fallbackColor), roughness, side: THREE.DoubleSide })
+    }
 
-    const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(d, h), wallMaterial)
-    leftWall.rotation.y = Math.PI / 2
-    leftWall.position.x = -w / 2
-    leftWall.name = 'wall_left'
-    scene.add(leftWall)
-    leftWallRef.current = leftWall
+    if (roomMesh) {
+      // SAM3D 메쉬로 방 렌더링 (Y축 반전: PyTorch3D → Three.js)
+      const geo = new THREE.BufferGeometry()
+      const nv = roomMesh.vertices.length
+      const verts = new Float32Array(nv * 3)
+      for (let i = 0; i < nv; i++) {
+        verts[i*3]     =  roomMesh.vertices[i][0]
+        verts[i*3 + 1] = -roomMesh.vertices[i][1]
+        verts[i*3 + 2] =  roomMesh.vertices[i][2]
+      }
+      const nf = roomMesh.faces.length
+      const faces = new Uint32Array(nf * 3)
+      for (let i = 0; i < nf; i++) {
+        faces[i*3]     = roomMesh.faces[i][0]
+        faces[i*3 + 1] = roomMesh.faces[i][1]
+        faces[i*3 + 2] = roomMesh.faces[i][2]
+      }
+      const nc = roomMesh.colors.length
+      const cols = new Float32Array(nc * 3)
+      for (let i = 0; i < nc; i++) {
+        cols[i*3]     = roomMesh.colors[i][0]
+        cols[i*3 + 1] = roomMesh.colors[i][1]
+        cols[i*3 + 2] = roomMesh.colors[i][2]
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3))
+      geo.setIndex(new THREE.BufferAttribute(faces, 1))
+      geo.setAttribute('color', new THREE.BufferAttribute(cols, 3))
+      geo.computeVertexNormals()
+      geo.computeBoundingBox()
 
-    const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(d, h), wallMaterial)
-    rightWall.rotation.y = -Math.PI / 2
-    rightWall.position.x = w / 2
-    rightWall.name = 'wall_right'
-    scene.add(rightWall)
-    rightWallRef.current = rightWall
+      const center = new THREE.Vector3()
+      geo.boundingBox.getCenter(center)
 
-    const ceiling = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, d),
-      new THREE.MeshStandardMaterial({ color: 0xffffff })
-    )
-    ceiling.rotation.x = Math.PI / 2
-    ceiling.position.y = h / 2
-    ceiling.name = 'ceiling'
-    ceilingRef.current = ceiling
-    scene.add(ceiling)
+      const mat  = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })
+      const roomMeshObj = new THREE.Mesh(geo, mat)
+      roomMeshObj.position.sub(center)
+      scene.add(roomMeshObj)
+
+      // 가구 배치용 보이지 않는 바닥면 (bounding box 하단 기준)
+      const floorY = geo.boundingBox.min.y - center.y
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(w * 3, d * 3), new THREE.MeshStandardMaterial({ visible: false }))
+      floor.rotation.x = -Math.PI / 2
+      floor.position.y = floorY
+      floor.name = 'floor'
+      scene.add(floor)
+      floorRef.current = floor
+
+      // 보이지 않는 벽면 (raycasting 용)
+      const invisWallMat = new THREE.MeshStandardMaterial({ visible: false })
+      const backWall = new THREE.Mesh(new THREE.PlaneGeometry(w * 3, h * 3), invisWallMat)
+      backWall.position.z = -d / 2; backWall.name = 'wall_back'; scene.add(backWall); backWallRef.current = backWall
+      const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(d * 3, h * 3), invisWallMat)
+      leftWall.rotation.y = Math.PI / 2; leftWall.position.x = -w / 2; leftWall.name = 'wall_left'; scene.add(leftWall); leftWallRef.current = leftWall
+      const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(d * 3, h * 3), invisWallMat)
+      rightWall.rotation.y = -Math.PI / 2; rightWall.position.x = w / 2; rightWall.name = 'wall_right'; scene.add(rightWall); rightWallRef.current = rightWall
+    } else {
+      // 기본 박스 방
+      const floorMat = roomSurfaceTextures?.floor
+        ? makeSurfaceMat(roomSurfaceTextures.floor, fc, 0.8)
+        : new THREE.MeshStandardMaterial({ map: createDynamicTexture(fColor, 'plank'), roughness: 0.8 })
+      const wallMat = makeSurfaceMat(roomSurfaceTextures?.wall, wc, 1.0)
+
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), floorMat)
+      floor.rotation.x = -Math.PI / 2; floor.position.y = -h / 2; floor.name = 'floor'
+      scene.add(floor); floorRef.current = floor
+
+      const backWall = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMat)
+      backWall.position.z = -d / 2; backWall.name = 'wall_back'
+      scene.add(backWall); backWallRef.current = backWall
+
+      const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(d, h), wallMat)
+      leftWall.rotation.y = Math.PI / 2; leftWall.position.x = -w / 2; leftWall.name = 'wall_left'
+      scene.add(leftWall); leftWallRef.current = leftWall
+
+      const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(d, h), wallMat)
+      rightWall.rotation.y = -Math.PI / 2; rightWall.position.x = w / 2; rightWall.name = 'wall_right'
+      scene.add(rightWall); rightWallRef.current = rightWall
+    }
+    // 천장 없음 (인테리어 앱 스타일)
 
     const getMousePos = (e) => {
       const rect = el.getBoundingClientRect()
@@ -972,7 +1017,7 @@ async function dbDeleteDesign(id) {
 }
 
 export default function Interior3DStep() {
-  const { furnitureList, roomSize, roomColors, roomTextures, reset, originalFile,
+  const { furnitureList, roomSize, roomColors, roomTextures, roomSurfaceTextures, roomMesh, reset, originalFile,
           savedDesignToLoad, clearSavedDesignToLoad, setSavedDesignToLoad, setStep } = useStore()
   const roomColorsMemo = useMemo(() => ({
     wall: roomColors?.wall || [0.9, 0.9, 0.9],
@@ -1179,6 +1224,8 @@ export default function Interior3DStep() {
           roomSize={roomSize}
           roomColors={roomColorsMemo}
           roomTextures={roomTextures}
+          roomSurfaceTextures={roomSurfaceTextures}
+          roomMesh={roomMesh}
           placedMeshes={placedMeshes}
           onDrop={handleDrop}
           onDelete={handleDelete}

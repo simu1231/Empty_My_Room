@@ -48,6 +48,8 @@ async def lifespan(app: FastAPI):
 
     
 
+    app.state.moge = None  # 온디맨드 로드 (GPU 메모리 충돌 방지)
+
     print("서버 준비 완료!")
     yield
     print("서버 종료")
