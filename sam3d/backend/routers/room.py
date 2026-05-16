@@ -156,18 +156,74 @@ async def generate_room_3d(
         else:
             return JSONResponse({"success": False, "error": "메쉬 생성 실패"}, status_code=500)
 
-        # SAM3D vertex color 대신 실제 이미지 색을 vertex Y값 기준으로 입히기
-        # 백엔드 Y+가 높을수록 = 프론트 Y-flip 후 아래쪽(바닥)
-        y = vertices_np[:, 1]
-        floor_thresh = y.max() - 0.12 * (y.max() - y.min())  # 상위 12%만 바닥
-        is_floor = y >= floor_thresh
+        # SAM3D vertex color를 힌트로 벽/바닥 분류 후 이미지 실제 색 입히기
+        if glb is not None and hasattr(glb.visual, 'vertex_colors') and glb.visual.vertex_colors is not None:
+            sam3d_colors = np.array(glb.visual.vertex_colors[:, :3], dtype=np.float32) / 255.0
+        elif raw_mesh is not None and hasattr(raw_mesh, 'vertex_attrs') and raw_mesh.vertex_attrs is not None:
+            sam3d_colors = np.clip(raw_mesh.vertex_attrs[:, :3].cpu().float().numpy() * 1.1, 0, 1)
+        else:
+            sam3d_colors = np.full((len(vertices_np), 3), 0.5, dtype=np.float32)
+
+        wc = np.array(wall_color,  dtype=np.float32)
+        fc = np.array(floor_color, dtype=np.float32)
+
+        color_diff = float(np.linalg.norm(wc - fc))
+        if color_diff > 0.05:
+            # 각 vertex가 벽색/바닥색 중 어느 쪽에 가까운지 거리로 판단
+            dist_wall  = np.linalg.norm(sam3d_colors - wc[None, :], axis=1)
+            dist_floor = np.linalg.norm(sam3d_colors - fc[None, :], axis=1)
+            is_floor   = dist_floor < dist_wall
+            print(f"[분류] SAM3D 색 거리 기반 (색 차이={color_diff:.3f})")
+        else:
+            # 벽/바닥 색이 너무 비슷하면 Y값 fallback
+            y = vertices_np[:, 1]
+            is_floor = y >= (y.max() - 0.06 * (y.max() - y.min()))
+            print(f"[분류] Y값 fallback (색 차이 작음={color_diff:.3f})")
+
         colors_np = np.where(
-            is_floor[:, None],
-            np.array(floor_color, dtype=np.float32)[None, :],
-            np.array(wall_color,  dtype=np.float32)[None, :],
+            is_floor[:, None], fc[None, :], wc[None, :]
         ).astype(np.float32)
 
-        print(f"[완료] 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")
+        # 후처리: 구멍 메우기
+        try:
+            import trimesh, trimesh.repair
+
+            mesh_tri = trimesh.Trimesh(
+                vertices=vertices_np,
+                faces=faces_np,
+                vertex_colors=(colors_np * 255).astype(np.uint8),
+                process=False,
+            )
+
+            # 1) degenerate face 제거 (면적 거의 0인 삼각형)
+            face_mask = mesh_tri.area_faces > 1e-8
+            mesh_tri.update_faces(face_mask)
+
+            # 2) 구멍 메우기
+            trimesh.repair.fill_holes(mesh_tri)
+
+            vertices_np = np.array(mesh_tri.vertices, dtype=np.float32)
+            faces_np    = np.array(mesh_tri.faces, dtype=np.int32)
+
+            # 색 재할당: hole fill로 추가된 vertex도 같은 방식으로
+            new_n = len(vertices_np)
+            old_n = len(is_floor)
+            if new_n > old_n:
+                # 새로 추가된 vertex는 Y값으로 판단
+                extra = new_n - old_n
+                y2 = vertices_np[old_n:, 1]
+                extra_floor = y2 >= (y2.max() - 0.06 * (y2.max() - y2.min())) if len(y2) > 0 else np.array([], dtype=bool)
+                is_floor_all = np.concatenate([is_floor, extra_floor])
+            else:
+                is_floor_all = is_floor[:new_n]
+            colors_np = np.where(
+                is_floor_all[:, None], fc[None, :], wc[None, :]
+            ).astype(np.float32)
+
+            print(f"[후처리 완료] 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")
+        except Exception as pe:
+            print(f"[후처리 스킵] {pe}")
+            print(f"[완료] 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")
 
         body = orjson.dumps({
             "success": True,
