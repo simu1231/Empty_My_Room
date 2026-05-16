@@ -180,8 +180,9 @@ async def generate_room_3d(
             is_floor = y >= (y.max() - 0.06 * (y.max() - y.min()))
             print(f"[분류] Y값 fallback (색 차이 작음={color_diff:.3f})")
 
+        # is_floor=True인 vertex → 벽색, False → 바닥색 (Y방향 반전 보정)
         colors_np = np.where(
-            is_floor[:, None], fc[None, :], wc[None, :]
+            is_floor[:, None], wc[None, :], fc[None, :]
         ).astype(np.float32)
 
         # 후처리: 구멍 메우기
@@ -220,7 +221,7 @@ async def generate_room_3d(
             else:
                 is_floor_all = is_floor[:new_n]
             colors_np = np.where(
-                is_floor_all[:, None], fc[None, :], wc[None, :]
+                is_floor_all[:, None], wc[None, :], fc[None, :]
             ).astype(np.float32)
 
             print(f"[후처리 완료] 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")
@@ -229,7 +230,9 @@ async def generate_room_3d(
             print(f"[완료] 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")
 
         body = orjson.dumps({
-            "success": True,
+            "success":     True,
+            "wall_color":  wall_color,
+            "floor_color": floor_color,
             "mesh": {
                 "vertices": vertices_np.tolist(),
                 "faces":    faces_np.tolist(),

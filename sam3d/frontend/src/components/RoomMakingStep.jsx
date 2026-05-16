@@ -101,7 +101,7 @@ function MeshPreview({ meshData }) {
 }
 
 export default function RoomMakingStep() {
-  const { emptyRoomUrl, emptyRoomFile, setStep, setRoomSize, setRoomMesh, reset } = useStore()
+  const { emptyRoomUrl, emptyRoomFile, setStep, setRoomSize, setRoomMesh, setRoomColors, reset } = useStore()
 
   const canvasRef   = useRef(null)
   const debounceRef = useRef(null)
@@ -193,7 +193,7 @@ export default function RoomMakingStep() {
       const res = await fetch('http://127.0.0.1:8001/api/room/generate3d', { method: 'POST', body: form })
       const data = await res.json()
       if (!data.success) throw new Error(data.error)
-      setMeshData(data.mesh)
+      setMeshData({ ...data.mesh, _wall: data.wall_color, _floor: data.floor_color })
       setPreview(true)
     } catch (e) { toast.error('생성 실패: ' + e.message) }
     setGen(false)

@@ -171,10 +171,15 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
     const raycaster = new THREE.Raycaster()
 
     // roomMesh 있으면 버텍스 컬러가 잘 보이도록 ambient 강화
-    scene.add(new THREE.AmbientLight(0xffffff, roomMesh ? 2.0 : 0.75))
-    const sunLight = new THREE.DirectionalLight(0xfff8f0, roomMesh ? 0.3 : 0.5)
-    sunLight.position.set(5, 10, 8)
+    scene.add(new THREE.AmbientLight(0xffffff, roomMesh ? 0.6 : 0.75))
+    const sunLight = new THREE.DirectionalLight(0xfff8f0, roomMesh ? 0.9 : 0.5)
+    sunLight.position.set(3, 8, 5)
     scene.add(sunLight)
+    if (roomMesh) {
+      const fill = new THREE.DirectionalLight(0xffffff, 0.3)
+      fill.position.set(-4, 2, -3)
+      scene.add(fill)
+    }
 
     const w = roomSize.width
     const h = roomSize.height
@@ -227,28 +232,58 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       const center = new THREE.Vector3()
       geo.boundingBox.getCenter(center)
 
-      const mat  = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })
+      const mat  = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.85, metalness: 0 })
       const roomMeshObj = new THREE.Mesh(geo, mat)
-      roomMeshObj.position.sub(center)
+
+      // X/Z는 방 크기에 정확히 맞추고, Y는 덜 찌그러지게 작은 쪽 사용
+      const mSize = new THREE.Vector3(); geo.boundingBox.getSize(mSize)
+      const sx = w / mSize.x
+      const sz = d / mSize.z
+      console.log('mesh size:', mSize, 'sx:', sx.toFixed(3), 'sz:', sz.toFixed(3), 'scaled size:', (mSize.x*sx).toFixed(2), (mSize.z*sz).toFixed(2), 'room w/d:', w, d)
+      roomMeshObj.scale.set(sx, sz, sz)
+
+      // mesh floor가 정확히 -h/2에 오도록 Y 이동
+      const meshFloorY = (geo.boundingBox.min.y - center.y) * sz
+      const yShift = -h / 2 - meshFloorY
+      roomMeshObj.position.set(-center.x * sx, -center.y * sz + yShift, -center.z * sz)
       scene.add(roomMeshObj)
 
-      // 가구 배치용 보이지 않는 바닥면 (bounding box 하단 기준)
-      const floorY = geo.boundingBox.min.y - center.y
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(w * 3, d * 3), new THREE.MeshStandardMaterial({ visible: false }))
-      floor.rotation.x = -Math.PI / 2
-      floor.position.y = floorY
-      floor.name = 'floor'
-      scene.add(floor)
-      floorRef.current = floor
+      // SAM3D mesh 실제 bounding box 기준으로 raycasting plane 배치
+      const box = new THREE.Box3().setFromObject(roomMeshObj)
+      const bSize = new THREE.Vector3(); box.getSize(bSize)
+      const bCenter = new THREE.Vector3(); box.getCenter(bCenter)
+      const invisMat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
 
-      // 보이지 않는 벽면 (raycasting 용)
-      const invisWallMat = new THREE.MeshStandardMaterial({ visible: false })
-      const backWall = new THREE.Mesh(new THREE.PlaneGeometry(w * 3, h * 3), invisWallMat)
-      backWall.position.z = -d / 2; backWall.name = 'wall_back'; scene.add(backWall); backWallRef.current = backWall
-      const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(d * 3, h * 3), invisWallMat)
-      leftWall.rotation.y = Math.PI / 2; leftWall.position.x = -w / 2; leftWall.name = 'wall_left'; scene.add(leftWall); leftWallRef.current = leftWall
-      const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(d * 3, h * 3), invisWallMat)
-      rightWall.rotation.y = -Math.PI / 2; rightWall.position.x = w / 2; rightWall.name = 'wall_right'; scene.add(rightWall); rightWallRef.current = rightWall
+      // 바닥: mesh 실제 바닥 Y, center X/Z
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(bSize.x * 2, bSize.z * 2), invisMat)
+      floor.rotation.x = -Math.PI / 2
+      floor.position.set(bCenter.x, box.min.y, bCenter.z)
+      floor.name = 'floor'
+      scene.add(floor); floorRef.current = floor
+
+      // 뒤쪽 벽: mesh 실제 min.z, center X/Y
+      const backWall = new THREE.Mesh(new THREE.PlaneGeometry(bSize.x * 2, bSize.y * 2), invisMat)
+      backWall.position.set(bCenter.x, bCenter.y, box.min.z)
+      backWall.name = 'wall_back'
+      scene.add(backWall); backWallRef.current = backWall
+
+      // 왼쪽 벽: mesh 실제 min.x, center Y/Z
+      const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(bSize.z * 2, bSize.y * 2), invisMat)
+      leftWall.rotation.y = Math.PI / 2
+      leftWall.position.set(box.min.x, bCenter.y, bCenter.z)
+      leftWall.name = 'wall_left'
+      scene.add(leftWall); leftWallRef.current = leftWall
+
+      // 오른쪽 벽: mesh 실제 max.x, center Y/Z
+      const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(bSize.z * 2, bSize.y * 2), invisMat)
+      rightWall.rotation.y = -Math.PI / 2
+      rightWall.position.set(box.max.x, bCenter.y, bCenter.z)
+      rightWall.name = 'wall_right'
+      scene.add(rightWall); rightWallRef.current = rightWall
+
+      console.log('[Room planes] floor Y:', box.min.y.toFixed(2), 'back Z:', box.min.z.toFixed(2),
+                  'left X:', box.min.x.toFixed(2), 'right X:', box.max.x.toFixed(2),
+                  'center:', bCenter.x.toFixed(2), bCenter.y.toFixed(2), bCenter.z.toFixed(2))
     } else {
       // 기본 박스 방
       const floorMat = roomSurfaceTextures?.floor
@@ -336,35 +371,14 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
 
     const intersects = raycaster.intersectObject(floorRef.current)
     if (intersects.length > 0) {
-      // 벽 딱 붙이기: 아주 작은 여백(2cm)만 남김
       const halfW = roomSize.width / 2 - 0.02
       const halfD = roomSize.depth / 2 - 0.02
-
-      // 벽 통과 방지 클램프
       let newX = Math.max(-halfW, Math.min(halfW, intersects[0].point.x))
       let newZ = Math.max(-halfD, Math.min(halfD, intersects[0].point.z))
-
-      // 가구끼리 겹침 방지
-      const currentId = Object.entries(placedGroupsRef.current)
-        .find(([, g]) => g === selectedObjRef.current)?.[0]
-
-      /*Object.entries(placedGroupsRef.current).forEach(([id, otherGroup]) => {
-        if (id === currentId) return
-        const dx = newX - otherGroup.position.x
-        const dz = newZ - otherGroup.position.z
-        const dist = Math.sqrt(dx * dx + dz * dz)
-        const minDist = 0.8
-        if (dist < minDist && dist > 0) {
-          const nx = dx / dist
-          const nz = dz / dist
-          newX = otherGroup.position.x + nx * minDist
-          newZ = otherGroup.position.z + nz * minDist
-        }
-      })*/
-
       selectedObjRef.current.position.x = newX
       selectedObjRef.current.position.z = newZ
     }
+
   } else if (isRotating) {
     const dx = e.clientX - prevX
     const dy = e.clientY - prevY
@@ -459,12 +473,15 @@ useEffect(() => {
         group.userData.halfSize = 0
       } else if (position.wallNormal) {
         const wn = position.wallNormal
-        const wallOffset = 0.04
+        // 벽 두께 offset: roomSize의 4% → 방 크기에 비례해서 자동 조정
+        const backOffset = roomSize.depth * 0.04
+        const sideOffset = roomSize.width * 0.04
+        // hit point 좌표를 그대로 쓰고 interior 방향으로만 밀기
         group.position.set(
-          wn === 'left'  ? -roomSize.width / 2 + wallOffset
-            : wn === 'right' ? roomSize.width / 2 - wallOffset : position.x,
+          wn === 'left'  ? position.x + sideOffset
+            : wn === 'right' ? position.x - sideOffset : position.x,
           position.y,
-          wn === 'back'  ? -roomSize.depth / 2 + wallOffset : position.z
+          wn === 'back'  ? position.z + backOffset : position.z
         )
         group.rotation.y = wn === 'left' ? Math.PI / 2 : wn === 'right' ? -Math.PI / 2 : 0
         group.userData.isWallItem = true
@@ -539,12 +556,15 @@ useEffect(() => {
         group.userData.halfSize = 0
       } else if (position.wallNormal) {
         const wn = position.wallNormal
-        const wallOffset = 0.04
+        // 벽 두께 offset: roomSize의 4% → 방 크기에 비례해서 자동 조정
+        const backOffset = roomSize.depth * 0.04
+        const sideOffset = roomSize.width * 0.04
+        // hit point 좌표를 그대로 쓰고 interior 방향으로만 밀기
         group.position.set(
-          wn === 'left'  ? -roomSize.width / 2 + wallOffset
-            : wn === 'right' ? roomSize.width / 2 - wallOffset : position.x,
+          wn === 'left'  ? position.x + sideOffset
+            : wn === 'right' ? position.x - sideOffset : position.x,
           position.y,
-          wn === 'back'  ? -roomSize.depth / 2 + wallOffset : position.z
+          wn === 'back'  ? position.z + backOffset : position.z
         )
         group.rotation.y = wn === 'left' ? Math.PI / 2 : wn === 'right' ? -Math.PI / 2 : 0
         group.userData.isWallItem = true
@@ -627,6 +647,10 @@ useEffect(() => {
       }
       if (!placed && floorRef.current) {
         const hits = raycaster.intersectObject(floorRef.current)
+        console.log('[DROP] floorRef.Y:', floorRef.current.position.y.toFixed(3),
+                    '| roomSize.height:', roomSize.height,
+                    '| -h/2:', (-roomSize.height/2).toFixed(3),
+                    '| hit:', hits.length > 0 ? `x=${hits[0].point.x.toFixed(2)} z=${hits[0].point.z.toFixed(2)}` : 'MISS')
         if (hits.length > 0)
           onDrop(furnitureId, { x: hits[0].point.x, z: hits[0].point.z })
       }
