@@ -218,13 +218,46 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
         faces[i*3 + 1] = roomMesh.faces[i][1]
         faces[i*3 + 2] = roomMesh.faces[i][2]
       }
-      const nc = roomMesh.colors.length
-      const cols = new Float32Array(nc * 3)
-      for (let i = 0; i < nc; i++) {
-        cols[i*3]     = roomMesh.colors[i][0]
-        cols[i*3 + 1] = roomMesh.colors[i][1]
-        cols[i*3 + 2] = roomMesh.colors[i][2]
+      // Y 위치 기반으로 바닥/벽 색상 깔끔하게 재적용
+      // (SAM3D vertex color 노이즈 제거: 하위 20% Y = 바닥, 나머지 = 벽)
+      let yMin2 = Infinity, yMax2 = -Infinity
+      for (let i = 0; i < nv; i++) {
+        yMin2 = Math.min(yMin2, verts[i*3+1])
+        yMax2 = Math.max(yMax2, verts[i*3+1])
       }
+      const floorThresh = yMin2 + (yMax2 - yMin2) * 0.22
+      const cols = new Float32Array(nv * 3)
+      for (let i = 0; i < nv; i++) {
+        const isFloor = verts[i*3+1] < floorThresh
+        cols[i*3]   = isFloor ? fc[0] : wc[0]
+        cols[i*3+1] = isFloor ? fc[1] : wc[1]
+        cols[i*3+2] = isFloor ? fc[2] : wc[2]
+      }
+
+      // 천장·앞벽 페이스를 배경색(#2a2a2a)으로 칠해서 숨기기
+      let xMid = 0, yMid = 0, zMid = 0
+      for (let i = 0; i < nv; i++) { xMid += verts[i*3]; yMid += verts[i*3+1]; zMid += verts[i*3+2] }
+      xMid /= nv; yMid /= nv; zMid /= nv
+      const bg = 42 / 255
+      for (let i = 0; i < nf; i++) {
+        const f0=faces[i*3], f1=faces[i*3+1], f2=faces[i*3+2]
+        const ax=verts[f0*3],ay=verts[f0*3+1],az=verts[f0*3+2]
+        const bx=verts[f1*3],by=verts[f1*3+1],bz=verts[f1*3+2]
+        const cx=verts[f2*3],cy=verts[f2*3+1],cz=verts[f2*3+2]
+        const e1x=bx-ax,e1y=by-ay,e1z=bz-az, e2x=cx-ax,e2y=cy-ay,e2z=cz-az
+        let nx=e1y*e2z-e1z*e2y, ny=e1z*e2x-e1x*e2z, nz=e1x*e2y-e1y*e2x
+        const len=Math.sqrt(nx*nx+ny*ny+nz*nz); if(len<1e-10) continue
+        nx/=len; ny/=len; nz/=len
+        const fcy=(ay+by+cy)/3, fcz=(az+bz+cz)/3
+        const isCeiling  = Math.abs(ny) > 0.5 && fcy > yMid   // 수평 + 상단 → 천장
+        const isFrontWall = Math.abs(nz) > 0.5 && fcz > zMid  // 수직 + 앞쪽 → 앞벽
+        if (isCeiling || isFrontWall) {
+          cols[f0*3]=cols[f0*3+1]=cols[f0*3+2]=bg
+          cols[f1*3]=cols[f1*3+1]=cols[f1*3+2]=bg
+          cols[f2*3]=cols[f2*3+1]=cols[f2*3+2]=bg
+        }
+      }
+
       geo.setAttribute('position', new THREE.BufferAttribute(verts, 3))
       geo.setIndex(new THREE.BufferAttribute(faces, 1))
       geo.setAttribute('color', new THREE.BufferAttribute(cols, 3))
