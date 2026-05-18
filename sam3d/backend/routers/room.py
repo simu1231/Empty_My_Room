@@ -221,7 +221,7 @@ async def generate_room_3d(
             else:
                 is_floor_all = is_floor[:new_n]
             colors_np = np.where(
-                is_floor_all[:, None], wc[None, :], fc[None, :]
+                is_floor_all[:, None], fc[None, :], wc[None, :]
             ).astype(np.float32)
 
             print(f"[후처리 완료] 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")

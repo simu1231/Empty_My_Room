@@ -35,7 +35,9 @@ function MiniMeshViewer({ data }) {
       camera.lookAt(0, 0, 0)
     } else {
       const geometry = new THREE.BufferGeometry()
-      geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices.slice(), 3))
+      const flippedVerts = data.vertices.slice()
+      for (let i = 1; i < flippedVerts.length; i += 3) flippedVerts[i] = -flippedVerts[i]
+      geometry.setAttribute('position', new THREE.BufferAttribute(flippedVerts, 3))
       geometry.setIndex(new THREE.BufferAttribute(data.faces.slice(), 1))
 
       let material
@@ -498,7 +500,9 @@ useEffect(() => {
       group.userData.halfFZ = data.halfFZ
     } else {
       const geometry = new THREE.BufferGeometry()
-      geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices.slice(), 3))
+      const flippedVerts = data.vertices.slice()
+      for (let i = 1; i < flippedVerts.length; i += 3) flippedVerts[i] = -flippedVerts[i]
+      geometry.setAttribute('position', new THREE.BufferAttribute(flippedVerts, 3))
       geometry.setIndex(new THREE.BufferAttribute(data.faces.slice(), 1))
 
       let material
