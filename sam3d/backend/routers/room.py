@@ -17,6 +17,36 @@ MIN_INPUT_SIZE  = 512
 MAX_INPUT_SIZE  = 1024
 
 
+def _flatten_room_mesh(vertices_np: np.ndarray, snap_strength: float = 0.9, snap_zone: float = 0.28) -> np.ndarray:
+    """SAM3D 메쉬의 울퉁불퉁한 벽/바닥을 평면으로 snap하여 교정"""
+    v = vertices_np.copy().astype(np.float32)
+    x_min, y_min, z_min = v.min(axis=0)
+    x_max, y_max, z_max = v.max(axis=0)
+    dx = max(x_max - x_min, 1e-6)
+    dy = max(y_max - y_min, 1e-6)
+    dz = max(z_max - z_min, 1e-6)
+
+    # 바닥·뒷벽·좌벽·우벽 4면까지 정규화 거리 (천장·앞벽 제외)
+    d_floor = (v[:, 1] - y_min) / dy
+    d_back  = (v[:, 2] - z_min) / dz
+    d_left  = (v[:, 0] - x_min) / dx
+    d_right = (x_max - v[:, 0]) / dx
+
+    all_d   = np.stack([d_floor, d_back, d_left, d_right], axis=1)
+    nearest = np.argmin(all_d, axis=1)
+    min_d   = all_d[np.arange(len(v)), nearest]
+
+    # snap_zone 안에 있는 vertex만 해당 면 쪽으로 당김
+    alpha = np.clip(snap_strength * (1.0 - min_d / snap_zone), 0.0, 1.0)
+    alpha[min_d >= snap_zone] = 0.0
+
+    v[nearest == 0, 1] += (y_min - v[nearest == 0, 1]) * alpha[nearest == 0]  # 바닥
+    v[nearest == 1, 2] += (z_min - v[nearest == 1, 2]) * alpha[nearest == 1]  # 뒷벽
+    v[nearest == 2, 0] += (x_min - v[nearest == 2, 0]) * alpha[nearest == 2]  # 왼쪽
+    v[nearest == 3, 0] += (x_max - v[nearest == 3, 0]) * alpha[nearest == 3]  # 오른쪽
+    return v
+
+
 def _crop_and_resize(rgb: np.ndarray, mask: np.ndarray):
     rows = np.any(mask, axis=1)
     cols = np.any(mask, axis=0)
@@ -98,17 +128,23 @@ async def generate_room_3d(
     if sam2 is None:
         return JSONResponse({"success": False, "error": "SAM2 not loaded"}, status_code=500)
 
-    # SAM2 마스크 → 이미지 Y 분할로 벽/바닥 평균색 추출
+    # SAM2 마스크 → 벽/바닥 색 추출
     orig_mask = sam2.predict(img_np, room_pts)["mask"].astype(bool)
+    h_img, w_img = img_np.shape[:2]
+
+    # 바닥: 이미지 하단 15% 영역 (가장 확실한 바닥 픽셀)
+    floor_row_start = int(h_img * 0.85)
+    floor_strip = img_np[floor_row_start:, int(w_img*0.1):int(w_img*0.9)]
+    floor_color = (floor_strip.mean(axis=(0, 1)) / 255.0).tolist()
+
+    # 벽: SAM2 마스크 상단 50% 영역 평균
     rows = np.where(orig_mask.any(axis=1))[0]
     if len(rows) >= 2:
-        y_mid = int(rows[0] + (rows[-1] - rows[0]) * 0.65)
-        wall_region  = orig_mask.copy(); wall_region[y_mid:, :]  = False
-        floor_region = orig_mask.copy(); floor_region[:y_mid, :] = False
+        y_mid = int(rows[0] + (rows[-1] - rows[0]) * 0.50)
+        wall_region = orig_mask.copy(); wall_region[y_mid:, :] = False
     else:
-        wall_region = floor_region = orig_mask
-    wall_color  = (img_np[wall_region].mean(axis=0)  / 255.0).tolist() if wall_region.any()  else [0.88, 0.88, 0.88]
-    floor_color = (img_np[floor_region].mean(axis=0) / 255.0).tolist() if floor_region.any() else [0.65, 0.55, 0.40]
+        wall_region = orig_mask
+    wall_color = (img_np[wall_region].mean(axis=0) / 255.0).tolist() if wall_region.any() else [0.88, 0.88, 0.88]
     print(f"[색상] 벽: {[round(c,3) for c in wall_color]}, 바닥: {[round(c,3) for c in floor_color]}")
 
     # SAM3D: mesh 생성
@@ -164,26 +200,16 @@ async def generate_room_3d(
         else:
             sam3d_colors = np.full((len(vertices_np), 3), 0.5, dtype=np.float32)
 
-        wc = np.array(wall_color,  dtype=np.float32)
         fc = np.array(floor_color, dtype=np.float32)
 
-        color_diff = float(np.linalg.norm(wc - fc))
-        if color_diff > 0.05:
-            # 각 vertex가 벽색/바닥색 중 어느 쪽에 가까운지 거리로 판단
-            dist_wall  = np.linalg.norm(sam3d_colors - wc[None, :], axis=1)
-            dist_floor = np.linalg.norm(sam3d_colors - fc[None, :], axis=1)
-            is_floor   = dist_floor < dist_wall
-            print(f"[분류] SAM3D 색 거리 기반 (색 차이={color_diff:.3f})")
-        else:
-            # 벽/바닥 색이 너무 비슷하면 Y값 fallback
-            y = vertices_np[:, 1]
-            is_floor = y >= (y.max() - 0.06 * (y.max() - y.min()))
-            print(f"[분류] Y값 fallback (색 차이 작음={color_diff:.3f})")
+        # SAM3D가 이미지에서 직접 투영한 색 그대로 사용 (벽마다 다른 색 보존)
+        colors_np = sam3d_colors.astype(np.float32)
 
-        # is_floor=True → 바닥색, False → 벽색
-        colors_np = np.where(
-            is_floor[:, None], fc[None, :], wc[None, :]
-        ).astype(np.float32)
+        # Y값으로 바닥만 따로 보정 (PyTorch3D에서 y.min()이 바닥)
+        y = vertices_np[:, 1]
+        is_floor = y <= (y.min() + 0.20 * (y.max() - y.min()))
+        colors_np[is_floor] = fc
+        print(f"[색상] SAM3D 투영 색 사용, 바닥만 보정")
 
         # 후처리: 구멍 메우기
         try:
@@ -209,20 +235,21 @@ async def generate_room_3d(
             vertices_np = np.array(mesh_tri.vertices, dtype=np.float32)
             faces_np    = np.array(mesh_tri.faces, dtype=np.int32)
 
-            # 색 재할당: hole fill로 추가된 vertex도 같은 방식으로
+            # 벽/바닥 평면 snap으로 울퉁불퉁함 제거
+            vertices_np = _flatten_room_mesh(vertices_np)
+
+            # 색 재할당: hole fill로 추가된 vertex 처리
             new_n = len(vertices_np)
-            old_n = len(is_floor)
+            old_n = len(colors_np)
             if new_n > old_n:
-                # 새로 추가된 vertex는 Y값으로 판단
-                extra = new_n - old_n
-                y2 = vertices_np[old_n:, 1]
-                extra_floor = y2 >= (y2.max() - 0.06 * (y2.max() - y2.min())) if len(y2) > 0 else np.array([], dtype=bool)
-                is_floor_all = np.concatenate([is_floor, extra_floor])
+                extra_colors = np.tile(fc, (new_n - old_n, 1))
+                colors_np = np.vstack([colors_np, extra_colors])
             else:
-                is_floor_all = is_floor[:new_n]
-            colors_np = np.where(
-                is_floor_all[:, None], fc[None, :], wc[None, :]
-            ).astype(np.float32)
+                colors_np = colors_np[:new_n]
+            # 바닥 보정 (PyTorch3D에서 y.min()이 바닥)
+            y2 = vertices_np[:, 1]
+            is_floor2 = y2 <= (y2.min() + 0.06 * (y2.max() - y2.min()))
+            colors_np[is_floor2] = fc
 
             print(f"[후처리 완료] 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")
         except Exception as pe:

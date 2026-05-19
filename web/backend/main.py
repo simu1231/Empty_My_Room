@@ -63,6 +63,19 @@ async def lifespan(app: FastAPI):
         print(f"Gaussian 로드 실패: {e}")
         app.state.gaussian = None
 
+    # TripoSR 로드
+    try:
+        from services.triposr_service import TripoSRService
+        app.state.triposr = TripoSRService()
+        print("TripoSR 로드 완료!")
+    except Exception as e:
+        print(f"TripoSR 로드 실패: {e}")
+        app.state.triposr = None
+
+    yield
+        # 여기 아래는 서버 종료 시 실행 (없어도 됨)
+    print("서버 종료")
+
 
 
 app = FastAPI(title="Furniture Remover API", lifespan=lifespan)

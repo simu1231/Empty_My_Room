@@ -1,64 +1,57 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { useStore } from '../store/useStore'
 import toast from 'react-hot-toast'
+ 
 function MeshViewer({ data }) {
   const mountRef = useRef(null)
-
+ 
   useEffect(() => {
     if (!data || !mountRef.current) return
-
+ 
     const THREE = window.THREE
     const el = mountRef.current
     const width = el.clientWidth
     const height = 400
-
+ 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x1a1a1a)
-
+ 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 1000)
-
+ 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(width, height)
     el.appendChild(renderer.domElement)
-
-    // 조명
+ 
     scene.add(new THREE.AmbientLight(0xffffff, 0.8))
     const dir1 = new THREE.DirectionalLight(0xffffff, 1.0)
     dir1.position.set(5, 10, 5)
     scene.add(dir1)
-
-    // 메쉬
+ 
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(data.vertices.flat()), 3))
     geometry.setAttribute('color',    new THREE.BufferAttribute(new Float32Array(data.colors.flat()), 3))
     geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(data.faces.flat()), 1))
     geometry.computeVertexNormals()
     geometry.center()
-
-    // 크기 자동 계산
+ 
     geometry.computeBoundingBox()
     const size = new THREE.Vector3()
     geometry.boundingBox.getSize(size)
     const maxDim = Math.max(size.x, size.y, size.z)
     camera.position.set(0, maxDim * 0.5, maxDim * 1.5)
     camera.lookAt(0, 0, 0)
-
+ 
     const material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide })
     const group = new THREE.Group()
     const mesh = new THREE.Mesh(geometry, material)
     mesh.rotation.x = -Math.PI / 2
     group.add(mesh)
     scene.add(group)
-
-    // 드래그 - el 기준으로만
+ 
     let isDragging = false
     let prevX = 0, prevY = 0
-
-    const onDown = (e) => {
-      isDragging = true
-      prevX = e.clientX
-      prevY = e.clientY
-    }
+ 
+    const onDown = (e) => { isDragging = true; prevX = e.clientX; prevY = e.clientY }
     const onMove = (e) => {
       if (!isDragging) return
       group.rotation.y += (e.clientX - prevX) * 0.01
@@ -71,52 +64,49 @@ function MeshViewer({ data }) {
       e.preventDefault()
       camera.position.z = Math.max(0.1, Math.min(50, camera.position.z + e.deltaY * 0.01))
     }
-
+ 
     renderer.domElement.addEventListener('mousedown', onDown)
     renderer.domElement.addEventListener('mousemove', onMove)
     renderer.domElement.addEventListener('mouseup', onUp)
     renderer.domElement.addEventListener('mouseleave', onUp)
     renderer.domElement.addEventListener('wheel', onWheel, { passive: false })
-
+ 
     let animId
-    const animate = () => {
-      animId = requestAnimationFrame(animate)
-      renderer.render(scene, camera)
-    }
+    const animate = () => { animId = requestAnimationFrame(animate); renderer.render(scene, camera) }
     animate()
-
+ 
     return () => {
       cancelAnimationFrame(animId)
       renderer.dispose()
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement)
     }
   }, [data])
-
+ 
   return (
     <div ref={mountRef} style={{ width: '100%', height: '400px', borderRadius: '8px', overflow: 'hidden', cursor: 'grab' }} />
   )
 }
+ 
 function GaussianViewer({ data }) {
   const mountRef = useRef(null)
-
+ 
   useEffect(() => {
     if (!data || !mountRef.current) return
-
+ 
     const THREE = window.THREE
     const width  = mountRef.current.clientWidth
     const height = 400
-
+ 
     const scene    = new THREE.Scene()
     scene.background = new THREE.Color(0x111111)
-
+ 
     const camera = new THREE.PerspectiveCamera(60, width / height, 0.01, 100)
     camera.position.set(0, 0, 5)
-
+ 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(width, height)
     mountRef.current.appendChild(renderer.domElement)
-
-    // 가우시안 스프라이트 생성
+ 
     const canvas2d = document.createElement('canvas')
     canvas2d.width = 64
     canvas2d.height = 64
@@ -126,10 +116,10 @@ function GaussianViewer({ data }) {
     grad.addColorStop(1, 'rgba(255,255,255,0)')
     ctx2d.fillStyle = grad
     ctx2d.fillRect(0, 0, 64, 64)
-
+ 
     const spriteTex = new THREE.CanvasTexture(canvas2d)
     const group = new THREE.Group()
-
+ 
     data.means.forEach((pt, i) => {
       const c = data.colors[i]
       const mat = new THREE.SpriteMaterial({
@@ -145,18 +135,17 @@ function GaussianViewer({ data }) {
       sprite.scale.set(0.3, 0.3, 0.3)
       group.add(sprite)
     })
-
+ 
     scene.add(group)
-
-    // 중앙 정렬
+ 
     const box = new THREE.Box3().setFromObject(group)
     const center = box.getCenter(new THREE.Vector3())
     group.position.sub(center)
-
+ 
     let isDragging = false
     let prevX = 0, prevY = 0
     let autoRotate = true
-
+ 
     const onMouseDown = (e) => { isDragging = true; autoRotate = false; prevX = e.clientX; prevY = e.clientY }
     const onMouseUp   = ()  => { isDragging = false }
     const onMouseMove = (e) => {
@@ -170,13 +159,13 @@ function GaussianViewer({ data }) {
       camera.position.z += e.deltaY * 0.001
       camera.position.z = Math.max(0.5, Math.min(5, camera.position.z))
     }
-
+ 
     const el = renderer.domElement
     el.addEventListener('mousedown', onMouseDown)
     window.addEventListener('mouseup', onMouseUp)
     window.addEventListener('mousemove', onMouseMove)
     el.addEventListener('wheel', onWheel, { passive: false })
-
+ 
     let animId
     const animate = () => {
       animId = requestAnimationFrame(animate)
@@ -184,7 +173,7 @@ function GaussianViewer({ data }) {
       renderer.render(scene, camera)
     }
     animate()
-
+ 
     return () => {
       cancelAnimationFrame(animId)
       el.removeEventListener('mousedown', onMouseDown)
@@ -197,34 +186,32 @@ function GaussianViewer({ data }) {
       }
     }
   }, [data])
-
+ 
   return (
-    <div
-      ref={mountRef}
-      style={{ width: '100%', height: '400px', borderRadius: '8px', overflow: 'hidden', cursor: 'grab' }}
-    />
+    <div ref={mountRef} style={{ width: '100%', height: '400px', borderRadius: '8px', overflow: 'hidden', cursor: 'grab' }} />
   )
 }
+ 
 function PointCloudViewer({ data }) {
   const mountRef = useRef(null)
-
+ 
   useEffect(() => {
     if (!data || !mountRef.current) return
-
+ 
     const THREE = window.THREE
     const el = mountRef.current
     const width = el.clientWidth
     const height = 400
-
+ 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x1a1a1a)
-
+ 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 1000)
-
+ 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(width, height)
     el.appendChild(renderer.domElement)
-
+ 
     const positions = []
     const colors = []
     data.points.forEach((pt, i) => {
@@ -232,24 +219,24 @@ function PointCloudViewer({ data }) {
       const c = data.colors[i]
       colors.push(c[0], c[1], c[2])
     })
-
+ 
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
     geometry.center()
-
+ 
     geometry.computeBoundingBox()
     const size = new THREE.Vector3()
     geometry.boundingBox.getSize(size)
     const maxDim = Math.max(size.x, size.y, size.z)
     camera.position.set(0, maxDim * 0.5, maxDim * 1.5)
     camera.lookAt(0, 0, 0)
-
+ 
     const material = new THREE.PointsMaterial({ size: 0.3, vertexColors: true })
     const group = new THREE.Group()
     group.add(new THREE.Points(geometry, material))
     scene.add(group)
-
+ 
     let isDragging = false, prevX = 0, prevY = 0
     const onDown  = (e) => { isDragging = true; prevX = e.clientX; prevY = e.clientY }
     const onMove  = (e) => {
@@ -263,29 +250,30 @@ function PointCloudViewer({ data }) {
       e.preventDefault()
       camera.position.z = Math.max(0.1, Math.min(50, camera.position.z + e.deltaY * 0.05))
     }
-
+ 
     renderer.domElement.addEventListener('mousedown', onDown)
     renderer.domElement.addEventListener('mousemove', onMove)
     renderer.domElement.addEventListener('mouseup', onUp)
     renderer.domElement.addEventListener('mouseleave', onUp)
     renderer.domElement.addEventListener('wheel', onWheel, { passive: false })
-
+ 
     let animId
     const animate = () => { animId = requestAnimationFrame(animate); renderer.render(scene, camera) }
     animate()
-
+ 
     return () => {
       cancelAnimationFrame(animId)
       renderer.dispose()
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement)
     }
   }, [data])
-
+ 
   return <div ref={mountRef} style={{ width: '100%', height: '400px', borderRadius: '8px', overflow: 'hidden', cursor: 'grab' }} />
 }
+ 
 export default function RelocateStep() {
   const { originalFile, inpaintedUrl, clickPoints, maskB64, reset } = useStore()
-
+ 
   const canvasRef = useRef(null)
   const [furnitureList, setFurnitureList] = useState([])
   const [placedItems, setPlacedItems] = useState([])
@@ -296,21 +284,21 @@ export default function RelocateStep() {
   const dragState = useRef(null)
   const [views3D, setViews3D] = useState(null)
   const [generating3D, setGenerating3D] = useState(false)
-
+ 
   const extracted = useRef(false)
-    useEffect(() => {
-      if (!originalFile || !clickPoints.length || extracted.current) return
-      extracted.current = true
-      extractFurniture()
+  useEffect(() => {
+    if (!originalFile || !clickPoints.length || extracted.current) return
+    extracted.current = true
+    extractFurniture()
   }, [])
-
+ 
   useEffect(() => {
     if (!inpaintedUrl) return
     const img = new Image()
     img.src = inpaintedUrl
     img.onload = () => setBgImage(img)
   }, [inpaintedUrl])
-
+ 
   const getImg = (b64) => {
     if (imgCache.current[b64]) return imgCache.current[b64]
     const img = new Image()
@@ -318,7 +306,7 @@ export default function RelocateStep() {
     imgCache.current[b64] = img
     return img
   }
-
+ 
   const redraw = useCallback(() => {
     if (!bgImage) return
     const canvas = canvasRef.current
@@ -326,29 +314,27 @@ export default function RelocateStep() {
     canvas.width = bgImage.width
     canvas.height = bgImage.height
     ctx.drawImage(bgImage, 0, 0)
-
+ 
     placedItems.forEach(item => {
       const img = getImg(item.b64)
       const cx = item.x + item.width / 2
       const cy = item.y + item.height / 2
-
+ 
       ctx.save()
       ctx.translate(cx, cy)
       ctx.rotate((item.rotation || 0) * Math.PI / 180)
       if (item.flipped) ctx.scale(-1, 1)
       ctx.drawImage(img, -item.width / 2, -item.height / 2, item.width, item.height)
       ctx.restore()
-
+ 
       if (selectedId === item.id) {
-        // 테두리
         ctx.save()
         ctx.translate(cx, cy)
         ctx.rotate((item.rotation || 0) * Math.PI / 180)
         ctx.strokeStyle = '#00ff00'
         ctx.lineWidth = 3
         ctx.strokeRect(-item.width / 2, -item.height / 2, item.width, item.height)
-
-        // 모서리 핸들
+ 
         const corners = [
           [-item.width / 2, -item.height / 2],
           [item.width / 2, -item.height / 2],
@@ -360,8 +346,7 @@ export default function RelocateStep() {
           ctx.fillRect(hx - 7, hy - 7, 14, 14)
         })
         ctx.restore()
-
-        // 회전 핸들 (테두리 위 중앙)
+ 
         const rotHandleX = cx + Math.sin((item.rotation || 0) * Math.PI / 180) * (-item.height / 2 - 30)
         const rotHandleY = cy - Math.cos((item.rotation || 0) * Math.PI / 180) * (item.height / 2 + 30)
         ctx.beginPath()
@@ -371,14 +356,12 @@ export default function RelocateStep() {
         ctx.strokeStyle = 'white'
         ctx.lineWidth = 2
         ctx.stroke()
-        // 회전 아이콘 텍스트
         ctx.fillStyle = 'white'
         ctx.font = 'bold 12px Arial'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         ctx.fillText('↻', rotHandleX, rotHandleY)
-
-        // 뒤집기 버튼 (테두리 아래 중앙)
+ 
         const flipX = cx
         const flipY = cy + Math.cos((item.rotation || 0) * Math.PI / 180) * (item.height / 2 + 25)
         ctx.beginPath()
@@ -393,9 +376,9 @@ export default function RelocateStep() {
       }
     })
   }, [bgImage, placedItems, selectedId])
-
+ 
   useEffect(() => { redraw() }, [redraw])
-
+ 
   const getCanvasPos = (e) => {
     const canvas = canvasRef.current
     const rect = canvas.getBoundingClientRect()
@@ -404,7 +387,7 @@ export default function RelocateStep() {
       y: (e.clientY - rect.top) * (canvas.height / rect.height),
     }
   }
-
+ 
   const getRotatedLocal = (item, pos) => {
     const cx = item.x + item.width / 2
     const cy = item.y + item.height / 2
@@ -416,25 +399,23 @@ export default function RelocateStep() {
       ly: dx * Math.sin(angle) + dy * Math.cos(angle),
     }
   }
-
+ 
   const handleMouseDown = (e) => {
     const pos = getCanvasPos(e)
-
+ 
     if (selectedId !== null) {
       const item = placedItems.find(i => i.id === selectedId)
       if (item) {
         const cx = item.x + item.width / 2
         const cy = item.y + item.height / 2
-
-        // 회전 핸들 클릭
+ 
         const rotHandleX = cx + Math.sin((item.rotation || 0) * Math.PI / 180) * (-item.height / 2 - 30)
         const rotHandleY = cy - Math.cos((item.rotation || 0) * Math.PI / 180) * (item.height / 2 + 30)
         if (Math.hypot(pos.x - rotHandleX, pos.y - rotHandleY) < 14) {
           dragState.current = { type: 'rotate', cx, cy, itemId: item.id }
           return
         }
-
-        // 뒤집기 버튼 클릭
+ 
         const flipY = cy + Math.cos((item.rotation || 0) * Math.PI / 180) * (item.height / 2 + 25)
         if (Math.abs(pos.x - cx) < 30 && Math.abs(pos.y - flipY) < 14) {
           setPlacedItems(prev => prev.map(i =>
@@ -442,8 +423,7 @@ export default function RelocateStep() {
           ))
           return
         }
-
-        // 모서리 핸들 클릭
+ 
         const { lx, ly } = getRotatedLocal(item, pos)
         const hw = item.width / 2
         const hh = item.height / 2
@@ -461,8 +441,7 @@ export default function RelocateStep() {
         }
       }
     }
-
-    // 아이템 이동
+ 
     for (let i = placedItems.length - 1; i >= 0; i--) {
       const item = placedItems[i]
       const { lx, ly } = getRotatedLocal(item, pos)
@@ -474,19 +453,18 @@ export default function RelocateStep() {
     }
     setSelectedId(null)
   }
-
+ 
   const handleMouseMove = (e) => {
     if (!dragState.current) return
     const pos = getCanvasPos(e)
     const ds = dragState.current
-
+ 
     if (ds.type === 'move') {
       setPlacedItems(prev => prev.map(item =>
         item.id === ds.itemId ? { ...item, x: pos.x - ds.startX, y: pos.y - ds.startY } : item
       ))
     } else if (ds.type === 'rotate') {
       const angle = Math.atan2(pos.x - ds.cx, -(pos.y - ds.cy)) * 180 / Math.PI
-      // 30도 스냅
       const snapped = Math.round(angle / 30) * 30
       setPlacedItems(prev => prev.map(item =>
         item.id === selectedId ? { ...item, rotation: snapped } : item
@@ -498,21 +476,21 @@ export default function RelocateStep() {
       const angle = (orig.rotation || 0) * Math.PI / 180
       const ldx = dx * Math.cos(-angle) - dy * Math.sin(-angle)
       const ldy = dx * Math.sin(-angle) + dy * Math.cos(-angle)
-
+ 
       let { x, y, width, height } = orig
       if (ds.corner === 'se') { width = Math.max(50, orig.width + ldx); height = Math.max(50, orig.height + ldy) }
       else if (ds.corner === 'sw') { x = orig.x + ldx; width = Math.max(50, orig.width - ldx); height = Math.max(50, orig.height + ldy) }
       else if (ds.corner === 'ne') { y = orig.y + ldy; width = Math.max(50, orig.width + ldx); height = Math.max(50, orig.height - ldy) }
       else if (ds.corner === 'nw') { x = orig.x + ldx; y = orig.y + ldy; width = Math.max(50, orig.width - ldx); height = Math.max(50, orig.height - ldy) }
-
+ 
       setPlacedItems(prev => prev.map(item =>
         item.id === selectedId ? { ...item, x, y, width, height } : item
       ))
     }
   }
-
+ 
   const handleMouseUp = () => { dragState.current = null }
-
+ 
   const handleDrop = (e) => {
     e.preventDefault()
     const furnitureId = e.dataTransfer.getData('furnitureId')
@@ -533,7 +511,7 @@ export default function RelocateStep() {
     setSelectedId(newItem.id)
     toast.success('가구 배치! 모서리로 크기 조절, 위 파란 버튼으로 회전, 아래 버튼으로 반전')
   }
-
+ 
   const extractFurniture = async () => {
     setLoading(true)
     try {
@@ -552,61 +530,61 @@ export default function RelocateStep() {
       setLoading(false)
     }
   }
-
-   const generate3DViews = async (e, furniture) => {
-  e.stopPropagation()
-  setGenerating3D(true)
-  toast.success('SAM3D 포인트클라우드 생성 중...')
-  try {
-    const imgBlob = await fetch(`data:image/png;base64,${furniture.b64}`).then(r => r.blob())
-    const imgFile = new File([imgBlob], 'furniture.png', { type: 'image/png' })
-
-    const form = new FormData()
-    form.append('image', imgFile)
-
-    const res = await fetch('http://127.0.0.1:8000/api/sam3d/pointcloud', { method: 'POST', body: form })
-    const data = await res.json()
-    if (!data.success) throw new Error('SAM3D 생성 실패')
-
-    setViews3D({ sam3d: data.pointcloud, points: data.point_count })
-    toast.success(`SAM3D 완료! ${data.point_count}개 포인트 🎉`)
-  } catch (e) {
-    toast.error(`3D 생성 실패: ${e.message}`)
-  } finally {
-    setGenerating3D(false)
+ 
+  const generate3DViews = async (e, furniture) => {
+    e.stopPropagation()
+    setGenerating3D(true)
+    toast.success('TripoSR 3D 메쉬 생성 중...')
+    try {
+      const imgBlob = await fetch(`data:image/png;base64,${furniture.b64}`).then(r => r.blob())
+      const imgFile = new File([imgBlob], 'furniture.png', { type: 'image/png' })
+ 
+      const form = new FormData()
+      form.append('image', imgFile)
+ 
+      const res = await fetch('http://127.0.0.1:8000/api/triposr/mesh', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!data.success) throw new Error('TripoSR 생성 실패')
+ 
+      setViews3D({ mesh: data.mesh, vertices: data.vertices, faces: data.faces })
+      toast.success(`TripoSR 완료! 버텍스 ${data.vertices}개 🎉`)
+    } catch (e) {
+      toast.error(`3D 생성 실패: ${e.message}`)
+    } finally {
+      setGenerating3D(false)
+    }
   }
-}
-
+ 
   return (
     <>
-    {views3D && (
-      <div
-        style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 999,
-        }}
-        onMouseDown={e => e.stopPropagation()}
-        onMouseMove={e => e.stopPropagation()}
-        onMouseUp={e => e.stopPropagation()}
-      >
-        <div style={{ background: '#1a1a1a', borderRadius: '16px', padding: '24px', maxWidth: '800px', width: '90%' }}>
-          <h3 style={{ marginBottom: '8px' }}>🔷 SAM3D 포인트클라우드 뷰어</h3>
-          <p style={{ color: '#aaa', fontSize: '13px', marginBottom: '12px' }}>
-            포인트: {views3D.points?.toLocaleString()}개 · 마우스로 회전
-          </p>
-          <PointCloudViewer data={views3D.sam3d} />
-          <button onClick={() => setViews3D(null)}
-            style={{ marginTop: '16px', width: '100%', padding: '12px', background: '#333', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
-            닫기
-          </button>
+      {views3D && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 999,
+          }}
+          onMouseDown={e => e.stopPropagation()}
+          onMouseMove={e => e.stopPropagation()}
+          onMouseUp={e => e.stopPropagation()}
+        >
+          <div style={{ background: '#1a1a1a', borderRadius: '16px', padding: '24px', maxWidth: '800px', width: '90%' }}>
+            <h3 style={{ marginBottom: '8px' }}>🔷 TripoSR 3D 메쉬 뷰어</h3>
+            <p style={{ color: '#aaa', fontSize: '13px', marginBottom: '12px' }}>
+              버텍스: {views3D.vertices?.toLocaleString()}개 · 페이스: {views3D.faces?.toLocaleString()}개 · 마우스로 회전
+            </p>
+            <MeshViewer data={views3D.mesh} />
+            <button onClick={() => setViews3D(null)}
+              style={{ marginTop: '16px', width: '100%', padding: '12px', background: '#333', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+              닫기
+            </button>
+          </div>
         </div>
-      </div>
-    )}
+      )}
       <div style={{ padding: '20px' }}>
         <h2>가구 재배치</h2>
         <p style={{ color: '#aaa' }}>드래그로 배치 · 클릭 후 모서리로 크기조절</p>
-
+ 
         <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
           {/* 가구 목록 */}
           <div style={{ width: '160px', background: '#1a1a1a', borderRadius: '12px', padding: '12px', overflowY: 'auto', maxHeight: '600px' }}>
@@ -630,7 +608,7 @@ export default function RelocateStep() {
               ))
             }
           </div>
-
+ 
           {/* 캔버스 */}
           <div style={{ flex: 1 }}>
             <canvas ref={canvasRef}
@@ -643,7 +621,7 @@ export default function RelocateStep() {
               style={{ width: '100%', borderRadius: '12px', border: '2px solid #333', cursor: 'default' }}
             />
           </div>
-
+ 
           {/* 컨트롤 */}
           <div style={{ width: '160px', background: '#1a1a1a', borderRadius: '12px', padding: '12px' }}>
             <h3 style={{ marginBottom: '12px', fontSize: '14px' }}>컨트롤</h3>
