@@ -4,7 +4,7 @@ import base64
 import json
 import numpy as np
 import cv2
-from PIL import Image
+from PIL import Image, ImageOps
 from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException
 from fastapi.responses import JSONResponse
 
@@ -28,7 +28,11 @@ async def create_mask(
         raise HTTPException(503, "SAM2 모델이 로드되지 않았습니다")
 
     contents = await image.read()
-    image_np = np.array(Image.open(io.BytesIO(contents)).convert("RGB"))
+    # ImageOps.exif_transpose: 스마트폰 사진의 EXIF 회전 정보를 픽셀에 반영
+    # 미적용 시 브라우저(EXIF 자동 적용)와 백엔드 좌표계가 달라져 마스크 위치가 어긋남
+    _pil = Image.open(io.BytesIO(contents)).convert("RGB")
+    _pil = ImageOps.exif_transpose(_pil)
+    image_np = np.array(_pil)
 
     # 친구 코드 셀 3 그대로 MAX_SIZE=1024
     MAX_SIZE = 1024

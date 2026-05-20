@@ -27,6 +27,8 @@ class SDService:
             torch_dtype=torch.float16,
             safety_checker=None
         ).to('cuda')
+        self.pipe.enable_xformers_memory_efficient_attention() # xformers가 설치되어 있다면
+        self.pipe.enable_attention_slicing() # VRAM 사용량 최적화
         self.pipe.scheduler = DDIMScheduler.from_config(self.pipe.scheduler.config)
         print('ControlNet 로드 완료!')
 
@@ -56,8 +58,8 @@ class SDService:
 
         # 친구 코드 셀 7 SD 실행 그대로
         result = self.pipe(
-            prompt="empty room, continuous seamless wooden floor, clean flat white wall, photorealistic textures",
-            negative_prompt="furniture, bed, chair, table, objects, 3d render, shadows, clutter, lines, bumps",
+            prompt="empty room interior, match existing wall color and floor material, seamless natural textures, photorealistic, no objects",
+            negative_prompt="furniture, bed, chair, table, objects, 3d render, clutter, lines, bumps, color change, different material",
             image=image_pil,
             mask_image=mask_pil,
             control_image=canny_pil,
@@ -65,6 +67,7 @@ class SDService:
             guidance_scale=8.0,
             controlnet_conditioning_scale=1.0,
             strength=0.8,
+            generator=torch.Generator("cuda").manual_seed(42),
         ).images[0]
 
         result = result.resize((W, H), Image.LANCZOS)
