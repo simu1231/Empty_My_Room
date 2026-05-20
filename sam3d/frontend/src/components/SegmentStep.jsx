@@ -21,6 +21,7 @@ export default function SegmentStep() {
   const [selectedLabel, setSelectedLabel] = useState('소파')
   const [customLabel, setCustomLabel] = useState('')
   const [maskPreviews, setMaskPreviews] = useState({}) // label → base64 mask
+  const [resizedImageB64, setResizedImageB64] = useState(null) // 첫 미리보기에서 저장한 리사이즈 이미지
   const [maskLoading, setMaskLoading] = useState(false)
   const debounceRef = useRef(null)
 
@@ -113,6 +114,7 @@ export default function SegmentStep() {
       const data = await res.json()
       if (data.success) {
         setMaskPreviews(prev => ({ ...prev, [label]: data.mask_b64 }))
+        setResizedImageB64(prev => prev ?? data.resized_image_b64) // 처음 한 번만 저장
       }
     } catch (_) {}
     setMaskLoading(false)
@@ -136,32 +138,64 @@ export default function SegmentStep() {
     }, 300)
   }
 
-   const handleExtract = async () => {
+  // 미리보기 마스크들을 OR 합산 (lighten 합성)
+  const combineMaskPreviews = () => new Promise(resolve => {
+    const masks = Object.values(maskPreviews).filter(Boolean)
+    if (!masks.length) { resolve(null); return }
+    const first = new Image()
+    first.onload = () => {
+      const off = document.createElement('canvas')
+      off.width = first.naturalWidth; off.height = first.naturalHeight
+      const ctx = off.getContext('2d')
+      ctx.fillStyle = 'black'; ctx.fillRect(0, 0, off.width, off.height)
+      ctx.globalCompositeOperation = 'lighten'
+      let loaded = 0
+      masks.forEach(b64 => {
+        const img = new Image()
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0)
+          if (++loaded === masks.length) resolve(off.toDataURL('image/png').split(',')[1])
+        }
+        img.src = `data:image/png;base64,${b64}`
+      })
+    }
+    first.src = `data:image/png;base64,${masks[0]}`
+  })
+
+  const handleExtract = async () => {
   if (clickPoints.length === 0) {
     toast.error('가구를 먼저 클릭해서 선택하세요!')
     return
   }
   setLoading(true, 'SAM2가 가구 영역 분석중...')
   try {
-    // SAM2로 마스크 생성
-    const form1 = new FormData()
-    form1.append('image', originalFile)
-    form1.append('points', JSON.stringify(clickPoints.map(p => [p.x, p.y])))
-    form1.append('labels', JSON.stringify(clickPoints.map(p => p.label)))
+    // 모든 레이블 미리보기가 준비됐으면 SAM2 재호출 없이 재사용
+    const labels = [...new Set(clickPoints.map(p => p.label))]
+    const canReuse = resizedImageB64 && labels.every(l => maskPreviews[l])
 
-    const res1 = await fetch('http://127.0.0.1:8001/api/segment/mask', {
-      method: 'POST',
-      body: form1,
-    })
-    const data1 = await res1.json()
-    if (!data1.success) throw new Error('마스크 생성 실패')
-    setMask(data1.mask_b64)
+    let maskB64, resizedB64
+    if (canReuse) {
+      console.log('[최적화] SAM2 재호출 스킵 — 미리보기 마스크 재사용')
+      maskB64   = await combineMaskPreviews()
+      resizedB64 = resizedImageB64
+    } else {
+      const form1 = new FormData()
+      form1.append('image', originalFile)
+      form1.append('points', JSON.stringify(clickPoints.map(p => [p.x, p.y])))
+      form1.append('labels', JSON.stringify(clickPoints.map(p => p.label)))
+      const res1 = await fetch('http://127.0.0.1:8001/api/segment/mask', { method: 'POST', body: form1 })
+      const data1 = await res1.json()
+      if (!data1.success) throw new Error('마스크 생성 실패')
+      maskB64    = data1.mask_b64
+      resizedB64 = data1.resized_image_b64
+    }
+    setMask(maskB64)
 
     // LaMa로 빈방 만들기
     setLoading(true, 'LaMa가 가구 제거중...')
-    const maskBlob = await fetch(`data:image/png;base64,${data1.mask_b64}`).then(r => r.blob())
+    const maskBlob = await fetch(`data:image/png;base64,${maskB64}`).then(r => r.blob())
     const maskFile = new File([maskBlob], 'mask.png', { type: 'image/png' })
-    const resizedBlob = await fetch(`data:image/png;base64,${data1.resized_image_b64}`).then(r => r.blob())
+    const resizedBlob = await fetch(`data:image/png;base64,${resizedB64}`).then(r => r.blob())
     const resizedFile = new File([resizedBlob], 'resized.png', { type: 'image/png' })
 
     const form2 = new FormData()
@@ -287,7 +321,7 @@ export default function SegmentStep() {
             )}
           </div>
           <div>
-              <button onClick={() => { clearPoints(); setMaskPreviews({}) }} style={{ width: '100%', padding: '10px', marginBottom: '8px', background: '#333', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+              <button onClick={() => { clearPoints(); setMaskPreviews({}); setResizedImageB64(null) }} style={{ width: '100%', padding: '10px', marginBottom: '8px', background: '#333', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
                 🗑️ 초기화
               </button>
               <button onClick={handleExtract} style={{ width: '100%', padding: '12px', background: '#3498db', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold' }}>

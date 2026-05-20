@@ -45,13 +45,21 @@ class LamaService:
 
         img = image_np.astype(np.float32) / 255.0
         msk = (mask_np > 127).astype(np.float32)
+        print(f"[DEBUG LaMa] mask_np unique: {np.unique(mask_np)}, nonzero: {np.count_nonzero(mask_np)}")
+        print(f"[DEBUG LaMa] msk(float) sum: {msk.sum():.0f}, shape: {msk.shape}")
         img_t = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0).cuda()
         msk_t = torch.from_numpy(msk).unsqueeze(0).unsqueeze(0).cuda()
 
         with torch.no_grad():
             batch  = {'image': img_t, 'mask': msk_t}
             batch  = self.model(batch)
+            torch.cuda.synchronize()  # GPU 비동기 연산 완료 대기 (정확한 시간 측정용)
             result = batch['inpainted'][0].permute(1, 2, 0).cpu().numpy()
             result = (result * 255).clip(0, 255).astype(np.uint8)
+
+        diff = np.abs(result[:h, :w].astype(int) - image_np[:h, :w].astype(int)).mean()
+        print(f"[DEBUG LaMa] 원본과 결과 평균 차이: {diff:.2f} (0이면 LaMa 미작동)")
+        Image.fromarray(result[:h, :w]).save('/tmp/lama_debug.png')
+        print("[DEBUG] LaMa 결과 저장완료: /tmp/lama_debug.png")
 
         return result[:h, :w]

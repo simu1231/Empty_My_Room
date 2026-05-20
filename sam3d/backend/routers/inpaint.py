@@ -33,8 +33,11 @@ async def remove_furniture(
     mask_np  = np.array(Image.open(io.BytesIO(mask_bytes)).convert("L"))
 
     h, w = image_np.shape[:2]
+    print(f"[DEBUG] image shape: {image_np.shape}, mask shape before resize: {mask_np.shape}")
+    print(f"[DEBUG] mask unique values: {np.unique(mask_np)}, nonzero: {np.count_nonzero(mask_np)}")
     if mask_np.shape != (h, w):
         mask_np = cv2.resize(mask_np, (w, h), interpolation=cv2.INTER_NEAREST)
+        print(f"[DEBUG] mask resized to: {mask_np.shape}, nonzero after resize: {np.count_nonzero(mask_np)}")
 
     # LaMa
     print("LaMa 시작...")

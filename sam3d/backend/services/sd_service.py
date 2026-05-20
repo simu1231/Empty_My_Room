@@ -42,19 +42,21 @@ class SDService:
         image_pil = image_pil.resize((new_w, new_h))
         mask_pil  = mask_pil.resize((new_w, new_h))
 
-        # 친구 코드 셀 7 마스크 팽창 그대로
         mask_arr = np.array(mask_pil)
         mask_arr = cv2.dilate(mask_arr, np.ones((41, 41), np.uint8), iterations=2)
         kernel_down = np.zeros((40, 40), np.uint8)
         kernel_down[20:, :] = 1
         mask_arr = cv2.dilate(mask_arr, kernel_down, iterations=3)
-        mask_arr = cv2.GaussianBlur(mask_arr, (51, 51), 0)
-        mask_pil = Image.fromarray(mask_arr)
 
-        # 친구 코드 셀 7 Canny 엣지 그대로
+        # 블러 전 선명한 마스크로 엣지 제거 (블러 후엔 경계가 흐릿해져 > 128 기준이 애매해짐)
         image_cv = np.array(image_pil)
         edges    = cv2.Canny(image_cv, 100, 200)
+        edges[mask_arr > 128] = 0
         canny_pil = Image.fromarray(np.stack([edges]*3, axis=-1))
+
+        # 엣지 제거 후 블러 적용
+        mask_arr = cv2.GaussianBlur(mask_arr, (51, 51), 0)
+        mask_pil = Image.fromarray(mask_arr)
 
         # 친구 코드 셀 7 SD 실행 그대로
         result = self.pipe(
@@ -65,8 +67,8 @@ class SDService:
             control_image=canny_pil,
             num_inference_steps=50,
             guidance_scale=8.0,
-            controlnet_conditioning_scale=1.0,
-            strength=0.8,
+            controlnet_conditioning_scale=0.5,
+            strength=0.95,
             generator=torch.Generator("cuda").manual_seed(42),
         ).images[0]
 
