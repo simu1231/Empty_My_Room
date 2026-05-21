@@ -49,6 +49,26 @@ function MeshPreview({ meshData }) {
       cols[i*3] = meshData.colors[i][0]; cols[i*3+1] = meshData.colors[i][1]; cols[i*3+2] = meshData.colors[i][2]
     }
 
+    // 천장·앞벽 face를 배경색으로 숨기기 (0x13131a = 19/255)
+    let yMin2 = Infinity, yMax2 = -Infinity, zMin2 = Infinity, zMax2 = -Infinity
+    for (let i = 0; i < numVerts; i++) {
+      yMin2 = Math.min(yMin2, verts[i*3+1]); yMax2 = Math.max(yMax2, verts[i*3+1])
+      zMin2 = Math.min(zMin2, verts[i*3+2]); zMax2 = Math.max(zMax2, verts[i*3+2])
+    }
+    const ceilThresh  = yMin2 + (yMax2 - yMin2) * 0.82
+    const frontThresh = zMax2 - (zMax2 - zMin2) * 0.12
+    const bg = 19 / 255
+    for (let i = 0; i < numFaces; i++) {
+      const f0 = faces[i*3], f1 = faces[i*3+1], f2 = faces[i*3+2]
+      const fcy = (verts[f0*3+1] + verts[f1*3+1] + verts[f2*3+1]) / 3
+      const fcz = (verts[f0*3+2] + verts[f1*3+2] + verts[f2*3+2]) / 3
+      if (fcy > ceilThresh || fcz > frontThresh) {
+        cols[f0*3]=cols[f0*3+1]=cols[f0*3+2]=bg
+        cols[f1*3]=cols[f1*3+1]=cols[f1*3+2]=bg
+        cols[f2*3]=cols[f2*3+1]=cols[f2*3+2]=bg
+      }
+    }
+
     geo.setAttribute('position', new THREE.BufferAttribute(verts, 3))
     geo.setIndex(new THREE.BufferAttribute(faces, 1))
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3))

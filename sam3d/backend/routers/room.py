@@ -238,6 +238,18 @@ async def generate_room_3d(
             # 벽/바닥 평면 snap으로 울퉁불퉁함 제거
             vertices_np = _flatten_room_mesh(vertices_np)
 
+            # 천장·앞벽 face 제거
+            y_min_v = vertices_np[:, 1].min(); y_max_v = vertices_np[:, 1].max()
+            z_min_v = vertices_np[:, 2].min(); z_max_v = vertices_np[:, 2].max()
+            dy_v = y_max_v - y_min_v
+            dz_v = z_max_v - z_min_v
+            face_centers = vertices_np[faces_np].mean(axis=1)
+            is_ceiling = face_centers[:, 1] >= (y_max_v - 0.03 * dy_v)
+            is_front   = face_centers[:, 2] >= (z_max_v - 0.05 * dz_v)
+            keep = ~(is_ceiling | is_front)
+            faces_np = faces_np[keep]
+            print(f"[천장/앞벽 제거] {(~keep).sum()}개 face 제거")
+
             # 색 재할당: hole fill로 추가된 vertex 처리
             new_n = len(vertices_np)
             old_n = len(colors_np)
@@ -255,6 +267,33 @@ async def generate_room_3d(
         except Exception as pe:
             print(f"[후처리 스킵] {pe}")
             print(f"[완료] 버텍스: {len(vertices_np)}, 페이스: {len(faces_np)}")
+
+        # 바닥 커버리지 체크 → 부족하면 바닥 평면 추가
+        y_arr   = vertices_np[:, 1]
+        y_min_v = y_arr.min(); y_max_v = y_arr.max()
+        floor_v = vertices_np[y_arr <= (y_min_v + 0.15 * (y_max_v - y_min_v))]
+        if len(floor_v) > 3:
+            fx = floor_v[:, 0].max() - floor_v[:, 0].min()
+            fz = floor_v[:, 2].max() - floor_v[:, 2].min()
+            bx = vertices_np[:, 0].max() - vertices_np[:, 0].min()
+            bz = vertices_np[:, 2].max() - vertices_np[:, 2].min()
+            coverage = (fx * fz) / (bx * bz + 1e-6)
+        else:
+            coverage = 0.0
+
+        print(f"[바닥 커버리지] {coverage:.2f}")
+        if coverage < 0.4:
+            print(f"[바닥 추가] 커버리지 {coverage:.2f} → 바닥 평면 삽입")
+            x0, x1 = vertices_np[:, 0].min(), vertices_np[:, 0].max()
+            z0, z1 = vertices_np[:, 2].min(), vertices_np[:, 2].max()
+            yf = y_min_v
+            n  = len(vertices_np)
+            new_v = np.array([[x0,yf,z0],[x1,yf,z0],[x1,yf,z1],[x0,yf,z1]], dtype=np.float32)
+            new_f = np.array([[n,n+1,n+2],[n,n+2,n+3],[n+2,n+1,n],[n+3,n+2,n]], dtype=np.int32)
+            new_c = np.tile(fc, (4, 1))
+            vertices_np = np.vstack([vertices_np, new_v])
+            faces_np    = np.vstack([faces_np,    new_f])
+            colors_np   = np.vstack([colors_np,   new_c])
 
         body = orjson.dumps({
             "success":     True,

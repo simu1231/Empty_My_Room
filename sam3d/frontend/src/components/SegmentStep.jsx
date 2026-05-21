@@ -13,7 +13,7 @@ const FURNITURE_LIST = ['소파', '침대', '책상', '의자', '테이블', '�
 export default function SegmentStep() {
   const {
   originalFile, originalUrl,
-  clickPoints, addPoint, clearPoints,
+  clickPoints, addPoint, removeLastPoint, clearPoints,
   setStep, setLoading, setMask, setFurnitureList, setEmptyRoom
   } = useStore()
 
@@ -321,6 +321,24 @@ export default function SegmentStep() {
             )}
           </div>
           <div>
+              <button
+                onClick={() => {
+                  if (clickPoints.length === 0) return
+                  const removed = clickPoints[clickPoints.length - 1]
+                  removeLastPoint()
+                  const remaining = clickPoints.slice(0, -1).filter(p => p.label === removed.label)
+                  if (remaining.length === 0) {
+                    setMaskPreviews(prev => { const n = { ...prev }; delete n[removed.label]; return n })
+                  } else {
+                    if (debounceRef.current) clearTimeout(debounceRef.current)
+                    debounceRef.current = setTimeout(() => fetchMaskPreview(removed.label, remaining, originalFile), 300)
+                  }
+                }}
+                disabled={clickPoints.length === 0}
+                style={{ width: '100%', padding: '10px', marginBottom: '8px', background: clickPoints.length > 0 ? '#e67e22' : '#555', color: 'white', border: 'none', borderRadius: '8px', cursor: clickPoints.length > 0 ? 'pointer' : 'not-allowed' }}
+              >
+                ↩ 마지막 취소
+              </button>
               <button onClick={() => { clearPoints(); setMaskPreviews({}); setResizedImageB64(null) }} style={{ width: '100%', padding: '10px', marginBottom: '8px', background: '#333', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
                 🗑️ 초기화
               </button>

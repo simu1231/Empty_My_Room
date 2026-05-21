@@ -10,6 +10,7 @@ export const useStore = create((set) => ({
   },
   clickPoints: [],
   addPoint: (pt) => set((s) => ({ clickPoints: [...s.clickPoints, pt] })),
+  removeLastPoint: () => set((s) => ({ clickPoints: s.clickPoints.slice(0, -1) })),
   clearPoints: () => set({ clickPoints: [] }),
   maskB64: null,
   setMask: (b64) => set({ maskB64: b64 }),
