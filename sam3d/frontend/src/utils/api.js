@@ -1,7 +1,17 @@
 import axios from 'axios'
 
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001'
+
+export const API = {
+  segment:    `${API_BASE}/api/segment/mask`,
+  inpaint:    `${API_BASE}/api/inpaint/remove`,
+  extract:    `${API_BASE}/api/extract/furniture`,
+  generate3d: `${API_BASE}/api/room/generate3d`,
+  sam3dMesh:  `${API_BASE}/api/sam3d/mesh`,
+}
+
 const api = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: API_BASE,
   timeout: 120000,
 })
 

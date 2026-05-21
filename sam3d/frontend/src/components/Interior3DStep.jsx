@@ -103,20 +103,27 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
         ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke()
       }
     } else {
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.07)'
-      ctx.lineWidth = 1
-      const plankWidth = 48
-      for (let x = 0; x <= 512; x += plankWidth) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 512); ctx.stroke()
-        let startY = (x % (plankWidth * 2) === 0) ? 0 : 200
-        for (let y = startY; y <= 512; y += 400) {
-          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + plankWidth, y); ctx.stroke()
-        }
+      // 가로 나무 판자 (달하우스 스타일 나무바닥)
+      const plankH = 36
+      for (let y = 0; y <= 512; y += plankH) {
+        // 판자 경계선
+        ctx.strokeStyle = 'rgba(0,0,0,0.12)'
+        ctx.lineWidth = 1.5
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke()
+        // 판자 중간 결 (밝게)
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)'
+        ctx.lineWidth = 0.8
+        ctx.beginPath(); ctx.moveTo(0, y + plankH * 0.4); ctx.lineTo(512, y + plankH * 0.4); ctx.stroke()
+        // 판자 이음새 (엇갈리게)
+        const offset = (Math.floor(y / plankH) % 2 === 0) ? 180 : 360
+        ctx.strokeStyle = 'rgba(0,0,0,0.08)'
+        ctx.lineWidth = 1
+        ctx.beginPath(); ctx.moveTo(offset, y); ctx.lineTo(offset, y + plankH); ctx.stroke()
       }
     }
     const texture = new window.THREE.CanvasTexture(canvas)
     texture.wrapS = texture.wrapT = window.THREE.RepeatWrapping
-    texture.repeat.set(2, 2)
+    texture.repeat.set(3, 3)
     return texture
   }
  
@@ -143,11 +150,12 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
     const { w: width, h: height } = getSize()
  
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x2a2a2a)
+    scene.background = new THREE.Color(0x1a1a2e)
     sceneRef.current = scene
  
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 1000)
-    camera.position.set(0, roomSize.height * 1.5, roomSize.depth * 2.5)
+    const camera = new THREE.PerspectiveCamera(35, width / height, 0.01, 1000)
+    const _cd = Math.max(roomSize.width, roomSize.depth, roomSize.height) * 2.2
+    camera.position.set(_cd * 0.8, _cd * 0.6, _cd * 0.8)
     camera.lookAt(0, 0, 0)
     cameraRef.current = camera
  
@@ -168,16 +176,17 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
     resizeObserver.observe(el)
     const raycaster = new THREE.Raycaster()
  
-    // 3단계(RoomMakingStep)와 동일한 조명 세팅
-    scene.add(new THREE.AmbientLight(0xffffff, roomMesh ? 0.55 : 0.75))
-    const sunLight = new THREE.DirectionalLight(0xffffff, roomMesh ? 0.7 : 0.5)
-    sunLight.position.set(2, 6, 4)
-    scene.add(sunLight)
-    if (roomMesh) {
-      const fill = new THREE.DirectionalLight(0xffffff, 0.2)
-      fill.position.set(-3, 2, -2)
-      scene.add(fill)
-    }
+    // 달하우스 스타일 조명
+    scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.85)
+    keyLight.position.set(8, 12, 8)
+    scene.add(keyLight)
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.3)
+    fillLight.position.set(-6, 4, -6)
+    scene.add(fillLight)
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.15)
+    rimLight.position.set(-4, 8, 4)
+    scene.add(rimLight)
  
     const w = roomSize.width
     const h = roomSize.height
@@ -285,27 +294,74 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
                   'center:', bCenter.x.toFixed(2), bCenter.y.toFixed(2), bCenter.z.toFixed(2))
  
     } else {
-      // 기본 박스 방
-      const floorMat = roomSurfaceTextures?.floor
-        ? makeSurfaceMat(roomSurfaceTextures.floor, fc, 0.8)
-        : new THREE.MeshStandardMaterial({ map: createDynamicTexture(fColor, 'plank'), roughness: 0.8 })
-      const wallMat = makeSurfaceMat(roomSurfaceTextures?.wall, wc, 1.0)
- 
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), floorMat)
-      floor.rotation.x = -Math.PI / 2; floor.position.y = -h / 2; floor.name = 'floor'
+      // ── 인테리어 시뮬레이션 박스 방 ──
+      const WT = 0.08   // 벽 두께
+      const FT = 0.04   // 바닥 두께
+      const BH = 0.10   // 걸레받이 높이
+      const BD = 0.025  // 걸레받이 두께
+
+      // 벽: 추출 색상 단색 (photo 텍스처 제거 → 깔끔한 실내 느낌)
+      const wallMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(...wc), roughness: 0.92, metalness: 0, side: THREE.FrontSide
+      })
+      // 바닥: 추출 색상으로 절차적 나무 패턴 (photo 텍스처보다 깔끔)
+      const floorMat = new THREE.MeshStandardMaterial({
+        map: createDynamicTexture(fColor, 'plank'), roughness: 0.75, metalness: 0
+      })
+      // 걸레받이: 벽보다 약간 어두운 단색
+      const baseColor = new THREE.Color(...wc).multiplyScalar(0.7)
+      const baseMat = new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.8 })
+
+      // 바닥 (두께 있는 박스)
+      const floor = new THREE.Mesh(new THREE.BoxGeometry(w, FT, d), floorMat)
+      floor.position.y = -h / 2 - FT / 2; floor.name = 'floor'
       scene.add(floor); floorRef.current = floor
- 
-      const backWall = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMat)
-      backWall.position.z = -d / 2; backWall.name = 'wall_back'
+
+      // 뒷벽 (두께 있는 박스)
+      const backWall = new THREE.Mesh(new THREE.BoxGeometry(w + WT * 2, h, WT), wallMat)
+      backWall.position.set(0, 0, -d / 2 - WT / 2); backWall.name = 'wall_back'
       scene.add(backWall); backWallRef.current = backWall
- 
-      const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(d, h), wallMat)
-      leftWall.rotation.y = Math.PI / 2; leftWall.position.x = -w / 2; leftWall.name = 'wall_left'
+
+      // 왼쪽 벽
+      const leftWall = new THREE.Mesh(new THREE.BoxGeometry(WT, h, d), wallMat)
+      leftWall.position.set(-w / 2 - WT / 2, 0, 0); leftWall.name = 'wall_left'
       scene.add(leftWall); leftWallRef.current = leftWall
- 
-      const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(d, h), wallMat)
-      rightWall.rotation.y = -Math.PI / 2; rightWall.position.x = w / 2; rightWall.name = 'wall_right'
+
+      // 오른쪽 벽
+      const rightWall = new THREE.Mesh(new THREE.BoxGeometry(WT, h, d), wallMat)
+      rightWall.position.set(w / 2 + WT / 2, 0, 0); rightWall.name = 'wall_right'
       scene.add(rightWall); rightWallRef.current = rightWall
+
+      // 걸레받이 (뒷벽, 왼쪽, 오른쪽)
+      const bBack  = new THREE.Mesh(new THREE.BoxGeometry(w, BH, BD), baseMat)
+      bBack.position.set(0, -h / 2 + BH / 2, -d / 2 + BD / 2)
+      scene.add(bBack)
+      const bLeft  = new THREE.Mesh(new THREE.BoxGeometry(BD, BH, d), baseMat)
+      bLeft.position.set(-w / 2 + BD / 2, -h / 2 + BH / 2, 0)
+      scene.add(bLeft)
+      const bRight = new THREE.Mesh(new THREE.BoxGeometry(BD, BH, d), baseMat)
+      bRight.position.set(w / 2 - BD / 2, -h / 2 + BH / 2, 0)
+      scene.add(bRight)
+
+      // raycasting용 invisible plane (바닥은 실제 박스 위쪽 면 높이)
+      const invisMat2 = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
+      const floorPlane = new THREE.Mesh(new THREE.PlaneGeometry(w, d), invisMat2)
+      floorPlane.rotation.x = -Math.PI / 2
+      floorPlane.position.y = -h / 2
+      floorPlane.name = 'floor'
+      scene.add(floorPlane); floorRef.current = floorPlane
+
+      const bwPlane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), invisMat2)
+      bwPlane.position.z = -d / 2; bwPlane.name = 'wall_back'
+      scene.add(bwPlane); backWallRef.current = bwPlane
+
+      const lwPlane = new THREE.Mesh(new THREE.PlaneGeometry(d, h), invisMat2)
+      lwPlane.rotation.y = Math.PI / 2; lwPlane.position.x = -w / 2; lwPlane.name = 'wall_left'
+      scene.add(lwPlane); leftWallRef.current = lwPlane
+
+      const rwPlane = new THREE.Mesh(new THREE.PlaneGeometry(d, h), invisMat2)
+      rwPlane.rotation.y = -Math.PI / 2; rwPlane.position.x = w / 2; rwPlane.name = 'wall_right'
+      scene.add(rwPlane); rightWallRef.current = rwPlane
     }
  
     const getMousePos = (e) => {
@@ -597,7 +653,8 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       cameraRef.current.lookAt(camTargetRef.current.x, 0, camTargetRef.current.z)
     } else {
       camTargetRef.current = { x: 0, y: 0, z: 0 }
-      cameraRef.current.position.set(0, roomSize.height * 1.5, roomSize.depth * 2.5)
+      const cd = Math.max(roomSize.width, roomSize.depth, roomSize.height) * 2.2
+      cameraRef.current.position.set(cd * 0.8, cd * 0.6, cd * 0.8)
       cameraRef.current.lookAt(0, 0, 0)
     }
   }, [viewMode])
