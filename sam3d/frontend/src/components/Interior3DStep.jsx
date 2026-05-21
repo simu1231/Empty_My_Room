@@ -86,7 +86,7 @@ function MiniMeshViewer({ data }) {
   return <div ref={mountRef} style={{ width: '100%', height: '120px', borderRadius: '6px', overflow: 'hidden' }} />
 }
  
-function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, roomMesh, placedMeshes, onDrop, onDelete, onCopy, viewMode }) {
+function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, roomMesh, roomWindows, placedMeshes, onDrop, onDelete, onCopy, viewMode }) {
   const createDynamicTexture = (baseColor, type = 'plank') => {
     const canvas = document.createElement('canvas')
     canvas.width = 512
@@ -317,34 +317,75 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       floor.position.y = -h / 2 - FT / 2; floor.name = 'floor'
       scene.add(floor); floorRef.current = floor
 
-      // 뒷벽 (두께 있는 박스)
-      const backWall = new THREE.Mesh(new THREE.BoxGeometry(w + WT * 2, h, WT), wallMat)
-      backWall.position.set(0, 0, -d / 2 - WT / 2); backWall.name = 'wall_back'
+      // ── 창문 구멍 있는 뒷벽 ──
+      const wins = (roomWindows || []).filter(win => win.wall === 'back')
+      const backShape = new THREE.Shape()
+      backShape.moveTo(-w / 2, -h / 2); backShape.lineTo(w / 2, -h / 2)
+      backShape.lineTo(w / 2, h / 2);   backShape.lineTo(-w / 2, h / 2)
+      backShape.closePath()
+      wins.forEach(win => {
+        const cx  = (win.nx - 0.5) * w
+        const cy  = (0.5 - win.ny * 0.85) * h     // ny: 위=0 → Three.js y 방향 보정
+        const hw  = (win.nw * w) / 2
+        const hh  = (win.nh * h * 0.75) / 2
+        const hole = new THREE.Path()
+        hole.moveTo(cx - hw, cy - hh); hole.lineTo(cx + hw, cy - hh)
+        hole.lineTo(cx + hw, cy + hh); hole.lineTo(cx - hw, cy + hh)
+        hole.closePath()
+        backShape.holes.push(hole)
+      })
+      const backGeo = new THREE.ExtrudeGeometry(backShape, { depth: WT, bevelEnabled: false })
+      const backWallMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(...wc), roughness: 0.92, metalness: 0, side: THREE.DoubleSide })
+      const backWall = new THREE.Mesh(backGeo, backWallMat)
+      backWall.position.set(0, 0, -d / 2 - WT); backWall.name = 'wall_back'
       scene.add(backWall); backWallRef.current = backWall
+
+      // 창문 유리 + 창틀
+      const glassMat  = new THREE.MeshPhysicalMaterial({ color: 0xc8e8ff, transparent: true, opacity: 0.25, roughness: 0, metalness: 0.1, side: THREE.DoubleSide })
+      const frameMat2 = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.5 })
+      const FW = 0.04  // 창틀 두께
+      wins.forEach(win => {
+        const cx = (win.nx - 0.5) * w
+        const cy = (0.5 - win.ny * 0.85) * h
+        const ww = win.nw * w;  const wh = win.nh * h * 0.75
+        const gz = -d / 2 + 0.01
+        // 유리
+        scene.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(ww, wh), glassMat), { position: new THREE.Vector3(cx, cy, gz) }))
+        // 창틀 4면
+        ;[
+          [ww + FW, FW, cx, cy + wh / 2 + FW / 2],
+          [ww + FW, FW, cx, cy - wh / 2 - FW / 2],
+          [FW, wh, cx - ww / 2 - FW / 2, cy],
+          [FW, wh, cx + ww / 2 + FW / 2, cy],
+        ].forEach(([fw, fh, fx, fy]) => {
+          const fm = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, FW), frameMat2)
+          fm.position.set(fx, fy, gz - FW / 2)
+          scene.add(fm)
+        })
+      })
 
       // 왼쪽 벽
       const leftWall = new THREE.Mesh(new THREE.BoxGeometry(WT, h, d), wallMat)
       leftWall.position.set(-w / 2 - WT / 2, 0, 0); leftWall.name = 'wall_left'
       scene.add(leftWall); leftWallRef.current = leftWall
 
-      // 오른쪽 벽
-      const rightWall = new THREE.Mesh(new THREE.BoxGeometry(WT, h, d), wallMat)
-      rightWall.position.set(w / 2 + WT / 2, 0, 0); rightWall.name = 'wall_right'
-      scene.add(rightWall); rightWallRef.current = rightWall
-
-      // 걸레받이 (뒷벽, 왼쪽, 오른쪽)
+      // 걸레받이 (뒷벽, 왼쪽)
       const bBack  = new THREE.Mesh(new THREE.BoxGeometry(w, BH, BD), baseMat)
       bBack.position.set(0, -h / 2 + BH / 2, -d / 2 + BD / 2)
       scene.add(bBack)
       const bLeft  = new THREE.Mesh(new THREE.BoxGeometry(BD, BH, d), baseMat)
       bLeft.position.set(-w / 2 + BD / 2, -h / 2 + BH / 2, 0)
       scene.add(bLeft)
-      const bRight = new THREE.Mesh(new THREE.BoxGeometry(BD, BH, d), baseMat)
-      bRight.position.set(w / 2 - BD / 2, -h / 2 + BH / 2, 0)
-      scene.add(bRight)
 
       // raycasting용 invisible plane (바닥은 실제 박스 위쪽 면 높이)
       const invisMat2 = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
+
+      // 천장 — 보이지 않지만 조명 배치용 raycasting plane
+      const ceilingPlane = new THREE.Mesh(new THREE.PlaneGeometry(w, d), invisMat2)
+      ceilingPlane.rotation.x = Math.PI / 2
+      ceilingPlane.position.y = h / 2
+      ceilingPlane.name = 'ceiling'
+      scene.add(ceilingPlane); ceilingRef.current = ceilingPlane
       const floorPlane = new THREE.Mesh(new THREE.PlaneGeometry(w, d), invisMat2)
       floorPlane.rotation.x = -Math.PI / 2
       floorPlane.position.y = -h / 2
@@ -359,9 +400,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       lwPlane.rotation.y = Math.PI / 2; lwPlane.position.x = -w / 2; lwPlane.name = 'wall_left'
       scene.add(lwPlane); leftWallRef.current = lwPlane
 
-      const rwPlane = new THREE.Mesh(new THREE.PlaneGeometry(d, h), invisMat2)
-      rwPlane.rotation.y = -Math.PI / 2; rwPlane.position.x = w / 2; rwPlane.name = 'wall_right'
-      scene.add(rwPlane); rightWallRef.current = rwPlane
+      rightWallRef.current = null
     }
  
     const getMousePos = (e) => {
@@ -423,14 +462,52 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
           return
         }
  
-        const intersects = raycaster.intersectObject(floorRef.current)
-        if (intersects.length > 0) {
-          const halfW = roomSize.width / 2 - 0.02
-          const halfD = roomSize.depth / 2 - 0.02
-          let newX = Math.max(-halfW, Math.min(halfW, intersects[0].point.x))
-          let newZ = Math.max(-halfD, Math.min(halfD, intersects[0].point.z))
-          selectedObjRef.current.position.x = newX
-          selectedObjRef.current.position.z = newZ
+        const sel = selectedObjRef.current
+        const prevX = sel.position.x
+        const prevZ = sel.position.z
+
+        // 다른 가구 위에 올리기 — 위쪽 면(normal.y > 0.5) 감지
+        const others = Object.values(placedGroupsRef.current).filter(
+          g => g !== sel && !g.userData.isWallItem && !g.userData.isCeilingItem
+        )
+        const furHits = raycaster.intersectObjects(others, true)
+        const topHit = furHits.find(h => {
+          const n = h.face?.normal.clone().applyQuaternion(h.object.getWorldQuaternion(new THREE.Quaternion()))
+          return n && n.y > 0.5
+        })
+
+        if (topHit) {
+          sel.position.x = topHit.point.x
+          sel.position.z = topHit.point.z
+          sel.position.y = topHit.point.y + (sel.userData.halfSize || 0.3)
+        } else {
+          const floorHits = floorRef.current ? raycaster.intersectObject(floorRef.current) : []
+          if (floorHits.length > 0) {
+            const halfW = roomSize.width / 2 - 0.02
+            const halfD = roomSize.depth / 2 - 0.02
+            sel.position.x = Math.max(-halfW, Math.min(halfW, floorHits[0].point.x))
+            sel.position.z = Math.max(-halfD, Math.min(halfD, floorHits[0].point.z))
+
+            // 바닥 레벨에서만 XZ 충돌 체크
+            const shx = (sel.userData.halfFX || sel.userData.halfSize || 0.3) - 0.04
+            const shz = (sel.userData.halfFZ || sel.userData.halfSize || 0.3) - 0.04
+            const shy = (sel.userData.halfSize || 0.3) - 0.04
+            const sp = sel.position
+            const collides = others.some(g => {
+              const ghx = (g.userData.halfFX || g.userData.halfSize || 0.3) - 0.04
+              const ghz = (g.userData.halfFZ || g.userData.halfSize || 0.3) - 0.04
+              const ghy = (g.userData.halfSize || 0.3) - 0.04
+              const gp = g.position
+              const xzOvlp = sp.x - shx < gp.x + ghx && sp.x + shx > gp.x - ghx &&
+                             sp.z - shz < gp.z + ghz && sp.z + shz > gp.z - ghz
+              const yOvlp  = sp.y - shy < gp.y + ghy && sp.y + shy > gp.y - ghy
+              return xzOvlp && yOvlp
+            })
+            if (collides) {
+              sel.position.x = prevX
+              sel.position.z = prevZ
+            }
+          }
         }
  
       } else if (isRotating) {
@@ -632,7 +709,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
  
       sceneRef.current.add(group)
       placedGroupsRef.current[instanceId] = group
- 
+
       if (!group.userData.isWallItem && !group.userData.isCeilingItem) {
         const box = new THREE.Box3().setFromObject(group)
         const floorY = -roomSize.height / 2
@@ -663,10 +740,11 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
  
   const handleDrop = (e) => {
     e.preventDefault()
-    const furnitureId = Number(e.dataTransfer.getData('furnitureId'))
+    const furnitureId = e.dataTransfer.getData('furnitureId')
     const furnitureName = e.dataTransfer.getData('furnitureName') || ''
     const isWallItem = [...WALL_ITEM_NAMES].some(k => furnitureName.includes(k))
-    const isCeilingItem = [...CEILING_ITEM_NAMES].some(k => furnitureName.includes(k))
+    // '스탠드 조명'은 바닥 아이템 — '조명' 포함 여부 체크 전에 제외
+    const isCeilingItem = !furnitureName.includes('스탠드') && [...CEILING_ITEM_NAMES].some(k => furnitureName.includes(k))
     const isCeilingOrFloor = [...CEILING_OR_FLOOR_NAMES].some(k => furnitureName.includes(k))
     const THREE = window.THREE
     const raycaster = new THREE.Raycaster()
@@ -769,12 +847,14 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
     if (selectedObjRef.current) {
       const group = selectedObjRef.current
       group.scale.multiplyScalar(factor)
-      const newHs = (group.userData.halfSize || 0.5) * factor
-      group.userData.halfSize = newHs
-      group.userData.halfFX = (group.userData.halfFX || newHs) * factor
-      group.userData.halfFZ = (group.userData.halfFZ || newHs) * factor
-      if (!group.userData.isWallItem) {
-        group.position.y = -roomSize.height / 2 + newHs
+      group.userData.halfSize = (group.userData.halfSize || 0.5) * factor
+      group.userData.halfFX = (group.userData.halfFX || group.userData.halfSize) * factor
+      group.userData.halfFZ = (group.userData.halfFZ || group.userData.halfSize) * factor
+      if (!group.userData.isWallItem && !group.userData.isCeilingItem) {
+        const T = window.THREE
+        const box = new T.Box3().setFromObject(group)
+        const floorY = -roomSize.height / 2
+        group.position.y += floorY - box.min.y
       }
     }
   }
@@ -915,6 +995,16 @@ const PROCEDURAL_FURNITURE = {
     { size:[0.84,0.02,0.26], pos:[0,1.44, 0],    c:[0.91,0.88,0.82] },
     { size:[0.90,0.03,0.30], pos:[0,1.795,0],    c:[0.72,0.69,0.62] },
   ]},
+  '문': { w:0.9, d:0.06, h:2.1, wallItem:true, parts:[
+    { size:[0.06,2.10,0.06], pos:[-0.42, 0,    0],    c:[0.52,0.38,0.26] },
+    { size:[0.06,2.10,0.06], pos:[ 0.42, 0,    0],    c:[0.52,0.38,0.26] },
+    { size:[0.90,0.06,0.06], pos:[ 0,    1.02, 0],    c:[0.52,0.38,0.26] },
+    { size:[0.78,1.98,0.04], pos:[ 0,    0,    0.01], c:[0.78,0.62,0.45] },
+    { size:[0.66,0.68,0.02], pos:[ 0,    0.56, 0.03], c:[0.84,0.70,0.52] },
+    { size:[0.66,0.90,0.02], pos:[ 0,   -0.42, 0.03], c:[0.84,0.70,0.52] },
+    { size:[0.05,0.12,0.05], pos:[ 0.30, 0.05, 0.06], c:[0.75,0.72,0.65] },
+    { size:[0.06,0.03,0.03], pos:[ 0.36, 0.05, 0.06], c:[0.75,0.72,0.65] },
+  ]},
   '창문': { w:1.2, d:0.10, h:1.0, wallItem:true, parts:[
     { size:[1.20,0.07,0.10], pos:[0, 0.465,0],  c:[0.90,0.90,0.90] },
     { size:[1.20,0.07,0.10], pos:[0,-0.465,0],  c:[0.90,0.90,0.90] },
@@ -1006,7 +1096,7 @@ function buildProceduralGroup(THREE, data) {
   return group
 }
  
-const WALL_ITEM_NAMES = new Set(['창문', '액자', '그림', '거울', '에어컨', '시계', '커튼'])
+const WALL_ITEM_NAMES = new Set(['문', '창문', '액자', '그림', '거울', '에어컨', '시계', '커튼'])
 const CEILING_ITEM_NAMES = new Set(['조명'])
 const CEILING_OR_FLOOR_NAMES = new Set(['화분'])
  
@@ -1055,7 +1145,7 @@ async function dbDeleteDesign(id) {
 }
  
 export default function Interior3DStep() {
-  const { furnitureList, roomSize, roomColors, roomTextures, roomSurfaceTextures, roomMesh, reset, originalFile,
+  const { furnitureList, roomSize, roomColors, roomTextures, roomSurfaceTextures, roomMesh, roomWindows, reset, originalFile,
           savedDesignToLoad, clearSavedDesignToLoad, setSavedDesignToLoad, setStep } = useStore()
   const roomColorsMemo = useMemo(() => ({
     wall: roomColors?.wall || [0.9, 0.9, 0.9],
@@ -1128,7 +1218,7 @@ export default function Interior3DStep() {
   const handleDelete = (instanceId) => {
     setPlacedMeshes(prev => { const next = { ...prev }; delete next[instanceId]; return next })
   }
- 
+
   const handleCopy = (instanceId) => {
     setPlacedMeshes(prev => {
       const original = prev[instanceId]
@@ -1173,16 +1263,27 @@ export default function Interior3DStep() {
   }
  
   const handleDrop = (furnitureId, position) => {
-    const meshData = furnitureMeshes[furnitureId]
+    if (String(furnitureId).startsWith('preset_')) {
+      const name = String(furnitureId).replace('preset_', '')
+      const def = findProceduralDef(name)
+      if (!def) return
+      const data = { type: 'procedural', name, wallItem: def.wallItem || false, halfH: def.h / 2, halfFX: def.w / 2, halfFZ: def.d / 2, parts: def.parts }
+      const instanceId = `${furnitureId}_${Date.now()}`
+      setPlacedMeshes(prev => ({ ...prev, [instanceId]: { data, position, estimatedRealSize: def.w } }))
+      return
+    }
+
+    const numId = Number(furnitureId)
+    const meshData = furnitureMeshes[numId]
     if (!meshData) { toast.error('먼저 3D 변환을 해주세요!'); return }
- 
+
     const allSizes = Object.values(furniturePxSizes)
     const maxPxDim = allSizes.length ? Math.max(...allSizes.map(s => Math.max(s.w, s.h))) : 100
-    const thisPxDim = furniturePxSizes[furnitureId] ? Math.max(furniturePxSizes[furnitureId].w, furniturePxSizes[furnitureId].h) : maxPxDim
+    const thisPxDim = furniturePxSizes[numId] ? Math.max(furniturePxSizes[numId].w, furniturePxSizes[numId].h) : maxPxDim
     const referenceRealSize = roomSize.width * 0.4
     const estimatedRealSize = referenceRealSize * (thisPxDim / maxPxDim)
- 
-    const instanceId = `${furnitureId}_${Date.now()}`
+
+    const instanceId = `${numId}_${Date.now()}`
     setPlacedMeshes(prev => ({ ...prev, [instanceId]: { data: meshData, position, estimatedRealSize } }))
   }
  
@@ -1198,6 +1299,7 @@ export default function Interior3DStep() {
           roomTextures={roomTextures}
           roomSurfaceTextures={roomSurfaceTextures}
           roomMesh={roomMesh}
+          roomWindows={roomWindows}
           placedMeshes={placedMeshes}
           onDrop={handleDrop}
           onDelete={handleDelete}
@@ -1234,6 +1336,35 @@ export default function Interior3DStep() {
       }}>
         <div style={{ padding: '14px 14px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <h3 style={{ margin: 0, fontSize: '13px', color: '#ddd', fontWeight: 600 }}>추출된 가구</h3>
+        </div>
+        {/* 문 추가 섹션 */}
+        <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ fontSize: '10px', color: '#666', letterSpacing: '0.06em', marginBottom: '6px' }}>벽 설치 아이템</div>
+          {[
+            { id: 'preset_문', name: '문', icon: '🚪', desc: '0.9×2.1m' },
+            { id: 'preset_창문', name: '창문', icon: '🪟', desc: '1.2×1.0m' },
+          ].map(item => (
+            <div key={item.id}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('furnitureId', item.id)
+                e.dataTransfer.setData('furnitureName', item.name)
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                background: 'rgba(255,255,255,0.06)', borderRadius: '8px',
+                padding: '7px 10px', marginBottom: '5px',
+                border: '1px solid rgba(255,255,255,0.1)',
+                cursor: 'grab',
+              }}
+            >
+              <span style={{ fontSize: '18px' }}>{item.icon}</span>
+              <div>
+                <div style={{ fontSize: '12px', color: '#ddd', fontWeight: 600 }}>{item.name}</div>
+                <div style={{ fontSize: '10px', color: '#666' }}>{item.desc}</div>
+              </div>
+            </div>
+          ))}
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
           {furnitureList.map((f, i) => (
