@@ -350,7 +350,9 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
         const ww = win.nw * w;  const wh = win.nh * h * 0.75
         const gz = -d / 2 + 0.01
         // 유리
-        scene.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(ww, wh), glassMat), { position: new THREE.Vector3(cx, cy, gz) }))
+        const glass = new THREE.Mesh(new THREE.PlaneGeometry(ww, wh), glassMat)
+        glass.position.set(cx, cy, gz)
+        scene.add(glass)
         // 창틀 4면
         ;[
           [ww + FW, FW, cx, cy + wh / 2 + FW / 2],
