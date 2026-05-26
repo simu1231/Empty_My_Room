@@ -86,7 +86,7 @@ function MiniMeshViewer({ data }) {
   return <div ref={mountRef} style={{ width: '100%', height: '120px', borderRadius: '6px', overflow: 'hidden' }} />
 }
  
-function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, roomMesh, roomWindows, placedMeshes, onDrop, onDelete, onCopy, viewMode }) {
+function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, roomMesh, placedMeshes, onDrop, onDelete, onCopy, viewMode }) {
   const createDynamicTexture = (baseColor, type = 'plank') => {
     const canvas = document.createElement('canvas')
     canvas.width = 512
@@ -317,54 +317,11 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       floor.position.y = -h / 2 - FT / 2; floor.name = 'floor'
       scene.add(floor); floorRef.current = floor
 
-      // ── 창문 구멍 있는 뒷벽 ──
-      const wins = (roomWindows || []).filter(win => win.wall === 'back')
-      const backShape = new THREE.Shape()
-      backShape.moveTo(-w / 2, -h / 2); backShape.lineTo(w / 2, -h / 2)
-      backShape.lineTo(w / 2, h / 2);   backShape.lineTo(-w / 2, h / 2)
-      backShape.closePath()
-      wins.forEach(win => {
-        const cx  = (win.nx - 0.5) * w
-        const cy  = (0.5 - win.ny * 0.85) * h     // ny: 위=0 → Three.js y 방향 보정
-        const hw  = (win.nw * w) / 2
-        const hh  = (win.nh * h * 0.75) / 2
-        const hole = new THREE.Path()
-        hole.moveTo(cx - hw, cy - hh); hole.lineTo(cx + hw, cy - hh)
-        hole.lineTo(cx + hw, cy + hh); hole.lineTo(cx - hw, cy + hh)
-        hole.closePath()
-        backShape.holes.push(hole)
-      })
-      const backGeo = new THREE.ExtrudeGeometry(backShape, { depth: WT, bevelEnabled: false })
+      // 뒷벽
       const backWallMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(...wc), roughness: 0.92, metalness: 0, side: THREE.DoubleSide })
-      const backWall = new THREE.Mesh(backGeo, backWallMat)
-      backWall.position.set(0, 0, -d / 2 - WT); backWall.name = 'wall_back'
+      const backWall = new THREE.Mesh(new THREE.BoxGeometry(w, h, WT), backWallMat)
+      backWall.position.set(0, 0, -d / 2 - WT / 2); backWall.name = 'wall_back'
       scene.add(backWall); backWallRef.current = backWall
-
-      // 창문 유리 + 창틀
-      const glassMat  = new THREE.MeshPhysicalMaterial({ color: 0xc8e8ff, transparent: true, opacity: 0.25, roughness: 0, metalness: 0.1, side: THREE.DoubleSide })
-      const frameMat2 = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.5 })
-      const FW = 0.04  // 창틀 두께
-      wins.forEach(win => {
-        const cx = (win.nx - 0.5) * w
-        const cy = (0.5 - win.ny * 0.85) * h
-        const ww = win.nw * w;  const wh = win.nh * h * 0.75
-        const gz = -d / 2 + 0.01
-        // 유리
-        const glass = new THREE.Mesh(new THREE.PlaneGeometry(ww, wh), glassMat)
-        glass.position.set(cx, cy, gz)
-        scene.add(glass)
-        // 창틀 4면
-        ;[
-          [ww + FW, FW, cx, cy + wh / 2 + FW / 2],
-          [ww + FW, FW, cx, cy - wh / 2 - FW / 2],
-          [FW, wh, cx - ww / 2 - FW / 2, cy],
-          [FW, wh, cx + ww / 2 + FW / 2, cy],
-        ].forEach(([fw, fh, fx, fy]) => {
-          const fm = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, FW), frameMat2)
-          fm.position.set(fx, fy, gz - FW / 2)
-          scene.add(fm)
-        })
-      })
 
       // 왼쪽 벽
       const leftWall = new THREE.Mesh(new THREE.BoxGeometry(WT, h, d), wallMat)
@@ -1147,7 +1104,7 @@ async function dbDeleteDesign(id) {
 }
  
 export default function Interior3DStep() {
-  const { furnitureList, roomSize, roomColors, roomTextures, roomSurfaceTextures, roomMesh, roomWindows, reset, originalFile,
+  const { furnitureList, roomSize, roomColors, roomTextures, roomSurfaceTextures, roomMesh, reset, originalFile,
           savedDesignToLoad, clearSavedDesignToLoad, setSavedDesignToLoad, setStep } = useStore()
   const roomColorsMemo = useMemo(() => ({
     wall: roomColors?.wall || [0.9, 0.9, 0.9],
@@ -1301,7 +1258,6 @@ export default function Interior3DStep() {
           roomTextures={roomTextures}
           roomSurfaceTextures={roomSurfaceTextures}
           roomMesh={roomMesh}
-          roomWindows={roomWindows}
           placedMeshes={placedMeshes}
           onDrop={handleDrop}
           onDelete={handleDelete}

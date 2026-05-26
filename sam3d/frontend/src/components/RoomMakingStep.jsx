@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 export default function RoomMakingStep() {
   const {
     emptyRoomUrl, emptyRoomFile,
-    setStep, setRoomSize, setRoomMesh, setRoomColors, setRoomSurfaceTextures, setRoomWindows, setLoading, reset
+    setStep, setRoomSize, setRoomMesh, setRoomColors, setRoomSurfaceTextures, setLoading, reset
   } = useStore()
 
   const [width,  setW] = useState(4.5)
@@ -30,7 +30,6 @@ export default function RoomMakingStep() {
         floorColor: data.floor_color,
         wallTex:    data.wall_texture,
         floorTex:   data.floor_texture,
-        windows:    data.windows || [],
       })
       toast.success('색상 분석 완료!')
     } catch (e) {
@@ -46,7 +45,6 @@ export default function RoomMakingStep() {
     setRoomSize({ width: parseFloat(width), depth: parseFloat(depth), height: parseFloat(height) })
     setRoomColors({ wall: preview.wallColor, floor: preview.floorColor })
     setRoomSurfaceTextures({ wall: preview.wallTex, floor: preview.floorTex })
-    setRoomWindows(preview.windows || [])
     setRoomMesh(null)   // SAM3D 메시 없이 Three.js 박스 방 사용
     setStep('interior3d')
   }

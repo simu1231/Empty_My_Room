@@ -3,7 +3,6 @@ import gc
 import json
 import base64
 import numpy as np
-import cv2
 import torch
 import orjson
 from PIL import Image
@@ -76,41 +75,6 @@ def _crop_and_resize(rgb: np.ndarray, mask: np.ndarray):
     return rgb, mask
 
 
-def _detect_windows(img_np):
-    """밝기 기반 창문 영역 자동 감지 — 정규화 좌표 반환"""
-    h, w = img_np.shape[:2]
-    wall_h = int(h * 0.75)           # 이미지 상단 75%가 벽 영역
-    wall_area = img_np[:wall_h, :]
-
-    gray = cv2.cvtColor(wall_area, cv2.COLOR_RGB2GRAY)
-    _, bright = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)
-
-    kernel = np.ones((20, 20), np.uint8)
-    bright = cv2.morphologyEx(bright, cv2.MORPH_CLOSE, kernel)
-    bright = cv2.morphologyEx(bright, cv2.MORPH_OPEN,  kernel)
-
-    contours, _ = cv2.findContours(bright, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    windows = []
-    for cnt in contours:
-        area = cv2.contourArea(cnt)
-        if area < h * w * 0.02:      # 전체 이미지 2% 미만은 무시
-            continue
-        x, y, bw, bh = cv2.boundingRect(cnt)
-        aspect = bw / max(bh, 1)
-        if not (0.3 < aspect < 5.0): # 가늘거나 극단적으로 넓은 건 무시
-            continue
-        windows.append({
-            "nx": (x + bw / 2) / w,          # 벽 면 기준 중심 x (0~1)
-            "ny": (y + bh / 2) / wall_h,      # 벽 면 기준 중심 y (0~1, 위=0)
-            "nw": bw / w,
-            "nh": bh / wall_h,
-            "wall": "back",
-        })
-
-    windows.sort(key=lambda x: x["nw"] * x["nh"], reverse=True)
-    print(f"[창문 감지] {len(windows[:2])}개: {windows[:2]}")
-    return windows[:2]
-
 
 @router.post("/extract-colors")
 async def extract_room_colors(image: UploadFile = File(...)):
@@ -138,15 +102,12 @@ async def extract_room_colors(image: UploadFile = File(...)):
     wall_tex.save(wall_buf, format='JPEG', quality=85)
     wall_tex_b64 = base64.b64encode(wall_buf.getvalue()).decode()
 
-    windows = _detect_windows(img_np)
-
     return JSONResponse({
         "success": True,
         "floor_color": floor_color,
         "wall_color": wall_color,
         "floor_texture": floor_tex_b64,
         "wall_texture": wall_tex_b64,
-        "windows": windows,
     })
 
 
