@@ -3,6 +3,7 @@ import gc
 import json
 import base64
 import numpy as np
+import requests
 import torch
 import orjson
 from PIL import Image
@@ -15,6 +16,7 @@ PIPELINE_CONFIG = '/home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints/pi
 WORKSPACE_DIR   = '/home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints'
 MIN_INPUT_SIZE  = 512
 MAX_INPUT_SIZE  = 1024
+ULAYOUT_SIDECAR_URL = 'http://localhost:8002/infer'
 
 
 def _flatten_room_mesh(vertices_np: np.ndarray, snap_strength: float = 0.9, snap_zone: float = 0.28) -> np.ndarray:
@@ -109,6 +111,30 @@ async def extract_room_colors(image: UploadFile = File(...)):
         "floor_texture": floor_tex_b64,
         "wall_texture": wall_tex_b64,
     })
+
+
+@router.post("/layout")
+async def estimate_room_layout(image: UploadFile = File(...), camera_height_m: float = Form(1.6)):
+    """
+    uLayout 사이드카(별도 conda env, localhost:8002)로 빈방 이미지를 보내
+    방 폭/깊이/높이(m)를 추정해서 돌려준다. 사이드카가 꺼져있으면 프론트가
+    수동 입력값으로 폴백할 수 있도록 success:false로 응답한다.
+    """
+    img_bytes = await image.read()
+    try:
+        resp = requests.post(
+            ULAYOUT_SIDECAR_URL,
+            files={"image": (image.filename or "room.jpg", img_bytes, image.content_type or "image/jpeg")},
+            data={"camera_height_m": camera_height_m},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return JSONResponse(resp.json())
+    except requests.exceptions.RequestException as e:
+        return JSONResponse(
+            {"success": False, "error": f"uLayout 서버에 연결할 수 없습니다: {e}"},
+            status_code=503,
+        )
 
 
 @router.post("/generate3d")

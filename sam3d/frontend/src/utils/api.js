@@ -8,6 +8,7 @@ export const API = {
   extract:    `${API_BASE}/api/extract/furniture`,
   generate3d: `${API_BASE}/api/room/generate3d`,
   sam3dMesh:  `${API_BASE}/api/sam3d/mesh`,
+  layout:     `${API_BASE}/api/room/layout`,
 }
 
 const api = axios.create({

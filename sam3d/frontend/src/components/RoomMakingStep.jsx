@@ -14,16 +14,25 @@ export default function RoomMakingStep() {
   const [height, setH] = useState(2.5)
   const [preview, setPreview] = useState(null)   // { wallColor, floorColor, wallTex, floorTex }
   const [analyzing, setAnalyzing] = useState(false)
+  const [layoutAuto, setLayoutAuto] = useState(false)   // 치수가 자동 추정된 값인지
 
   const handleAnalyze = async () => {
     if (!emptyRoomFile) return
     setAnalyzing(true)
-    setLoading(true, '빈방 이미지에서 색상·텍스처 분석 중...')
+    setLoading(true, '빈방 이미지에서 색상·텍스처·레이아웃 분석 중...')
     try {
-      const form = new FormData()
-      form.append('image', emptyRoomFile)
-      const res  = await fetch(`${API.generate3d.replace('generate3d', 'extract-colors')}`, { method: 'POST', body: form })
-      const data = await res.json()
+      const colorForm = new FormData()
+      colorForm.append('image', emptyRoomFile)
+      const layoutForm = new FormData()
+      layoutForm.append('image', emptyRoomFile)
+
+      const [colorRes, layoutRes] = await Promise.allSettled([
+        fetch(`${API.generate3d.replace('generate3d', 'extract-colors')}`, { method: 'POST', body: colorForm }),
+        fetch(API.layout, { method: 'POST', body: layoutForm }),
+      ])
+
+      if (colorRes.status !== 'fulfilled') throw new Error('색상 분석 요청 실패')
+      const data = await colorRes.value.json()
       if (!data.success) throw new Error(data.error || '분석 실패')
       setPreview({
         wallColor:  data.wall_color,
@@ -31,7 +40,25 @@ export default function RoomMakingStep() {
         wallTex:    data.wall_texture,
         floorTex:   data.floor_texture,
       })
-      toast.success('색상 분석 완료!')
+
+      // 레이아웃(방 치수) 자동 추정 — 실패해도 색상 분석 결과는 그대로 사용, 수동 입력값 유지
+      if (layoutRes.status === 'fulfilled') {
+        const layoutData = await layoutRes.value.json()
+        if (layoutData.success) {
+          const d = layoutData.room_dimensions_m
+          setW(d.room_width_m.toFixed(2))
+          setD(d.room_depth_m.toFixed(2))
+          setH(d.room_height_m.toFixed(2))
+          setLayoutAuto(true)
+          toast.success('색상 분석 + 방 치수 자동 추정 완료!')
+        } else {
+          setLayoutAuto(false)
+          toast.success('색상 분석 완료! (치수는 수동 입력해주세요)')
+        }
+      } else {
+        setLayoutAuto(false)
+        toast.success('색상 분석 완료! (치수는 수동 입력해주세요)')
+      }
     } catch (e) {
       toast.error('분석 실패: ' + e.message)
     } finally {
@@ -94,11 +121,18 @@ export default function RoomMakingStep() {
 
         {/* 방 크기 */}
         <div style={{ background: '#111', border: '1px solid #222', borderRadius: 12, padding: '14px' }}>
-          <div style={{ fontSize: 11, color: '#444', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>방 크기 (m)</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: '#444', letterSpacing: '0.08em', textTransform: 'uppercase' }}>방 크기 (m)</div>
+            {layoutAuto && (
+              <span style={{ fontSize: 10, color: '#6bcB77', background: 'rgba(107,203,119,0.12)', padding: '2px 6px', borderRadius: 6 }}>
+                자동 추정
+              </span>
+            )}
+          </div>
           {[['가로', width, setW], ['세로', depth, setD], ['높이', height, setH]].map(([label, val, set]) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <label style={{ fontSize: 12, color: '#555', width: 30 }}>{label}</label>
-              <input type="number" value={val} onChange={e => set(e.target.value)} min="1" max="20" step="0.5"
+              <input type="number" value={val} onChange={e => { set(e.target.value); setLayoutAuto(false) }} min="1" max="20" step="0.5"
                 style={{ flex: 1, padding: '6px 8px', background: '#0a0a0a', border: '1px solid #222', borderRadius: 7, color: '#c0c0d0', fontSize: 13, outline: 'none' }} />
               <span style={{ fontSize: 11, color: '#333' }}>m</span>
             </div>

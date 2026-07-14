@@ -1,4 +1,5 @@
 import io
+import os
 import time
 import base64
 import numpy as np
@@ -8,6 +9,8 @@ from fastapi import APIRouter, UploadFile, File, Request, HTTPException
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
+
+EMPTY_ROOM_SAVE_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'empty_room.jpg')
 
 def np_to_b64(image_np):
     img_pil = Image.fromarray(image_np)
@@ -58,6 +61,11 @@ async def remove_furniture(
         final_result = lama_result
 
     print(f"[⏱ 처리시간] 인페인팅 전체: {_lama_time + _sd_time:.2f}초")
+
+    os.makedirs(os.path.dirname(EMPTY_ROOM_SAVE_PATH), exist_ok=True)
+    Image.fromarray(final_result).save(EMPTY_ROOM_SAVE_PATH, quality=95)
+    print(f"[DEBUG] 빈 방 이미지 저장: {EMPTY_ROOM_SAVE_PATH}")
+
     return JSONResponse({
         "success": True,
         "result_b64": np_to_b64(final_result),
