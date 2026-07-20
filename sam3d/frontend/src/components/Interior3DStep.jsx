@@ -300,10 +300,20 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       const BH = 0.10   // 걸레받이 높이
       const BD = 0.025  // 걸레받이 두께
 
+      // A-3: mipmap + anisotropic filtering — 원거리 벽/바닥이 뭉개지거나 aliasing 나는 것 완화
+      const maxAniso = renderer.capabilities.getMaxAnisotropy()
+      const applyFiltering = (tex) => {
+        tex.generateMipmaps = true
+        tex.minFilter = THREE.LinearMipmapLinearFilter
+        tex.magFilter = THREE.LinearFilter
+        tex.anisotropy = maxAniso
+        return tex
+      }
+
       // uLayout rectify 실사 텍스처(있으면 사용) — 이미 해당 면 전체 크기로 펴져 있으므로 타일링 없이 1:1 매핑
       const makeRectifiedMat = (b64, side = THREE.FrontSide) => {
         if (!b64) return null
-        const tex = loader.load(`data:image/jpeg;base64,${b64}`)
+        const tex = applyFiltering(loader.load(`data:image/jpeg;base64,${b64}`))
         tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping
         return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0, side })
       }
@@ -315,7 +325,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       // 단색 대신 사진 질감이 살아있도록 함). rectify 실사 텍스처가 있으면 그게 우선.
       const makeTiledPatchMat = (b64, repeatX, repeatY, side = THREE.FrontSide) => {
         if (!b64) return null
-        const tex = loader.load(`data:image/jpeg;base64,${b64}`)
+        const tex = applyFiltering(loader.load(`data:image/jpeg;base64,${b64}`))
         tex.wrapS = tex.wrapT = THREE.RepeatWrapping
         tex.repeat.set(repeatX, repeatY)
         return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0, side })
