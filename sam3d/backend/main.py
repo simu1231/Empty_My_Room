@@ -6,6 +6,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+import pillow_heif
+pillow_heif.register_heif_opener()  # 아이폰 HEIC/HEIF 업로드를 PIL.Image.open()에서 바로 열 수 있게 등록
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("SAM3D 서버 시작 - AI 모델 로드 중...")

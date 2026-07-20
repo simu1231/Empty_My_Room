@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
-import { API } from '../utils/api'
+import { API, b64ToFile } from '../utils/api'
 import toast from 'react-hot-toast'
 
 export default function RoomMakingStep() {
   const {
-    emptyRoomUrl, emptyRoomFile,
-    setStep, setRoomSize, setRoomMesh, setRoomColors, setRoomSurfaceTextures, setLoading, reset
+    emptyRoomUrl, emptyRoomFile, maskB64,
+    setStep, setRoomSize, setRoomMesh, setRoomColors, setRoomSurfaceTextures, setRoomBoxTextures, setLoading, reset
   } = useStore()
 
   const [width,  setW] = useState(4.5)
@@ -23,12 +23,17 @@ export default function RoomMakingStep() {
     try {
       const colorForm = new FormData()
       colorForm.append('image', emptyRoomFile)
+      // 가구/창문/커튼을 지울 때 쓴 SAM2 마스크 — 있으면 패치 후보 선정 시 제외 영역으로 재사용
+      if (maskB64) colorForm.append('mask', b64ToFile(maskB64, 'mask.png', 'image/png'))
       const layoutForm = new FormData()
       layoutForm.append('image', emptyRoomFile)
+      const rectifyForm = new FormData()
+      rectifyForm.append('image', emptyRoomFile)
 
-      const [colorRes, layoutRes] = await Promise.allSettled([
+      const [colorRes, layoutRes, rectifyRes] = await Promise.allSettled([
         fetch(`${API.generate3d.replace('generate3d', 'extract-colors')}`, { method: 'POST', body: colorForm }),
         fetch(API.layout, { method: 'POST', body: layoutForm }),
+        fetch(API.rectifyTextures, { method: 'POST', body: rectifyForm }),
       ])
 
       if (colorRes.status !== 'fulfilled') throw new Error('색상 분석 요청 실패')
@@ -39,6 +44,8 @@ export default function RoomMakingStep() {
         floorColor: data.floor_color,
         wallTex:    data.wall_texture,
         floorTex:   data.floor_texture,
+        wallPatch:  data.wall_patch,   // 타일링용 균일 패치 (RANSAC 실패 시 기본 폴백)
+        floorPatch: data.floor_patch,
       })
 
       // 레이아웃(방 치수) 자동 추정 — 실패해도 색상 분석 결과는 그대로 사용, 수동 입력값 유지
@@ -59,6 +66,15 @@ export default function RoomMakingStep() {
         setLayoutAuto(false)
         toast.success('색상 분석 완료! (치수는 수동 입력해주세요)')
       }
+
+      // 벽/바닥/천장 실사 텍스처 rectify — 실패해도 위 분석 결과는 그대로 사용,
+      // Interior3DStep이 procedural 단색/패턴으로 폴백함
+      if (rectifyRes.status === 'fulfilled') {
+        const rectifyData = await rectifyRes.value.json()
+        if (rectifyData.success) {
+          setPreview(p => ({ ...p, boxTextures: rectifyData.textures }))
+        }
+      }
     } catch (e) {
       toast.error('분석 실패: ' + e.message)
     } finally {
@@ -71,7 +87,8 @@ export default function RoomMakingStep() {
     if (!preview) { toast.error('먼저 방을 분석해주세요'); return }
     setRoomSize({ width: parseFloat(width), depth: parseFloat(depth), height: parseFloat(height) })
     setRoomColors({ wall: preview.wallColor, floor: preview.floorColor })
-    setRoomSurfaceTextures({ wall: preview.wallTex, floor: preview.floorTex })
+    setRoomSurfaceTextures({ wall: preview.wallPatch, floor: preview.floorPatch })
+    setRoomBoxTextures(preview.boxTextures || null)
     setRoomMesh(null)   // SAM3D 메시 없이 Three.js 박스 방 사용
     setStep('interior3d')
   }

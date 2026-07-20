@@ -32,6 +32,9 @@ export const useStore = create((set) => ({
   setRoomTextures: (textures) => set({ roomTextures: textures }),
   roomSurfaceTextures: null,
   setRoomSurfaceTextures: (t) => set({ roomSurfaceTextures: t }),
+  // uLayout 기반 rectify된 벽/바닥/천장 실사 텍스처 ({ back_wall, left_wall, right_wall, floor, ceiling } base64 JPEG)
+  roomBoxTextures: null,
+  setRoomBoxTextures: (t) => set({ roomBoxTextures: t }),
   roomMesh: null,
   setRoomMesh: (mesh) => set({ roomMesh: mesh }),
   loading: false,
@@ -54,6 +57,7 @@ export const useStore = create((set) => ({
     roomColors: { wall: [0.9, 0.9, 0.9], floor: [0.6, 0.4, 0.2] },
     roomTextures: { wall: null, floor: null },
     roomSurfaceTextures: null,
+    roomBoxTextures: null,
     roomMesh: null,
     loading: false,
     loadingMsg: '',

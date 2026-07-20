@@ -86,7 +86,7 @@ function MiniMeshViewer({ data }) {
   return <div ref={mountRef} style={{ width: '100%', height: '120px', borderRadius: '6px', overflow: 'hidden' }} />
 }
  
-function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, roomMesh, placedMeshes, onDrop, onDelete, onCopy, viewMode }) {
+function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, roomBoxTextures, roomMesh, placedMeshes, onDrop, onDelete, onCopy, viewMode }) {
   const createDynamicTexture = (baseColor, type = 'plank') => {
     const canvas = document.createElement('canvas')
     canvas.width = 512
@@ -300,12 +300,36 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       const BH = 0.10   // 걸레받이 높이
       const BD = 0.025  // 걸레받이 두께
 
-      // 벽: 추출 색상 단색 (photo 텍스처 제거 → 깔끔한 실내 느낌)
-      const wallMat = new THREE.MeshStandardMaterial({
+      // uLayout rectify 실사 텍스처(있으면 사용) — 이미 해당 면 전체 크기로 펴져 있으므로 타일링 없이 1:1 매핑
+      const makeRectifiedMat = (b64, side = THREE.FrontSide) => {
+        if (!b64) return null
+        const tex = loader.load(`data:image/jpeg;base64,${b64}`)
+        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping
+        return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0, side })
+      }
+      const rectBack  = roomBoxTextures && makeRectifiedMat(roomBoxTextures.back_wall, THREE.DoubleSide)
+      const rectLeft  = roomBoxTextures && makeRectifiedMat(roomBoxTextures.left_wall)
+      const rectFloor = roomBoxTextures && makeRectifiedMat(roomBoxTextures.floor)
+
+      // 원본 사진에서 오려낸 "무늬 균일한" 패치를 타일링하는 폴백 (RANSAC 코너 검출 실패 시에도
+      // 단색 대신 사진 질감이 살아있도록 함). rectify 실사 텍스처가 있으면 그게 우선.
+      const makeTiledPatchMat = (b64, repeatX, repeatY, side = THREE.FrontSide) => {
+        if (!b64) return null
+        const tex = loader.load(`data:image/jpeg;base64,${b64}`)
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+        tex.repeat.set(repeatX, repeatY)
+        return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0, side })
+      }
+      const tileWall  = roomSurfaceTextures?.wall  && makeTiledPatchMat(roomSurfaceTextures.wall, 4, 3)
+      const tileBack  = roomSurfaceTextures?.wall  && makeTiledPatchMat(roomSurfaceTextures.wall, 4, 3, THREE.DoubleSide)
+      const tileFloor = roomSurfaceTextures?.floor && makeTiledPatchMat(roomSurfaceTextures.floor, 5, 5)
+
+      // 벽: 1순위 rectify 실사, 2순위 사진 패치 타일링, 3순위(둘 다 없으면) 추출 색상 단색
+      const wallMat = rectLeft || tileWall || new THREE.MeshStandardMaterial({
         color: new THREE.Color(...wc), roughness: 0.92, metalness: 0, side: THREE.FrontSide
       })
-      // 바닥: 추출 색상으로 절차적 나무 패턴 (photo 텍스처보다 깔끔)
-      const floorMat = new THREE.MeshStandardMaterial({
+      // 바닥: 1순위 rectify 실사, 2순위 사진 패치 타일링, 3순위 절차적 나무 패턴
+      const floorMat = rectFloor || tileFloor || new THREE.MeshStandardMaterial({
         map: createDynamicTexture(fColor, 'plank'), roughness: 0.75, metalness: 0
       })
       // 걸레받이: 벽보다 약간 어두운 단색
@@ -318,7 +342,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       scene.add(floor); floorRef.current = floor
 
       // 뒷벽
-      const backWallMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(...wc), roughness: 0.92, metalness: 0, side: THREE.DoubleSide })
+      const backWallMat = rectBack || tileBack || new THREE.MeshStandardMaterial({ color: new THREE.Color(...wc), roughness: 0.92, metalness: 0, side: THREE.DoubleSide })
       const backWall = new THREE.Mesh(new THREE.BoxGeometry(w, h, WT), backWallMat)
       backWall.position.set(0, 0, -d / 2 - WT / 2); backWall.name = 'wall_back'
       scene.add(backWall); backWallRef.current = backWall
@@ -534,7 +558,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       renderer.dispose()
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement)
     }
-  }, [roomSize, roomColors, roomTextures])
+  }, [roomSize, roomColors, roomTextures, roomBoxTextures])
  
   useEffect(() => {
     if (!sceneRef.current) return
@@ -1104,7 +1128,7 @@ async function dbDeleteDesign(id) {
 }
  
 export default function Interior3DStep() {
-  const { furnitureList, roomSize, roomColors, roomTextures, roomSurfaceTextures, roomMesh, reset, originalFile,
+  const { furnitureList, roomSize, roomColors, roomTextures, roomSurfaceTextures, roomBoxTextures, roomMesh, reset, originalFile,
           savedDesignToLoad, clearSavedDesignToLoad, setSavedDesignToLoad, setStep } = useStore()
   const roomColorsMemo = useMemo(() => ({
     wall: roomColors?.wall || [0.9, 0.9, 0.9],
@@ -1257,6 +1281,7 @@ export default function Interior3DStep() {
           roomColors={roomColorsMemo}
           roomTextures={roomTextures}
           roomSurfaceTextures={roomSurfaceTextures}
+          roomBoxTextures={roomBoxTextures}
           roomMesh={roomMesh}
           placedMeshes={placedMeshes}
           onDrop={handleDrop}
@@ -1385,6 +1410,11 @@ export default function Interior3DStep() {
           color: '#ddd', border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: '10px', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
         }}>🗑️ 배치 초기화</button>
+        <button onClick={() => setStep('roommaking')} style={{
+          padding: '10px 16px', background: 'rgba(30,30,30,0.85)', backdropFilter: 'blur(8px)',
+          color: '#ddd', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '10px', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+        }}>← 방 만들기로</button>
         <button onClick={reset} style={{
           padding: '10px 16px', background: 'rgba(231,76,60,0.85)', backdropFilter: 'blur(8px)',
           color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '12px', fontWeight: 600,

@@ -9,6 +9,7 @@ export const API = {
   generate3d: `${API_BASE}/api/room/generate3d`,
   sam3dMesh:  `${API_BASE}/api/sam3d/mesh`,
   layout:     `${API_BASE}/api/room/layout`,
+  rectifyTextures: `${API_BASE}/api/room/rectify_textures`,
 }
 
 const api = axios.create({
