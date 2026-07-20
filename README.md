@@ -27,21 +27,29 @@
 
 ```
 Empty_My_Room/
-├── README.md        # 전체 프로젝트 소개 (현재 파일)
+├── README.md            # 전체 프로젝트 소개 (현재 파일)
 │
-├── sam2/            # 2D 기반 가구 분할 및 배경 복원
-│   ├── README.md
-│   ├── src/
-│   ├── data/
-│   └── docs/
+├── sam2/                # [초기] SAM2 기반 가구 분할·배경 복원 실험
+│   ├── code/            # Jupyter 노트북 (furniture_remover 시리즈)
+│   └── presentations/   # 발표자료
 │
-├── sam3d/           # 3D 객체 변환 및 물리 기반 재배치
-│   ├── README.md
-│   ├── src/
-│   ├── data/
-│   └── docs/
+├── sam3d/               # [중기] SAM3D 방 메쉬 생성 웹앱
+│   ├── frontend/        # React + Vite
+│   └── backend/         # FastAPI (room.py: 방 메쉬 평탄화 + uLayout 치수 추정)
 │
-└── docs/            # 공통 발표자료 및 문서
+├── sam3d_patches/       # sam-3d-objects 저장소에 적용하는 패치 파일
+│
+└── web/                 # [현재] 메인 웹 애플리케이션
+    ├── frontend/        # React + Vite (Upload → Segment → Relocate → Result)
+    │   └── src/
+    │       ├── components/  # 단계별 UI (RelocateStep: three.js + cannon-es 재배치)
+    │       ├── store/       # zustand 전역 상태
+    │       └── utils/       # API 호출
+    └── backend/         # FastAPI (SAM2·LaMa·SD·Zero123·Gaussian·TripoSR 서비스)
+        ├── routers/     # 모델별 API 엔드포인트
+        ├── services/    # 모델 로드·추론 로직
+        ├── eval_data/   # 분할 성능 평가용 이미지·GT 라벨
+        └── evaluate.py  # SAM2 분할 IoU 평가 스크립트
 ```
 
 ---
