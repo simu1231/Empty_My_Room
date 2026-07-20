@@ -1,9 +1,6 @@
-sam3d/frontend/node_modules/
-sam3d/backend/venv/
-sam3d/backend/__pycache__/
-sam3d/backend/routers/__pycache__/
-sam3d/backend/services/__pycache__/
-sam3d/backend/**/__pycache__/
+node_modules/
+venv/
+__pycache__/
 *.pyc
 
 sam3d/backend/data/
