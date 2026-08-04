@@ -6,7 +6,8 @@ import toast from 'react-hot-toast'
 export default function RoomMakingStep() {
   const {
     emptyRoomUrl, emptyRoomFile, maskB64,
-    setStep, setRoomSize, setRoomMesh, setRoomColors, setRoomSurfaceTextures, setRoomBoxTextures, setLoading, reset
+    setStep, setRoomSize, setRoomMesh, setRoomColors, setRoomSurfaceTextures, setRoomBoxTextures,
+    setRoomCameraPose, setLoading, reset
   } = useStore()
 
   const [width,  setW] = useState(4.5)
@@ -72,7 +73,7 @@ export default function RoomMakingStep() {
       if (rectifyRes.status === 'fulfilled') {
         const rectifyData = await rectifyRes.value.json()
         if (rectifyData.success) {
-          setPreview(p => ({ ...p, boxTextures: rectifyData.textures }))
+          setPreview(p => ({ ...p, boxTextures: rectifyData.textures, cameraPose: rectifyData.camera_pose }))
         }
       }
     } catch (e) {
@@ -89,6 +90,7 @@ export default function RoomMakingStep() {
     setRoomColors({ wall: preview.wallColor, floor: preview.floorColor })
     setRoomSurfaceTextures({ wall: preview.wallPatch, floor: preview.floorPatch })
     setRoomBoxTextures(preview.boxTextures || null)
+    setRoomCameraPose(preview.cameraPose || null)   // 가구 실제 크기 추정용 (uLayout solvePnP)
     setRoomMesh(null)   // SAM3D 메시 없이 Three.js 박스 방 사용
     setStep('interior3d')
   }

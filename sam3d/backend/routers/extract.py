@@ -91,11 +91,16 @@ async def extract_furniture(
             "name":  label,
             "b64":   pil_to_base64(furniture_img),
             "score": best_score,
-            "bbox":  [int(x) for x in bbox],
+            # bbox를 원본 사진(리사이즈 전) 좌표계로 환산해서 반환.
+            # 프론트가 THIN_FLAT 컨텍스트 크롭 시 originalFile(원본 해상도)과 함께 이
+            # bbox를 그대로 쓰는데, 리사이즈 좌표 그대로 주면 원본이 1024px보다 클 때
+            # 좌표계가 안 맞아 엉뚱한 영역을 크롭하는 버그가 있었음 — 여기서 교정.
+            "bbox":  [round(x / scale, 1) for x in bbox],
         })
 
     print(f"[⏱ 처리시간] 가구 추출 (SAM2 × {len(furniture_list)}개): {time.time()-_t0:.2f}초")
     return JSONResponse({
         "success":   True,
         "furniture": furniture_list,
+        "image_size": [w, h],  # 원본 사진 크기(bbox와 동일 좌표계) — 가구 실제 크기 추정에 사용
     })

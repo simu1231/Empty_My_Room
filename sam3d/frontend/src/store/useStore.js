@@ -35,6 +35,11 @@ export const useStore = create((set) => ({
   // uLayout 기반 rectify된 벽/바닥/천장 실사 텍스처 ({ back_wall, left_wall, right_wall, floor, ceiling } base64 JPEG)
   roomBoxTextures: null,
   setRoomBoxTextures: (t) => set({ roomBoxTextures: t }),
+  // uLayout solvePnP 카메라 pose ({rotation_matrix, translation, K, image_size}) — 가구 실제
+  // 크기 추정(광선-바닥평면 교차)에 재사용. 인페인팅이 화각/해상도를 안 바꾸므로 원본
+  // (가구 있는) 사진에도 그대로 적용 가능.
+  roomCameraPose: null,
+  setRoomCameraPose: (p) => set({ roomCameraPose: p }),
   roomMesh: null,
   setRoomMesh: (mesh) => set({ roomMesh: mesh }),
   loading: false,
@@ -58,6 +63,7 @@ export const useStore = create((set) => ({
     roomTextures: { wall: null, floor: null },
     roomSurfaceTextures: null,
     roomBoxTextures: null,
+    roomCameraPose: null,
     roomMesh: null,
     loading: false,
     loadingMsg: '',

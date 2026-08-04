@@ -654,8 +654,11 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
           scaleZ = size.z > 0 ? std.d / size.z : 1
           scaledHalfHeight = std.h / 2
         } else {
-          const targetSize = estimatedRealSize || roomSize.width * 0.2
-          const s = targetSize / maxDim
+          // estimatedRealSize는 이제 "추정 실제 높이"(카메라 pose 기반, handleDrop에서 계산)이므로
+          // 메쉬의 raw 높이(size.y)에 맞춰 스케일 — 이전엔 maxDim 기준이라 가구가 세로보다
+          // 가로로 긴 경우(소파 등) 실제 높이와 안 맞았음.
+          const targetHeight = estimatedRealSize || roomSize.width * 0.2
+          const s = size.y > 0 ? targetHeight / size.y : targetHeight / maxDim
           scaleX = s; scaleY = s; scaleZ = s
           scaledHalfHeight = (size.y * s) / 2
         }
@@ -923,7 +926,55 @@ function findStdSize(name) {
   }
   return null
 }
- 
+
+// 카메라 pose(uLayout solvePnP) + 가구의 원본 사진 픽셀 bbox로 가구의 실제 높이(m)를 추정.
+// 원리: bbox 하단 중앙을 "가구가 바닥에 닿는 점"으로 보고, 카메라에서 그 픽셀 방향으로
+// 광선을 쏴서 방 좌표계의 바닥평면(Y=0)과 만나는 지점을 구하면 그 지점까지의 실제 거리를
+// 알 수 있다. 그 거리와 bbox의 세로 픽셀 길이를 핀홀 카메라 비례식에 넣으면 실제 높이가 나옴
+// (원근 보정 포함 — 단순 픽셀 비율보다 정확, 카메라로부터의 거리를 직접 반영하기 때문).
+// bbox는 extract.py가 원본(리사이즈 전) 사진 좌표계로 반환하는 (rmin,rmax,cmin,cmax) 포맷.
+function estimateFurnitureHeightM(cameraPose, bbox) {
+  if (!cameraPose || !bbox || bbox.length !== 4) return null
+  const { rotation_matrix: R, translation: t, K } = cameraPose
+  const fx = K[0][0], fy = K[1][1], cx = K[0][2], cy = K[1][2]
+  const [y0, y1, x0, x1] = bbox
+  const xCenter = (x0 + x1) / 2
+  const yBottom = y1
+
+  const matTMulVec = (M, v) => [
+    M[0][0]*v[0] + M[1][0]*v[1] + M[2][0]*v[2],
+    M[0][1]*v[0] + M[1][1]*v[1] + M[2][1]*v[2],
+    M[0][2]*v[0] + M[1][2]*v[1] + M[2][2]*v[2],
+  ]
+  const matMulVec = (M, v) => [
+    M[0][0]*v[0] + M[0][1]*v[1] + M[0][2]*v[2],
+    M[1][0]*v[0] + M[1][1]*v[1] + M[1][2]*v[2],
+    M[2][0]*v[0] + M[2][1]*v[1] + M[2][2]*v[2],
+  ]
+
+  const camPosRoom = matTMulVec(R, [-t[0], -t[1], -t[2]])  // -R^T t
+  const dirCam = [(xCenter - cx) / fx, (yBottom - cy) / fy, 1.0]
+  const dirRoom = matTMulVec(R, dirCam)
+
+  if (Math.abs(dirRoom[1]) < 1e-6) return null   // 바닥과 거의 평행 -> 계산 불가
+  const s = -camPosRoom[1] / dirRoom[1]
+  if (s <= 0) return null   // 카메라 뒤쪽/무효
+
+  const floorPoint = [
+    camPosRoom[0] + s * dirRoom[0],
+    0,
+    camPosRoom[2] + s * dirRoom[2],
+  ]
+  const pCamFloor = matMulVec(R, floorPoint)
+  const zCam = pCamFloor[2] + t[2]   // 카메라 광축 기준 깊이 (핀홀 스케일 공식용)
+  if (zCam <= 0) return null
+
+  const pixelHeight = yBottom - y0
+  const realHeight = pixelHeight * zCam / fy
+  if (!(realHeight > 0) || !isFinite(realHeight)) return null
+  return realHeight
+}
+
 const PROCEDURAL_FURNITURE = {
   '의자': { w:0.5, d:0.5, h:0.9, parts:[
     { size:[0.45,0.05,0.45], pos:[0,0.45,0],    c:[0.85,0.76,0.62] },
@@ -1093,15 +1144,6 @@ const WALL_ITEM_NAMES = new Set(['문', '창문', '액자', '그림', '거울', 
 const CEILING_ITEM_NAMES = new Set(['조명'])
 const CEILING_OR_FLOOR_NAMES = new Set(['화분'])
  
-function getImageSize(b64) {
-  return new Promise(resolve => {
-    const img = new Image()
-    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight })
-    img.onerror = () => resolve({ w: 100, h: 100 })
-    img.src = `data:image/png;base64,${b64}`
-  })
-}
- 
 const DB_NAME = 'EmptyMyRoomDesigns', DB_VER = 1, STORE = 'designs'
 function openDB() {
   return new Promise((res, rej) => {
@@ -1138,7 +1180,7 @@ async function dbDeleteDesign(id) {
 }
  
 export default function Interior3DStep() {
-  const { furnitureList, roomSize, roomColors, roomTextures, roomSurfaceTextures, roomBoxTextures, roomMesh, reset, originalFile,
+  const { furnitureList, roomSize, roomColors, roomTextures, roomSurfaceTextures, roomBoxTextures, roomCameraPose, roomMesh, reset, originalFile,
           savedDesignToLoad, clearSavedDesignToLoad, setSavedDesignToLoad, setStep } = useStore()
   const roomColorsMemo = useMemo(() => ({
     wall: roomColors?.wall || [0.9, 0.9, 0.9],
@@ -1162,8 +1204,7 @@ export default function Interior3DStep() {
   const [viewMode, setViewMode] = useState('3d')
   const [generating, setGenerating] = useState(false)
   const [generatingId, setGeneratingId] = useState(null)
-  const [furniturePxSizes, setFurniturePxSizes] = useState({})
- 
+
   useEffect(() => {
     if (!savedDesignToLoad) return
     const meshes = savedDesignToLoad.furnitureMeshes || {}
@@ -1201,12 +1242,6 @@ export default function Interior3DStep() {
       toast.error('저장 실패: ' + e.message)
     }
   }
- 
-  useEffect(() => {
-    if (!furnitureList?.length) return
-    Promise.all(furnitureList.map(f => getImageSize(f.b64).then(s => [f.id, s])))
-      .then(entries => setFurniturePxSizes(Object.fromEntries(entries)))
-  }, [furnitureList])
  
   const handleDelete = (instanceId) => {
     setPlacedMeshes(prev => { const next = { ...prev }; delete next[instanceId]; return next })
@@ -1270,11 +1305,13 @@ export default function Interior3DStep() {
     const meshData = furnitureMeshes[numId]
     if (!meshData) { toast.error('먼저 3D 변환을 해주세요!'); return }
 
-    const allSizes = Object.values(furniturePxSizes)
-    const maxPxDim = allSizes.length ? Math.max(...allSizes.map(s => Math.max(s.w, s.h))) : 100
-    const thisPxDim = furniturePxSizes[numId] ? Math.max(furniturePxSizes[numId].w, furniturePxSizes[numId].h) : maxPxDim
-    const referenceRealSize = roomSize.width * 0.4
-    const estimatedRealSize = referenceRealSize * (thisPxDim / maxPxDim)
+    // 이름 매칭(findStdSize)이 안 되는 가구의 크기 추정값(estimatedRealSize, 렌더링 시
+    // "실제 높이" 기준으로 사용됨). 카메라 pose + 원본 사진 속 픽셀 bbox로 계산 —
+    // 원근을 반영하므로 이전의 "제일 큰 가구 대비 픽셀 비율" 방식보다 정확.
+    // 필요 데이터(카메라 pose, bbox)가 없으면 방 크기 비례 값으로 폴백.
+    const furniture = furnitureList.find(f => f.id === numId)
+    const estimatedRealSize =
+      estimateFurnitureHeightM(roomCameraPose, furniture?.bbox) ?? roomSize.width * 0.2
 
     const instanceId = `${numId}_${Date.now()}`
     setPlacedMeshes(prev => ({ ...prev, [instanceId]: { data: meshData, position, estimatedRealSize } }))
