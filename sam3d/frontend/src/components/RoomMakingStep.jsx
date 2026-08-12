@@ -7,7 +7,7 @@ export default function RoomMakingStep() {
   const {
     emptyRoomUrl, emptyRoomFile, maskB64,
     setStep, setRoomSize, setRoomMesh, setRoomColors, setRoomSurfaceTextures, setRoomBoxTextures,
-    setRoomCameraPose, setLoading, reset
+    setRoomCameraPose, setRoomCameraPoseMode, setLoading, reset
   } = useStore()
 
   const [width,  setW] = useState(4.5)
@@ -73,7 +73,12 @@ export default function RoomMakingStep() {
       if (rectifyRes.status === 'fulfilled') {
         const rectifyData = await rectifyRes.value.json()
         if (rectifyData.success) {
-          setPreview(p => ({ ...p, boxTextures: rectifyData.textures, cameraPose: rectifyData.camera_pose }))
+          setPreview(p => ({ ...p, boxTextures: rectifyData.textures, cameraPose: rectifyData.camera_pose, cameraPoseMode: rectifyData.camera_pose_mode }))
+        } else if (rectifyData.camera_pose) {
+          // 정밀 텍스처 rectify(코너 검출/solvePnP)는 실패했지만, 근사 pose(camera_pose_mode:
+          // "approx" — roll/pitch만 사용, 코너 불필요)는 왔음. 텍스처는 패치 타일 폴백을 쓰되,
+          // 가구 실제 크기 추정에는 이 근사 pose를 계속 재사용.
+          setPreview(p => ({ ...p, cameraPose: rectifyData.camera_pose, cameraPoseMode: rectifyData.camera_pose_mode }))
         }
       }
     } catch (e) {
@@ -91,6 +96,7 @@ export default function RoomMakingStep() {
     setRoomSurfaceTextures({ wall: preview.wallPatch, floor: preview.floorPatch })
     setRoomBoxTextures(preview.boxTextures || null)
     setRoomCameraPose(preview.cameraPose || null)   // 가구 실제 크기 추정용 (uLayout solvePnP)
+    setRoomCameraPoseMode(preview.cameraPoseMode || null)   // 'precise' | 'approx' — 실험 시 어느 pose로 계산됐는지 구분용
     setRoomMesh(null)   // SAM3D 메시 없이 Three.js 박스 방 사용
     setStep('interior3d')
   }

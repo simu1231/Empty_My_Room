@@ -975,6 +975,14 @@ function estimateFurnitureHeightM(cameraPose, bbox) {
   return realHeight
 }
 
+// 카메라 pose로부터 "방 바닥(Y=0) 기준 카메라의 실제 높이(m)"를 역산.
+// precise(solvePnP)에서는 실측 대상, approx에서는 build_approx_pose가 가정한 값(기본 1.6m)이 그대로 나옴 — 검증용.
+function estimateCameraHeightM(cameraPose) {
+  if (!cameraPose) return null
+  const { rotation_matrix: R, translation: t } = cameraPose
+  return R[0][1] * -t[0] + R[1][1] * -t[1] + R[2][1] * -t[2]
+}
+
 const PROCEDURAL_FURNITURE = {
   '의자': { w:0.5, d:0.5, h:0.9, parts:[
     { size:[0.45,0.05,0.45], pos:[0,0.45,0],    c:[0.85,0.76,0.62] },
@@ -1180,7 +1188,7 @@ async function dbDeleteDesign(id) {
 }
  
 export default function Interior3DStep() {
-  const { furnitureList, roomSize, roomColors, roomTextures, roomSurfaceTextures, roomBoxTextures, roomCameraPose, roomMesh, reset, originalFile,
+  const { furnitureList, roomSize, roomColors, roomTextures, roomSurfaceTextures, roomBoxTextures, roomCameraPose, roomCameraPoseMode, roomMesh, reset, originalFile,
           savedDesignToLoad, clearSavedDesignToLoad, setSavedDesignToLoad, setStep } = useStore()
   const roomColorsMemo = useMemo(() => ({
     wall: roomColors?.wall || [0.9, 0.9, 0.9],
@@ -1310,8 +1318,13 @@ export default function Interior3DStep() {
     // 원근을 반영하므로 이전의 "제일 큰 가구 대비 픽셀 비율" 방식보다 정확.
     // 필요 데이터(카메라 pose, bbox)가 없으면 방 크기 비례 값으로 폴백.
     const furniture = furnitureList.find(f => f.id === numId)
-    const estimatedRealSize =
-      estimateFurnitureHeightM(roomCameraPose, furniture?.bbox) ?? roomSize.width * 0.2
+    const computedHeight = estimateFurnitureHeightM(roomCameraPose, furniture?.bbox)
+    const estimatedRealSize = computedHeight ?? roomSize.width * 0.2
+    const camHeight = estimateCameraHeightM(roomCameraPose)
+    console.log(`[가구 실제 크기 추정] ${furniture?.name ?? numId}: ${estimatedRealSize.toFixed(3)}m`,
+      computedHeight != null
+        ? `(카메라 pose 기반 계산값, mode=${roomCameraPoseMode ?? 'unknown'}, 카메라 추정 높이=${camHeight != null ? (camHeight * 100).toFixed(1) + 'cm' : 'N/A'})`
+        : '(폴백: 방 가로 × 0.2)')
 
     const instanceId = `${numId}_${Date.now()}`
     setPlacedMeshes(prev => ({ ...prev, [instanceId]: { data: meshData, position, estimatedRealSize } }))

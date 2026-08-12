@@ -40,6 +40,9 @@ export const useStore = create((set) => ({
   // (가구 있는) 사진에도 그대로 적용 가능.
   roomCameraPose: null,
   setRoomCameraPose: (p) => set({ roomCameraPose: p }),
+  // roomCameraPose가 precise(코너 검출+solvePnP)인지 approx(roll/pitch+가정 카메라높이) fallback인지
+  roomCameraPoseMode: null,
+  setRoomCameraPoseMode: (m) => set({ roomCameraPoseMode: m }),
   roomMesh: null,
   setRoomMesh: (mesh) => set({ roomMesh: mesh }),
   loading: false,
@@ -64,6 +67,7 @@ export const useStore = create((set) => ({
     roomSurfaceTextures: null,
     roomBoxTextures: null,
     roomCameraPose: null,
+    roomCameraPoseMode: null,
     roomMesh: null,
     loading: false,
     loadingMsg: '',
