@@ -917,6 +917,19 @@ const FURNITURE_STD_SIZES = {
   'TV':        { w: 1.2, d: 0.1, h: 0.7 },
 }
  
+// 바닥 접촉 가정이 깨지는(카메라 pose 기반 광선-바닥평면 교차로 높이 추정이 안 되는)
+// 벽걸이/공중부양형 카테고리. generate3DMesh(SAM3D 호출 분기)와 handleDrop(높이 추정
+// 분기) 양쪽에서 공유 — 예전엔 각자 다른 인라인 배열을 써서 '스탠드 조명'이 한쪽에서
+// 누락돼 있었음.
+const THIN_FLAT = ['조명', '꽃', '화분', '시계', '액자', '그림', '거울', '스탠드 조명', '커튼']
+// Omni3D(Cube R-CNN) indoor 체크포인트가 지원하는 서브셋 — 시계/화분/꽃은 Omni3D
+// 38-class 실내 taxonomy에 아예 없어서(조사로 확인) SAM3D(MoGe) 폴백만 탄다.
+// '스탠드 조명'을 '조명'보다 먼저 검사해야 함(둘 다 furniture.name에 포함될 수 있어
+// 더 긴 키워드부터 매치해야 정확한 한글 카테고리명이 서버 매핑 테이블과 일치).
+// 커튼은 바닥까지 닿는지 여부가 들쭉날쭉해서 카메라 pose 바닥-교차 가정이 불안정
+// → THIN_FLAT에 넣어 그 방식을 아예 스킵하고 Omni3D(curtain 카테고리 지원)를 우선.
+const OMNI3D_SUPPORTED = ['스탠드 조명', '조명', '액자', '그림', '거울', '커튼']
+
 function findStdSize(name) {
   if (!name) return null
   if (FURNITURE_STD_SIZES[name]) return FURNITURE_STD_SIZES[name]
@@ -1275,12 +1288,12 @@ export default function Interior3DStep() {
       form.append('image', imgFile)
       form.append('category', furniture.name || '')
  
-      const THIN_FLAT = ['조명', '꽃', '화분', '시계', '액자', '그림', '거울']
-      if (THIN_FLAT.some(k => (furniture.name || '').includes(k)) && originalFile && furniture.bbox) {
+      const isThinFlat = THIN_FLAT.some(k => (furniture.name || '').includes(k))
+      if (isThinFlat && originalFile && furniture.bbox) {
         form.append('full_image', originalFile)
         form.append('bbox', JSON.stringify(furniture.bbox))
       }
- 
+
       const res = await fetch('http://127.0.0.1:8001/api/sam3d/mesh', { method: 'POST', body: form })
       const data = await res.json()
       if (!data.success) throw new Error(data.error || '3D 생성 실패')
@@ -1288,7 +1301,36 @@ export default function Interior3DStep() {
       const processed = data.type === 'textured'
         ? { type: 'textured', vertices: new Float32Array(raw.vertices.flat()), faces: new Uint32Array(raw.faces.flat()), uvs: new Float32Array(raw.uvs.flat()), textureB64: raw.textureB64 }
         : { type: 'vertex_color', vertices: new Float32Array(raw.vertices.flat()), faces: new Uint32Array(raw.faces.flat()), colors: new Float32Array(raw.colors.flat()) }
-      setFurnitureMeshes(prev => ({ ...prev, [furniture.id]: { ...processed, name: furniture.name } }))
+
+      // Omni3D(Cube R-CNN): 지원 카테고리(액자/그림/거울/조명/스탠드 조명)면 원본 전체
+      // 사진 + bbox + 카테고리로 oracle2D 기반 실제 크기(m) 추정을 추가로 시도.
+      // 실패해도 3D 변환 자체는 성공으로 유지(handleDrop의 폴백 체인이 처리).
+      let omni3dSizeM = null
+      const omni3dCategory = OMNI3D_SUPPORTED.find(k => (furniture.name || '').includes(k))
+      if (omni3dCategory && originalFile && furniture.bbox && furniture.bbox.length === 4) {
+        try {
+          const [y0, y1, x0, x1] = furniture.bbox
+          const omniForm = new FormData()
+          omniForm.append('image', originalFile)
+          omniForm.append('bbox', `${x0},${y0},${x1},${y1}`)
+          omniForm.append('category', omni3dCategory)
+          const omniRes = await fetch('http://127.0.0.1:8001/api/omni3d/estimate', { method: 'POST', body: omniForm })
+          const omniData = await omniRes.json()
+          if (omniData.success) {
+            omni3dSizeM = omniData.dimensions_m
+            console.log(`[Omni3D] ${furniture.name}: ${JSON.stringify(omni3dSizeM)} (score=${omniData.score?.toFixed(2)})`)
+          } else {
+            console.log(`[Omni3D] ${furniture.name}: 추정 실패 - ${omniData.error || '미지원'}`)
+          }
+        } catch (omniErr) {
+          console.log(`[Omni3D] ${furniture.name}: 사이드카 연결 실패 - ${omniErr.message}`)
+        }
+      }
+
+      setFurnitureMeshes(prev => ({
+        ...prev,
+        [furniture.id]: { ...processed, name: furniture.name, omni3dSizeM, sam3dSizeM: data.sam3d_size_m || null },
+      }))
       toast.success('3D 변환 완료! 드래그해서 방에 배치하세요 🎉')
     } catch (e) {
       toast.error(`3D 생성 실패: ${e.message}`)
@@ -1313,18 +1355,31 @@ export default function Interior3DStep() {
     const meshData = furnitureMeshes[numId]
     if (!meshData) { toast.error('먼저 3D 변환을 해주세요!'); return }
 
-    // 이름 매칭(findStdSize)이 안 되는 가구의 크기 추정값(estimatedRealSize, 렌더링 시
-    // "실제 높이" 기준으로 사용됨). 카메라 pose + 원본 사진 속 픽셀 bbox로 계산 —
-    // 원근을 반영하므로 이전의 "제일 큰 가구 대비 픽셀 비율" 방식보다 정확.
-    // 필요 데이터(카메라 pose, bbox)가 없으면 방 크기 비례 값으로 폴백.
+    // 가구 실제 높이(m) 추정 - 우선순위 체인:
+    //  1) 카메라 pose 기반 광선-바닥평면 교차 (바닥 접촉 가구만 - THIN_FLAT는 가정이
+    //     깨지므로 애초에 시도하지 않음)
+    //  2) Omni3D(Cube R-CNN) oracle2D 추정 (액자/그림/거울/조명/스탠드 조명만 지원)
+    //  3) SAM3D(MoGe) pose-decoder scale 기반 추정 (모든 카테고리 시도됨)
+    //  4) 방 크기 비례 폴백
     const furniture = furnitureList.find(f => f.id === numId)
-    const computedHeight = estimateFurnitureHeightM(roomCameraPose, furniture?.bbox)
-    const estimatedRealSize = computedHeight ?? roomSize.width * 0.2
+    const isFloorDetached = THIN_FLAT.some(k => (furniture?.name || '').includes(k))
+    const computedHeight = isFloorDetached ? null : estimateFurnitureHeightM(roomCameraPose, furniture?.bbox)
+    const omni3dHeight = meshData?.omni3dSizeM?.height
+    const sam3dHeight = meshData?.sam3dSizeM?.height
+    const estimatedRealSize = computedHeight ?? omni3dHeight ?? sam3dHeight ?? roomSize.width * 0.2
+
     const camHeight = estimateCameraHeightM(roomCameraPose)
-    console.log(`[가구 실제 크기 추정] ${furniture?.name ?? numId}: ${estimatedRealSize.toFixed(3)}m`,
-      computedHeight != null
-        ? `(카메라 pose 기반 계산값, mode=${roomCameraPoseMode ?? 'unknown'}, 카메라 추정 높이=${camHeight != null ? (camHeight * 100).toFixed(1) + 'cm' : 'N/A'})`
-        : '(폴백: 방 가로 × 0.2)')
+    let sourceLabel
+    if (computedHeight != null) {
+      sourceLabel = `카메라 pose 기반 계산값 (mode=${roomCameraPoseMode ?? 'unknown'}, 카메라 추정 높이=${camHeight != null ? (camHeight * 100).toFixed(1) + 'cm' : 'N/A'})`
+    } else if (omni3dHeight != null) {
+      sourceLabel = 'Omni3D(Cube R-CNN) oracle2D 추정값'
+    } else if (sam3dHeight != null) {
+      sourceLabel = 'SAM3D(MoGe) pose-decoder scale 추정값'
+    } else {
+      sourceLabel = '폴백: 방 가로 × 0.2'
+    }
+    console.log(`[가구 실제 크기 추정] ${furniture?.name ?? numId}: ${estimatedRealSize.toFixed(3)}m (${sourceLabel})`)
 
     const instanceId = `${numId}_${Date.now()}`
     setPlacedMeshes(prev => ({ ...prev, [instanceId]: { data: meshData, position, estimatedRealSize } }))

@@ -67,12 +67,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from routers import segment, extract, sam3d, inpaint, room
+from routers import segment, extract, sam3d, inpaint, room, omni3d
 app.include_router(segment.router, prefix="/api/segment", tags=["Segment"])
 app.include_router(extract.router, prefix="/api/extract", tags=["Extract"])
 app.include_router(sam3d.router,   prefix="/api/sam3d",   tags=["SAM3D"])
 app.include_router(inpaint.router, prefix="/api/inpaint", tags=["Inpaint"])
 app.include_router(room.router, prefix="/api/room", tags=["Room"])
+app.include_router(omni3d.router, prefix="/api/omni3d", tags=["Omni3D"])
 @app.get("/")
 def root():
     return {"message": "SAM3D Interior API 작동중!"}

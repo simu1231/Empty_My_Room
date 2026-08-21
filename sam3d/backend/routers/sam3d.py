@@ -233,6 +233,21 @@ async def generate_mesh(
                 vertices_np[:, flat_axis] = center + (vertices_np[:, flat_axis] - center) * scale_factor
                 print(f"[shape inflate] axis={flat_axis}, {min_range:.4f} → {target:.4f}")
 
+        # SAM3D pose-decoder의 canonical→실제 스케일 값(instance_scale_l2c, isotropic)으로
+        # canonical mesh extent를 실제 크기(m)로 환산. 시계/화분/꽃처럼 Omni3D 카테고리
+        # 커버리지가 없는 가구의 크기 추정 폴백으로 프론트에서 사용.
+        sam3d_size_m = None
+        pose_scale = result.get('scale')
+        if pose_scale is not None:
+            scale_value = float(np.asarray(pose_scale.detach().cpu() if hasattr(pose_scale, 'detach') else pose_scale).reshape(-1)[0])
+            extents = vertices_np.max(axis=0) - vertices_np.min(axis=0)
+            sam3d_size_m = {
+                "width":  float(extents[0] * scale_value),
+                "height": float(extents[1] * scale_value),
+                "depth":  float(extents[2] * scale_value),
+            }
+            print(f"[sam3d_size_m] scale={scale_value:.4f}, extents(canonical)={extents.tolist()}, size_m={sam3d_size_m}")
+
         # trimesh visual에서 UV + 텍스처 추출
         has_texture = False
         if glb is not None and hasattr(glb, 'visual'):
@@ -258,6 +273,7 @@ async def generate_mesh(
             body = orjson.dumps({
                 "success": True,
                 "type": "textured",
+                "sam3d_size_m": sam3d_size_m,
                 "mesh": {
                     "vertices":   vertices_np.tolist(),
                     "faces":      faces_np.tolist(),
@@ -279,6 +295,7 @@ async def generate_mesh(
             body = orjson.dumps({
                 "success": True,
                 "type": "vertex_color",
+                "sam3d_size_m": sam3d_size_m,
                 "mesh": {
                     "vertices": vertices_np.tolist(),
                     "faces":    faces_np.tolist(),

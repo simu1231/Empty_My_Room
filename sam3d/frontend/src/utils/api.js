@@ -10,6 +10,7 @@ export const API = {
   sam3dMesh:  `${API_BASE}/api/sam3d/mesh`,
   layout:     `${API_BASE}/api/room/layout`,
   rectifyTextures: `${API_BASE}/api/room/rectify_textures`,
+  omni3dEstimate: `${API_BASE}/api/omni3d/estimate`,
 }
 
 const api = axios.create({
