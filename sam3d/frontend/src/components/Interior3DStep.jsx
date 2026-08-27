@@ -66,18 +66,41 @@ function MiniMeshViewer({ data }) {
       scene.add(group)
     }
  
-    let animId
+    // 카드마다 WebGLRenderer가 하나씩 붙기 때문에, 가구를 여러 개 변환하면 미니뷰
+    // 개수만큼 컨텍스트가 동시에 60fps로 돈다. 화면 밖으로 스크롤됐거나 탭이 백그라운드일
+    // 때는 rAF를 멈춰서, 실제로 보이는 카드만 그리게 한다.
+    let animId = null
     let angle = 0
+    let onScreen = false
     const animate = () => {
       animId = requestAnimationFrame(animate)
       angle += 0.01
       group.rotation.y = angle
       renderer.render(scene, camera)
     }
-    animate()
+    const start = () => { if (animId === null && onScreen && !document.hidden) animate() }
+    const stop = () => { if (animId !== null) { cancelAnimationFrame(animId); animId = null } }
+
+    renderer.render(scene, camera)   // 관찰자가 처음 콜백을 주기 전 빈 화면 방지
+
+    const io = new IntersectionObserver(([entry]) => {
+      onScreen = entry.isIntersecting
+      onScreen ? start() : stop()
+    }, { threshold: 0.01 })
+    io.observe(el)
+    const onVisibility = () => { document.hidden ? stop() : start() }
+    document.addEventListener('visibilitychange', onVisibility)
  
     return () => {
-      cancelAnimationFrame(animId)
+      stop()
+      io.disconnect()
+      document.removeEventListener('visibilitychange', onVisibility)
+      // GPU 리소스 명시적 해제 — renderer.dispose()만으로는 지오메트리/텍스처가 안 풀린다.
+      scene.traverse(obj => {
+        if (obj.geometry) obj.geometry.dispose()
+        const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : []
+        mats.forEach(m => { if (m.map) m.map.dispose(); m.dispose() })
+      })
       renderer.dispose()
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement)
     }
@@ -140,6 +163,8 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
   const ceilingRef = useRef(null)
   const viewModeRef = useRef('3d')
   const camTargetRef = useRef({ x: 0, y: 0, z: 0 })
+  // on-demand 렌더링: 씬을 바꾼 쪽에서 이걸 호출해야 다시 그려진다.
+  const invalidateRef = useRef(() => {})
   const [contextMenu, setContextMenu] = useState(null)
  
   useEffect(() => {
@@ -171,6 +196,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       camera.aspect = w / h
       camera.updateProjectionMatrix()
       renderer.setSize(w, h)
+      invalidateRef.current()
     }
     const resizeObserver = new ResizeObserver(onResize)
     resizeObserver.observe(el)
@@ -195,7 +221,11 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
     const fc = roomColors.floor
     const fColor = `rgb(${fc[0]*255}, ${fc[1]*255}, ${fc[2]*255})`
  
-    const loader = new THREE.TextureLoader()
+    // 텍스처는 비동기로 디코딩되므로, 로딩이 끝나는 시점에 다시 그려주지 않으면
+    // on-demand 렌더링에서 텍스처가 안 붙은 프레임이 그대로 남는다.
+    const texManager = new THREE.LoadingManager()
+    texManager.onLoad = () => invalidateRef.current()
+    const loader = new THREE.TextureLoader(texManager)
     const makeSurfaceMat = (b64, fallbackColor, roughness = 0.8) => {
       if (b64) {
         const tex = loader.load(`data:image/jpeg;base64,${b64}`)
@@ -434,6 +464,8 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
     }
  
     const onMouseMove = (e) => {
+      // 드래그/회전 중에만 씬이 바뀐다. 그냥 마우스가 지나가는 것만으론 다시 그리지 않음.
+      if (isDraggingFurniture || isRotating) invalidateRef.current()
       if (isDraggingFurniture && selectedObjRef.current) {
         const mouse = getMousePos(e)
         raycaster.setFromCamera(mouse, camera)
@@ -539,6 +571,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
  
       isDraggingFurniture = false
       isRotating = false
+      invalidateRef.current()
     }
  
     const onWheel = (e) => {
@@ -548,6 +581,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       spherical.radius = Math.max(1, Math.min(20, spherical.radius))
       camera.position.setFromSpherical(spherical)
       camera.lookAt(0, 0, 0)
+      invalidateRef.current()
     }
  
     renderer.domElement.addEventListener('mousedown', onMouseDown)
@@ -555,8 +589,22 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
     window.addEventListener('mouseup', onMouseUp)
     renderer.domElement.addEventListener('wheel', onWheel, { passive: false })
  
+    // 예전엔 조작이 없어도 매 프레임 방 전체(조명 3개 + 실사 텍스처 + 가구 메쉬)를
+    // 다시 그렸다. 이제는 invalidate()가 불린 뒤 일정 시간 동안만 그린다. 창을 그냥
+    // 열어두면 GPU가 idle이 되고, 드래그/회전/줌 중에는 종전대로 60fps가 나온다.
+    // 한 프레임만 그리지 않고 여유(RENDER_WINDOW_MS)를 두는 이유는, 지오메트리 추가나
+    // 텍스처 반영이 다음 프레임에 걸쳐 정착하는 경우를 놓치지 않기 위함.
+    const RENDER_WINDOW_MS = 300
+    let renderUntil = performance.now() + RENDER_WINDOW_MS
+    const invalidate = () => { renderUntil = performance.now() + RENDER_WINDOW_MS }
+    invalidateRef.current = invalidate
+
     let animId
-    const animate = () => { animId = requestAnimationFrame(animate); renderer.render(scene, camera) }
+    const animate = () => {
+      animId = requestAnimationFrame(animate)
+      if (performance.now() > renderUntil) return
+      renderer.render(scene, camera)
+    }
     animate()
  
     return () => {
@@ -715,6 +763,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
         }
       }
     })
+    invalidateRef.current()
   }, [placedMeshes])
  
   useEffect(() => {
@@ -730,6 +779,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       cameraRef.current.position.set(cd * 0.8, cd * 0.6, cd * 0.8)
       cameraRef.current.lookAt(0, 0, 0)
     }
+    invalidateRef.current()
   }, [viewMode])
  
   const handleDragOver = (e) => e.preventDefault()
@@ -807,6 +857,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
  
   const handleRotate = () => {
     if (selectedObjRef.current) selectedObjRef.current.rotation.y += Math.PI / 2
+    invalidateRef.current()
     setContextMenu(null)
   }
  
@@ -819,6 +870,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
     const floorY = -roomSize.height / 2
     const bottomY = box.min.y
     if (bottomY < floorY) obj.position.y += floorY - bottomY
+    invalidateRef.current()
     setContextMenu(null)
   }
  
@@ -831,6 +883,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       }
       onDelete(contextMenu.instanceId)
     }
+    invalidateRef.current()
     setContextMenu(null)
   }
  

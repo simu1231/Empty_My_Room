@@ -4,7 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- 603KB짜리 스크립트라 defer 없이 두면 HTML 파싱이 여기서 멈춘다. defer를 붙여도
+         module 스크립트(main.jsx)와 같은 지연 큐에 들어가 문서 순서대로 실행되므로,
+         컴포넌트에서 window.THREE를 쓰는 시점엔 이미 로드가 끝나 있다. -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <title>3D Interior Designer</title>
   </head>
   <body>
