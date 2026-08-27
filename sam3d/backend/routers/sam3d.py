@@ -1,5 +1,6 @@
 import io
 import gc
+import os
 import time
 import base64
 import torch
@@ -161,6 +162,12 @@ async def generate_mesh(
 
         _t_sam3d_total = time.time()
         NUM_STAGE1_TRIES = 5
+        # 탐색 패스는 "어느 seed가 가장 입체적인가" 순위만 보는 용도지, 최종 메쉬를
+        # 만드는 데 쓰이지 않는다(아래 본 실행이 선택된 seed로 config 기본값 25스텝을
+        # 처음부터 다시 돈다). 그래서 탐색만 적은 스텝으로 돌려 시간을 줄인다.
+        # 주의: 거친 voxel로 순위를 매기게 되므로 선택되는 seed가 달라질 수 있음.
+        # SAM3D_SEARCH_STEPS=25로 두면 종전과 완전히 동일한 동작.
+        SEARCH_INFERENCE_STEPS = int(os.environ.get('SAM3D_SEARCH_STEPS', '10'))
 
         # Stage 1만 빠르게 여러 번 → 가장 입체적인 seed 선택
         best_seed = None
@@ -172,6 +179,7 @@ async def generate_mesh(
             r1 = pipeline.run(
                 rgb, mask, seed=seed,
                 stage1_only=True,
+                stage1_inference_steps=SEARCH_INFERENCE_STEPS,
                 with_mesh_postprocess=False,
                 with_texture_baking=False,
                 with_layout_postprocess=False,
@@ -189,7 +197,7 @@ async def generate_mesh(
                 best_stage1_score = score
                 best_seed = seed
 
-        print(f"[⏱ 처리시간] SAM3D Stage1 탐색 ({NUM_STAGE1_TRIES}회): {time.time()-_t_stage1:.2f}초")
+        print(f"[⏱ 처리시간] SAM3D Stage1 탐색 ({NUM_STAGE1_TRIES}회 × {SEARCH_INFERENCE_STEPS}스텝): {time.time()-_t_stage1:.2f}초")
         print(f"[최적 seed 선택] seed={best_seed} score={best_stage1_score:.4f}")
 
         # 최적 seed로 full 파이프라인 실행

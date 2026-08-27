@@ -31,14 +31,13 @@ async def lifespan(app: FastAPI):
         print(f"LaMa 로드 실패: {e}")
         app.state.lama = None
 
-    # SD 로드
-    try:
-        from services.sd_service import SDService
-        app.state.sd = SDService()
-        print("SD 로드 완료!")
-    except Exception as e:
-        print(f"SD 로드 실패: {e}")
-        app.state.sd = None
+    # SD는 시작 시 로드하지 않는다.
+    # SD(Stable Diffusion 1.5 inpainting + ControlNet, fp16)는 세션당 "빈방 만들기"에서
+    # 딱 한 번(약 7.6초) 쓰이는데, 상주시키면 3~4GB를 계속 물고 있는다. RTX 4090
+    # 24.5GB에 백엔드 + uLayout(8002) + Omni3D(8003)가 함께 올라가면 여유가 2.4GB까지
+    # 떨어지고, 그 상태에서 프로세스 간 GPU 작업이 겹치면 SAM3D decode가 0.2초 →
+    # 67초까지 튀는 걸 실측했다. inpaint 라우터가 필요할 때 로드하고 끝나면 해제한다.
+    app.state.sd = None
 
     # Extract 서비스 로드
     try:

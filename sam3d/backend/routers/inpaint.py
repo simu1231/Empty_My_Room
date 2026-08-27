@@ -1,5 +1,6 @@
 import io
 import os
+import gc
 import time
 import base64
 import numpy as np
@@ -25,7 +26,6 @@ async def remove_furniture(
     mask:  UploadFile = File(...),
 ):
     lama = request.app.state.lama
-    sd   = request.app.state.sd
     if lama is None:
         raise HTTPException(503, "LaMa 모델이 로드되지 않았습니다")
 
@@ -49,16 +49,41 @@ async def remove_furniture(
     _lama_time = time.time() - _t0
     print(f"[⏱ 처리시간] LaMa 인페인팅: {_lama_time:.2f}초")
 
-    # SD ControlNet
+    # SD ControlNet — 온디맨드 로드 후 사용이 끝나면 곧바로 해제한다.
+    # 이 단계는 세션당 한 번이고, 바로 다음 단계(방 분석 → 3D 변환)가 GPU를 훨씬 많이
+    # 쓰기 때문에 3~4GB를 계속 붙들고 있을 이유가 없다. 로드 실패 시에는 종전처럼
+    # LaMa 결과만 그대로 사용한다(품질만 조금 떨어지고 동작은 유지).
     _sd_time = 0.0
+    final_result = lama_result
+    sd = None
+    try:
+        from services.sd_service import SDService
+        print("SD 온디맨드 로드 중...")
+        _t_load = time.time()
+        sd = SDService()
+        print(f"[⏱ 처리시간] SD 로드: {time.time()-_t_load:.2f}초")
+    except Exception as e:
+        print(f"SD 로드 실패 — LaMa 결과만 사용: {e}")
+
     if sd is not None:
-        print("SD 시작...")
-        _t1 = time.time()
-        final_result = sd.inpaint(lama_result, mask_np)
-        _sd_time = time.time() - _t1
-        print(f"[⏱ 처리시간] SD Inpainting: {_sd_time:.2f}초")
-    else:
-        final_result = lama_result
+        try:
+            print("SD 시작...")
+            _t1 = time.time()
+            final_result = sd.inpaint(lama_result, mask_np)
+            _sd_time = time.time() - _t1
+            print(f"[⏱ 처리시간] SD Inpainting: {_sd_time:.2f}초")
+        except Exception as e:
+            print(f"SD 추론 실패 — LaMa 결과만 사용: {e}")
+            final_result = lama_result
+        finally:
+            del sd
+            gc.collect()
+            try:
+                import torch
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
+            print("SD 언로드 완료 (GPU 메모리 반환)")
 
     print(f"[⏱ 처리시간] 인페인팅 전체: {_lama_time + _sd_time:.2f}초")
 
