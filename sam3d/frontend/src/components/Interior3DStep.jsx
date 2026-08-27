@@ -1277,10 +1277,57 @@ export default function Interior3DStep() {
     })
   }
  
+  // Omni3D(Cube R-CNN) oracle2D 실제 크기(m) 추정. 스킵되는 모든 경로에서 그 이유를
+  // 콘솔에 남긴다 — 예전엔 조건 하나만 안 맞아도 아무 로그 없이 조용히 건너뛰어서
+  // "3D 변환했는데 콘솔에 아무것도 안 뜬다"는 상황의 원인을 좁힐 수가 없었음.
+  const estimateOmni3DSizeM = async (furniture) => {
+    const name = furniture.name || '(이름없음)'
+    const omni3dCategory = OMNI3D_SUPPORTED.find(k => (furniture.name || '').includes(k))
+    if (!omni3dCategory) {
+      console.log(`[Omni3D] ${name}: 스킵 — Omni3D 미지원 카테고리 (지원: ${OMNI3D_SUPPORTED.join(', ')}). SAM3D 폴백으로 넘어갑니다.`)
+      return null
+    }
+    if (!originalFile) {
+      console.log(`[Omni3D] ${name}: 스킵 — 원본 사진(originalFile) 없음. 저장된 디자인 불러오기로 들어온 세션은 원본이 없어 Omni3D를 쓸 수 없습니다.`)
+      return null
+    }
+    if (!furniture.bbox || furniture.bbox.length !== 4) {
+      console.log(`[Omni3D] ${name}: 스킵 — bbox 없음/형식 이상 (${JSON.stringify(furniture.bbox)})`)
+      return null
+    }
+    try {
+      // furniture.bbox는 extract.py가 주는 [y0, y1, x0, x1] 순서(일반적인 [x1,y1,x2,y2]가
+      // 아님). 사이드카는 'x0,y0,x1,y1'을 기대하므로 여기서 순서를 바꿔서 보낸다.
+      const [y0, y1, x0, x1] = furniture.bbox
+      const omniForm = new FormData()
+      omniForm.append('image', originalFile)
+      omniForm.append('bbox', `${x0},${y0},${x1},${y1}`)
+      omniForm.append('category', omni3dCategory)
+      const omniRes = await fetch('http://127.0.0.1:8001/api/omni3d/estimate', { method: 'POST', body: omniForm })
+      const omniData = await omniRes.json()
+      if (omniData.success) {
+        console.log(`[Omni3D] ${name}: ${JSON.stringify(omniData.dimensions_m)} (score=${omniData.score?.toFixed(2)})`)
+        return omniData.dimensions_m
+      }
+      console.log(`[Omni3D] ${name}: 추정 실패 - ${omniData.error || '미지원'}`)
+      return null
+    } catch (omniErr) {
+      console.log(`[Omni3D] ${name}: 사이드카 연결 실패 - ${omniErr.message}`)
+      return null
+    }
+  }
+
   const generate3DMesh = async (furniture) => {
     setGenerating(true)
     setGeneratingId(furniture.id)
     toast.success('SAM3D로 3D 메쉬 생성 중...')
+    // 버튼을 누르면 최소 이 로그 하나는 항상 남게 해서, 이후 단계가 조용히 스킵되더라도
+    // 어디까지 갔는지 콘솔만 보고 판단할 수 있게 한다.
+    console.log(`[3D 변환] 시작: ${furniture.name || '(이름없음)'} (id=${furniture.id}, bbox=${JSON.stringify(furniture.bbox)}, 원본사진=${originalFile ? 'O' : 'X'})`)
+    // Omni3D 추정은 SAM3D 메쉬 생성과 병렬로 시작한다. 예전엔 메쉬 생성이 성공한 뒤에
+    // 순차로 호출해서, SAM3D가 실패하면 크기 추정과 그 로그까지 통째로 날아갔음
+    // (SAM3D는 온디맨드 로딩이라 첫 호출이 수 분 걸리거나 OOM으로 실패하기도 함).
+    const omni3dPromise = estimateOmni3DSizeM(furniture)
     try {
       const imgBlob = await fetch(`data:image/png;base64,${furniture.b64}`).then(r => r.blob())
       const imgFile = new File([imgBlob], 'furniture.png', { type: 'image/png' })
@@ -1302,30 +1349,9 @@ export default function Interior3DStep() {
         ? { type: 'textured', vertices: new Float32Array(raw.vertices.flat()), faces: new Uint32Array(raw.faces.flat()), uvs: new Float32Array(raw.uvs.flat()), textureB64: raw.textureB64 }
         : { type: 'vertex_color', vertices: new Float32Array(raw.vertices.flat()), faces: new Uint32Array(raw.faces.flat()), colors: new Float32Array(raw.colors.flat()) }
 
-      // Omni3D(Cube R-CNN): 지원 카테고리(액자/그림/거울/조명/스탠드 조명)면 원본 전체
-      // 사진 + bbox + 카테고리로 oracle2D 기반 실제 크기(m) 추정을 추가로 시도.
-      // 실패해도 3D 변환 자체는 성공으로 유지(handleDrop의 폴백 체인이 처리).
-      let omni3dSizeM = null
-      const omni3dCategory = OMNI3D_SUPPORTED.find(k => (furniture.name || '').includes(k))
-      if (omni3dCategory && originalFile && furniture.bbox && furniture.bbox.length === 4) {
-        try {
-          const [y0, y1, x0, x1] = furniture.bbox
-          const omniForm = new FormData()
-          omniForm.append('image', originalFile)
-          omniForm.append('bbox', `${x0},${y0},${x1},${y1}`)
-          omniForm.append('category', omni3dCategory)
-          const omniRes = await fetch('http://127.0.0.1:8001/api/omni3d/estimate', { method: 'POST', body: omniForm })
-          const omniData = await omniRes.json()
-          if (omniData.success) {
-            omni3dSizeM = omniData.dimensions_m
-            console.log(`[Omni3D] ${furniture.name}: ${JSON.stringify(omni3dSizeM)} (score=${omniData.score?.toFixed(2)})`)
-          } else {
-            console.log(`[Omni3D] ${furniture.name}: 추정 실패 - ${omniData.error || '미지원'}`)
-          }
-        } catch (omniErr) {
-          console.log(`[Omni3D] ${furniture.name}: 사이드카 연결 실패 - ${omniErr.message}`)
-        }
-      }
+      // 위에서 병렬로 시작해둔 Omni3D 추정 결과 수거. 실패해도 3D 변환 자체는 성공으로
+      // 유지한다 (handleDrop의 우선순위 폴백 체인이 처리).
+      const omni3dSizeM = await omni3dPromise
 
       setFurnitureMeshes(prev => ({
         ...prev,
@@ -1333,6 +1359,9 @@ export default function Interior3DStep() {
       }))
       toast.success('3D 변환 완료! 드래그해서 방에 배치하세요 🎉')
     } catch (e) {
+      // 토스트는 금방 사라지므로 콘솔에도 남긴다 — SAM3D가 실패한 건지 Omni3D가
+      // 스킵된 건지 콘솔 한 줄로 구분할 수 있어야 함.
+      console.error(`[3D 변환] ${furniture.name || '(이름없음)'} 실패:`, e)
       toast.error(`3D 생성 실패: ${e.message}`)
     } finally {
       setGenerating(false)
