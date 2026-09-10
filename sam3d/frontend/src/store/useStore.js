@@ -43,6 +43,10 @@ export const useStore = create((set) => ({
   // roomCameraPose가 precise(코너 검출+solvePnP)인지 approx(roll/pitch+가정 카메라높이) fallback인지
   roomCameraPoseMode: null,
   setRoomCameraPoseMode: (m) => set({ roomCameraPoseMode: m }),
+  // 사진에서 역산한 카메라의 바닥 기준 높이(m). 방 치수와 가구 높이가 둘 다 이 값에
+  // 선형 비례하므로, 두 단계가 같은 값을 쓰는지 확인하는 기준점이자 표시용.
+  roomCameraHeightM: null,
+  setRoomCameraHeightM: (h) => set({ roomCameraHeightM: h }),
   roomMesh: null,
   setRoomMesh: (mesh) => set({ roomMesh: mesh }),
   loading: false,
@@ -68,6 +72,7 @@ export const useStore = create((set) => ({
     roomBoxTextures: null,
     roomCameraPose: null,
     roomCameraPoseMode: null,
+    roomCameraHeightM: null,
     roomMesh: null,
     loading: false,
     loadingMsg: '',

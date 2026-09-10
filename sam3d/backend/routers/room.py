@@ -19,6 +19,10 @@ MIN_INPUT_SIZE  = 512
 MAX_INPUT_SIZE  = 1024
 ULAYOUT_SIDECAR_URL = 'http://localhost:8002/infer'
 ULAYOUT_RECTIFY_SIDECAR_URL = 'http://localhost:8002/rectify'
+OMNI3D_CAMERA_HEIGHT_URL = 'http://localhost:8003/camera_height'
+
+# 카메라 높이 역산이 실패했을 때만 쓰는 최후 폴백. 종전에는 이 값이 무조건 쓰였다.
+DEFAULT_CAMERA_HEIGHT_M = 1.6
 
 # 패치 타일 폴백에서 "실제 무늬/질감" vs "매끈한 벽 + 미세한 그림자/조명 그라데이션"을
 # 가르는 std 임계값. 그라데이션만 있는 패치를 타일링하면 반복 이음새가 줄무늬처럼 튀어서
@@ -311,14 +315,73 @@ async def extract_room_colors(image: UploadFile = File(...), pitch_deg: float = 
     })
 
 
+def _resolve_camera_height(img_bytes: bytes, filename: str, content_type: str, given):
+    """
+    카메라 높이(m)를 정한다. 프론트가 값을 명시했으면 그대로 쓰고, 없으면 Omni3D
+    사이드카로 사진에서 역산한다. 역산도 실패하면 DEFAULT_CAMERA_HEIGHT_M.
+
+    이 값 하나가 방 치수(uLayout: scale_floor = camera_height_m / bearing)와 가구
+    높이(프론트: 광선-바닥평면 교차) **양쪽의 절대 스케일을 동시에** 결정한다.
+    종전에는 1.6m 고정이라 실제 촬영 높이가 다르면 둘 다 같은 비율로 틀렸다.
+    반환: (높이, 출처 문자열, 진단 dict)
+    """
+    if given is not None:
+        return float(given), "client", None
+
+    try:
+        resp = requests.post(
+            OMNI3D_CAMERA_HEIGHT_URL,
+            files={"image": (filename or "room.jpg", img_bytes, content_type or "image/jpeg")},
+            timeout=60,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("success"):
+            h = float(data["camera_height_m"])
+            print(f"[카메라 높이] Omni3D 역산 {h:.3f}m "
+                  f"(샘플 {data.get('n_samples')}개, K={data.get('K_source')}, "
+                  f"편차 {data.get('spread_m')}m)")
+            return h, "omni3d", data
+        print(f"[카메라 높이] Omni3D 역산 실패 → {DEFAULT_CAMERA_HEIGHT_M}m 폴백: {data.get('error')}")
+    except requests.exceptions.RequestException as e:
+        print(f"[카메라 높이] Omni3D 사이드카 연결 불가 → {DEFAULT_CAMERA_HEIGHT_M}m 폴백: {e}")
+
+    return DEFAULT_CAMERA_HEIGHT_M, "fallback", None
+
+
+@router.post("/camera-height")
+async def estimate_camera_height(image: UploadFile = File(...)):
+    """
+    사진에서 카메라의 바닥 기준 높이(m)를 역산해서 돌려준다 (Omni3D 사이드카 프록시).
+    프론트가 이 값을 먼저 받아 /layout과 /rectify_textures에 함께 넘기면, 두 호출이
+    같은 스케일 기준을 공유하면서 Omni3D 추론도 한 번만 돈다.
+    """
+    img_bytes = await image.read()
+    height, source, diag = _resolve_camera_height(
+        img_bytes, image.filename, image.content_type, None
+    )
+    return JSONResponse({
+        "success": source == "omni3d",
+        "camera_height_m": height,
+        "source": source,
+        "fallback_m": DEFAULT_CAMERA_HEIGHT_M,
+        "diagnostics": diag,
+    })
+
+
 @router.post("/layout")
-async def estimate_room_layout(image: UploadFile = File(...), camera_height_m: float = Form(1.6)):
+async def estimate_room_layout(image: UploadFile = File(...), camera_height_m: float = Form(None)):
     """
     uLayout 사이드카(별도 conda env, localhost:8002)로 빈방 이미지를 보내
     방 폭/깊이/높이(m)를 추정해서 돌려준다. 사이드카가 꺼져있으면 프론트가
     수동 입력값으로 폴백할 수 있도록 success:false로 응답한다.
+
+    camera_height_m을 안 주면 Omni3D로 사진에서 역산한다(_resolve_camera_height).
     """
     img_bytes = await image.read()
+    camera_height_m, ch_source, _ = _resolve_camera_height(
+        img_bytes, image.filename, image.content_type, camera_height_m
+    )
     try:
         resp = requests.post(
             ULAYOUT_SIDECAR_URL,
@@ -327,7 +390,12 @@ async def estimate_room_layout(image: UploadFile = File(...), camera_height_m: f
             timeout=30,
         )
         resp.raise_for_status()
-        return JSONResponse(resp.json())
+        # 추정에 실제로 쓰인 카메라 높이를 함께 돌려준다 — 프론트가 같은 값을
+        # 가구 크기 추정에도 써야 방과 가구의 스케일 기준이 일치한다.
+        payload = resp.json()
+        payload["camera_height_m"] = camera_height_m
+        payload["camera_height_source"] = ch_source
+        return JSONResponse(payload)
     except requests.exceptions.RequestException as e:
         return JSONResponse(
             {"success": False, "error": f"uLayout 서버에 연결할 수 없습니다: {e}"},
@@ -336,13 +404,18 @@ async def estimate_room_layout(image: UploadFile = File(...), camera_height_m: f
 
 
 @router.post("/rectify_textures")
-async def rectify_room_textures(image: UploadFile = File(...), camera_height_m: float = Form(1.6)):
+async def rectify_room_textures(image: UploadFile = File(...), camera_height_m: float = Form(None)):
     """
     uLayout 사이드카의 /rectify를 그대로 프록시. 벽/바닥/천장 5개 평면을 실사 텍스처로
     rectify한 결과(base64 JPEG)를 돌려준다. 사이드카가 꺼져있거나 코너 검출/solvePnP가
     실패하면 success:false로 응답 (프론트는 procedural box의 기존 단색 방식으로 폴백).
+
+    camera_height_m을 안 주면 Omni3D로 사진에서 역산한다(_resolve_camera_height).
     """
     img_bytes = await image.read()
+    camera_height_m, ch_source, _ = _resolve_camera_height(
+        img_bytes, image.filename, image.content_type, camera_height_m
+    )
     try:
         resp = requests.post(
             ULAYOUT_RECTIFY_SIDECAR_URL,
@@ -351,7 +424,10 @@ async def rectify_room_textures(image: UploadFile = File(...), camera_height_m: 
             timeout=60,
         )
         resp.raise_for_status()
-        return JSONResponse(resp.json())
+        payload = resp.json()
+        payload["camera_height_m"] = camera_height_m
+        payload["camera_height_source"] = ch_source
+        return JSONResponse(payload)
     except requests.exceptions.RequestException as e:
         return JSONResponse(
             {"success": False, "error": f"uLayout 서버에 연결할 수 없습니다: {e}"},
