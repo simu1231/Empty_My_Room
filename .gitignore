@@ -7,3 +7,6 @@ sam3d/backend/data/
 sam3d/frontend/.vercel/
 sam3d/frontend/.env.production
 sam3d/frontend/.env
+
+# graphify 지식 그래프 생성물 (로컬 캐시)
+graphify-out/
