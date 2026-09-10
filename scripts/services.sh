@@ -15,10 +15,10 @@
 # 미정의 상태로 참조해서 conda activate 자체가 실패한다.
 set -o pipefail
 
-REPO=/home/tmvlem5671/Empty_My_Room
-ULAYOUT_DIR=/home/tmvlem5671/uLayout
-OMNI3D_DIR=/home/tmvlem5671/omni3d
-OMNI3D_ENV=/home/tmvlem5671/miniconda3/envs/omni3d
+REPO="$HOME/Empty_My_Room"
+ULAYOUT_DIR="$HOME/uLayout"
+OMNI3D_DIR="$HOME/omni3d"
+OMNI3D_ENV="$HOME/miniconda3/envs/omni3d"
 LOG_DIR=/tmp/emr-logs
 
 mkdir -p "$LOG_DIR"
