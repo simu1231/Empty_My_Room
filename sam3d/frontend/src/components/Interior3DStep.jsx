@@ -970,17 +970,40 @@ const FURNITURE_STD_SIZES = {
   'TV':        { w: 1.2, d: 0.1, h: 0.7 },
 }
  
-// 바닥 접촉 가정이 깨지는(카메라 pose 기반 광선-바닥평면 교차로 높이 추정이 안 되는)
-// 벽걸이/공중부양형 카테고리. generate3DMesh(SAM3D 호출 분기)와 handleDrop(높이 추정
-// 분기) 양쪽에서 공유 — 예전엔 각자 다른 인라인 배열을 써서 '스탠드 조명'이 한쪽에서
-// 누락돼 있었음.
-const THIN_FLAT = ['조명', '꽃', '화분', '시계', '액자', '그림', '거울', '스탠드 조명', '커튼']
+// SAM3D 호출 시 크롭만으로는 형상 복원이 어려워 원본 사진 + bbox를 함께 보내야 하는
+// 얇거나 작은 카테고리. generate3DMesh에서만 쓴다.
+//
+// 주의: 이 목록은 "형상이 얇다"는 기준이고, 아래 FLOOR_DETACHED("바닥에 안 닿는다")와는
+// 다른 개념이다. 예전엔 THIN_FLAT 하나가 두 용도를 겸했는데, 그래서 바닥에 서 있는
+// '스탠드 조명'까지 바닥-교차 추정에서 제외되고 있었다(형상은 얇지만 바닥엔 닿는다).
+const NEEDS_FULL_IMAGE = ['조명', '꽃', '화분', '시계', '액자', '그림', '거울', '스탠드 조명', '커튼']
+
+// 바닥에 닿지 않아 바닥평면(Y=0) 교차로는 높이를 못 구하는 카테고리.
+const FLOOR_DETACHED = ['조명', '꽃', '화분', '시계', '액자', '그림', '거울', '커튼']
+// 위 목록의 키워드를 이름에 포함하더라도 실제로는 바닥에 서 있는 예외.
+// '스탠드 조명'은 '조명'을 포함하므로 목록에서 빼는 것만으로는 걸러지지 않는다 —
+// 반드시 이 예외를 먼저 검사해야 한다(기존 isCeilingItem 분기도 같은 이유로
+// !name.includes('스탠드')를 앞에 두고 있었다).
+const FLOOR_STANDING_EXCEPTIONS = ['스탠드']
+
+function isFloorDetachedName(name) {
+  const n = name || ''
+  if (FLOOR_STANDING_EXCEPTIONS.some(k => n.includes(k))) return false
+  return FLOOR_DETACHED.some(k => n.includes(k))
+}
+
+// 바닥에 안 닿더라도 "어느 평면에 붙어 있는지"를 알면 같은 기하로 풀 수 있다.
+// 벽에 붙는 것 / 천장에 붙는 것을 나눠 두고, 광선을 그 평면과 교차시킨다.
+// 여기 없는 FLOOR_DETACHED 항목(꽃·화분 — 바닥이든 가구 위든 평면을 특정할 수 없음)은
+// 종전처럼 Omni3D/SAM3D 폴백을 탄다.
+const WALL_MOUNTED = ['액자', '그림', '거울', '시계', '커튼']
+const CEILING_MOUNTED = ['조명']   // '스탠드 조명'은 아래 매칭에서 먼저 걸러낸다
 // Omni3D(Cube R-CNN) indoor 체크포인트가 지원하는 서브셋 — 시계/화분/꽃은 Omni3D
 // 38-class 실내 taxonomy에 아예 없어서(조사로 확인) SAM3D(MoGe) 폴백만 탄다.
 // '스탠드 조명'을 '조명'보다 먼저 검사해야 함(둘 다 furniture.name에 포함될 수 있어
 // 더 긴 키워드부터 매치해야 정확한 한글 카테고리명이 서버 매핑 테이블과 일치).
-// 커튼은 바닥까지 닿는지 여부가 들쭉날쭉해서 카메라 pose 바닥-교차 가정이 불안정
-// → THIN_FLAT에 넣어 그 방식을 아예 스킵하고 Omni3D(curtain 카테고리 지원)를 우선.
+// 커튼은 바닥까지 닿는지 여부가 들쭉날쭉해서 바닥-교차 가정을 못 쓰지만, 벽(창문)에는
+// 붙어 있으므로 WALL_MOUNTED로 벽 평면 교차를 쓴다 — 예전엔 Omni3D에만 의존했다.
 //
 // 바닥 접촉 가구(침대/소파/의자/…)를 여기 넣은 건 그 가구의 크기를 Omni3D로 정하려는
 // 게 아니다. 이들은 경로1(카메라 pose)로도 높이가 나오므로, 같은 가구를 두 방법으로
@@ -1079,6 +1102,112 @@ function estimateCameraHeightM(cameraPose) {
   return R[0][1] * -t[0] + R[1][1] * -t[1] + R[2][1] * -t[2]
 }
 
+// 방 치수 추정 오차를 감안해 평면 유효범위 판정에 주는 여유(비율).
+const PLANE_BOUND_TOL = 0.08
+
+/**
+ * 벽·천장에 붙은 물체의 실제 높이(m)를 구한다. 바닥 접촉 가구의 광선-바닥평면 교차와
+ * 원리가 완전히 같고, 교차시킬 평면만 바닥에서 벽/천장으로 바꾼 것이다.
+ *
+ * 왜 이게 되는가: 단일 이미지에서 bbox는 "시야에서 몇 도를 차지하는가"만 알려주므로
+ * 깊이를 모르면 실제 크기를 구할 수 없다. 깊이를 얻는 유일한 기하적 방법이 "물체가
+ * 알려진 평면 위에 있다"는 제약이고, 광선 하나와 평면 하나가 만나면 점이 유일하게
+ * 결정된다. 바닥만 그 대상이었던 건 바닥이 카메라 pose에서 공짜로 주어지는 유일한
+ * 평면이었기 때문인데, 방 치수를 알면 벽 4면과 천장의 방정식도 똑같이 세울 수 있다
+ * (uLayout room_rectify.py의 planes 정의와 동일한 좌표계: x∈[0,W], y∈[0,H], 뒷벽 z=0).
+ *
+ * 어느 벽인지 고르는 방법: 후보 평면 전부와 교차시켜, 교차점이 그 평면의 유효범위
+ * 안에 들어오는 해들 중 카메라에서 가장 가까운 것을 택한다. 카메라에서 광선이 먼저
+ * 만나는 면이 실제로 보이는 면이므로 이게 물리적으로 맞다.
+ *
+ * 벽걸이 물체는 bbox 전체가 벽면과 거의 평행하므로 하단이 아니라 중심 광선을 쓴다.
+ * 반환: { height, plane } — 평면을 특정할 수 없으면 null.
+ */
+function estimateWallItemHeightM(cameraPose, bbox, roomSize, kind) {
+  if (!cameraPose || !bbox || bbox.length !== 4) return null
+  const W = roomSize?.width, H = roomSize?.height
+  if (!(W > 0) || !(H > 0)) return null
+
+  const { rotation_matrix: R, translation: t, K } = cameraPose
+  const fx = K[0][0], fy = K[1][1], cx = K[0][2], cy = K[1][2]
+  const [y0, y1, x0, x1] = bbox
+
+  const matTMulVec = (M, v) => [
+    M[0][0]*v[0] + M[1][0]*v[1] + M[2][0]*v[2],
+    M[0][1]*v[0] + M[1][1]*v[1] + M[2][1]*v[2],
+    M[0][2]*v[0] + M[1][2]*v[1] + M[2][2]*v[2],
+  ]
+  const matMulVec = (M, v) => [
+    M[0][0]*v[0] + M[0][1]*v[1] + M[0][2]*v[2],
+    M[1][0]*v[0] + M[1][1]*v[1] + M[1][2]*v[2],
+    M[2][0]*v[0] + M[2][1]*v[1] + M[2][2]*v[2],
+  ]
+
+  const camPosRoom = matTMulVec(R, [-t[0], -t[1], -t[2]])
+  const dirCam = [((x0 + x1) / 2 - cx) / fx, ((y0 + y1) / 2 - cy) / fy, 1.0]
+  const dirRoom = matTMulVec(R, dirCam)
+
+  // 카메라 z가 뒷벽(z=0)에서 얼마나 떨어져 있는지 — 측벽/천장의 z 유효범위 상한
+  const zSpan = Math.max(camPosRoom[2], 0.5)
+  const tolW = W * PLANE_BOUND_TOL, tolH = H * PLANE_BOUND_TOL, tolZ = zSpan * PLANE_BOUND_TOL
+
+  // 축에 수직인 평면들: [축 인덱스, 평면 위치, 이름, 교차점 유효성 검사]
+  const inRange = (v, lo, hi, tol) => v >= lo - tol && v <= hi + tol
+  const candidates = kind === 'ceiling'
+    ? [[1, H, 'ceiling', (p) => inRange(p[0], 0, W, tolW) && inRange(p[2], 0, zSpan, tolZ)]]
+    : [
+        [2, 0, 'back_wall',  (p) => inRange(p[0], 0, W, tolW) && inRange(p[1], 0, H, tolH)],
+        [0, 0, 'left_wall',  (p) => inRange(p[1], 0, H, tolH) && inRange(p[2], 0, zSpan, tolZ)],
+        [0, W, 'right_wall', (p) => inRange(p[1], 0, H, tolH) && inRange(p[2], 0, zSpan, tolZ)],
+      ]
+
+  let best = null
+  for (const [axis, coord, name, valid] of candidates) {
+    const denom = dirRoom[axis]
+    if (Math.abs(denom) < 1e-6) continue          // 광선이 평면과 평행
+    const s = (coord - camPosRoom[axis]) / denom
+    if (!(s > 0) || !isFinite(s)) continue        // 카메라 뒤쪽
+    const hit = [
+      camPosRoom[0] + s * dirRoom[0],
+      camPosRoom[1] + s * dirRoom[1],
+      camPosRoom[2] + s * dirRoom[2],
+    ]
+    if (!valid(hit)) continue                     // 그 면의 범위를 벗어난 교차
+    if (best === null || s < best.s) best = { s, hit, name }
+  }
+  if (!best) return null
+
+  const pCam = matMulVec(R, best.hit)
+  const zCam = pCam[2] + t[2]
+  if (!(zCam > 0)) return null
+
+  const realHeight = (y1 - y0) * zCam / fy
+  if (!(realHeight > 0) || !isFinite(realHeight)) return null
+  return { height: realHeight, plane: best.name }
+}
+
+/**
+ * 기하(앵커 A)로 높이를 구하는 통합 진입점. 바닥 접촉 가구는 바닥평면, 벽걸이는 벽면,
+ * 천장 조명은 천장면을 쓴다. 전부 같은 카메라 pose와 같은 방 좌표계를 쓰므로 결과가
+ * 하나의 스케일 기준을 공유한다 — Omni3D/SAM3D(앵커 B)와 달리 환산이 필요 없다.
+ * 반환: { height, plane } 또는 null(평면을 특정할 수 없는 카테고리).
+ */
+function estimateGeometricHeightM(cameraPose, bbox, name, roomSize) {
+  const n = name || ''
+  if (!isFloorDetachedName(n)) {
+    const h = estimateFurnitureHeightM(cameraPose, bbox)
+    return h > 0 ? { height: h, plane: 'floor' } : null
+  }
+  // 여기 오는 '조명'은 천장 조명뿐이다('스탠드 조명'은 위에서 바닥으로 처리됨).
+  if (CEILING_MOUNTED.some(k => n.includes(k))) {
+    return estimateWallItemHeightM(cameraPose, bbox, roomSize, 'ceiling')
+  }
+  if (WALL_MOUNTED.some(k => n.includes(k))) {
+    return estimateWallItemHeightM(cameraPose, bbox, roomSize, 'wall')
+  }
+  return null   // 꽃·화분 등 평면 미상 → 호출부가 Omni3D/SAM3D 폴백
+}
+
 /**
  * 경로2(Omni3D)·경로3(SAM3D)의 스케일을 방 좌표계로 옮기는 환산 계수를 구한다.
  *
@@ -1094,15 +1223,17 @@ function estimateCameraHeightM(cameraPose) {
  *
  * 기준쌍이 하나도 없으면 null을 반환하고, 호출부는 보정 없이 기존 동작을 유지한다.
  */
-function computeScaleCalibration(furnitureMeshes, furnitureList, cameraPose) {
+function computeScaleCalibration(furnitureMeshes, furnitureList, cameraPose, roomSize) {
   const ratiosOmni = [], ratiosSam = []
   if (cameraPose) {
     for (const f of furnitureList || []) {
       const mesh = furnitureMeshes?.[f.id]
       if (!mesh) continue
-      // 벽걸이/공중부양은 경로1이 원천적으로 불가능 → 기준쌍이 될 수 없다
-      if (THIN_FLAT.some(k => (f.name || '').includes(k))) continue
-      const hPose = estimateFurnitureHeightM(cameraPose, f.bbox)
+      // 기하로 높이가 나오는 가구만 기준쌍이 된다. 벽 평면 제약이 생긴 뒤로는
+      // 벽걸이(액자·거울 등)도 여기 포함되므로 기준쌍이 늘어난다 — 동시에 그 가구들은
+      // 애초에 앵커 A로 풀리므로 환산이 필요 없어진다.
+      const geo = estimateGeometricHeightM(cameraPose, f.bbox, f.name, roomSize)
+      const hPose = geo?.height
       if (!(hPose > 0)) continue
       const hOmni = mesh.omni3dSizeM?.height
       const hSam = mesh.sam3dSizeM?.height
@@ -1367,8 +1498,8 @@ export default function Interior3DStep() {
   // 가구를 배치할 때마다 다시 계산하지 않도록 memo하고, 새 가구가 변환되면
   // (furnitureMeshes 변경) 기준쌍이 늘어나면서 자동으로 정밀해진다.
   const scaleCalib = useMemo(
-    () => computeScaleCalibration(furnitureMeshes, furnitureList, roomCameraPose),
-    [furnitureMeshes, furnitureList, roomCameraPose]
+    () => computeScaleCalibration(furnitureMeshes, furnitureList, roomCameraPose, roomSize),
+    [furnitureMeshes, furnitureList, roomCameraPose, roomSize]
   )
   useEffect(() => {
     if (scaleCalib.nOmni || scaleCalib.nSam) {
@@ -1505,7 +1636,7 @@ export default function Interior3DStep() {
       form.append('image', imgFile)
       form.append('category', furniture.name || '')
  
-      const isThinFlat = THIN_FLAT.some(k => (furniture.name || '').includes(k))
+      const isThinFlat = NEEDS_FULL_IMAGE.some(k => (furniture.name || '').includes(k))
       if (isThinFlat && originalFile && furniture.bbox) {
         form.append('full_image', originalFile)
         form.append('bbox', JSON.stringify(furniture.bbox))
@@ -1555,18 +1686,22 @@ export default function Interior3DStep() {
     if (!meshData) { toast.error('먼저 3D 변환을 해주세요!'); return }
 
     // 가구 실제 높이(m) 추정 - 우선순위 체인:
-    //  1) 카메라 pose 기반 광선-바닥평면 교차 (바닥 접촉 가구만 - THIN_FLAT는 가정이
-    //     깨지므로 애초에 시도하지 않음)
-    //  2) Omni3D(Cube R-CNN) oracle2D 추정  ×스케일 캘리브레이션 계수
-    //  3) SAM3D(MoGe) pose-decoder scale 추정  ×스케일 캘리브레이션 계수
+    //  1) 기하: 카메라 pose 광선을 "물체가 붙어 있는 평면"과 교차 (앵커 A)
+    //     - 바닥 접촉 가구 → 바닥평면 Y=0
+    //     - 벽걸이(액자·그림·거울·시계·커튼) → 벽 4면 중 광선이 먼저 만나는 면
+    //     - 천장 조명 → 천장평면 Y=방높이
+    //  2) Omni3D(Cube R-CNN) oracle2D 추정  ×스케일 캘리브레이션 계수 (앵커 B)
+    //  3) SAM3D(MoGe) pose-decoder scale 추정  ×스케일 캘리브레이션 계수 (앵커 B)
     //  4) 방 크기 비례 폴백
     // 2·3에 계수를 곱하는 이유: 이 둘은 방(uLayout)과 무관하게 각자 metric을 추정해서
-    // 그대로 쓰면 방과 다른 자로 잰 값이 된다. 바닥 접촉 가구를 경로1과 경로2/3로
-    // 동시에 재서 얻은 환산 계수로 방 좌표계에 맞춘다(computeScaleCalibration).
+    // 그대로 쓰면 방과 다른 자로 잰 값이 된다. 1)로 잰 가구를 2/3으로도 재서 얻은
+    // 환산 계수로 방 좌표계에 맞춘다(computeScaleCalibration).
+    // 벽 평면 제약이 붙은 뒤로 1)이 커버하는 범위가 넓어져, 꽃·화분처럼 붙어 있는
+    // 평면을 특정할 수 없는 카테고리만 2/3에 의존한다.
     // 마지막에 sanityCheckHeight로 표준 크기·방 높이 제약을 건다.
     const furniture = furnitureList.find(f => f.id === numId)
-    const isFloorDetached = THIN_FLAT.some(k => (furniture?.name || '').includes(k))
-    const computedHeight = isFloorDetached ? null : estimateFurnitureHeightM(roomCameraPose, furniture?.bbox)
+    const geo = estimateGeometricHeightM(roomCameraPose, furniture?.bbox, furniture?.name, roomSize)
+    const computedHeight = geo?.height ?? null
     const omni3dRaw = meshData?.omni3dSizeM?.height
     const sam3dRaw = meshData?.sam3dSizeM?.height
     const omni3dHeight = (omni3dRaw > 0 && scaleCalib.kOmni) ? omni3dRaw * scaleCalib.kOmni : omni3dRaw
@@ -1574,9 +1709,10 @@ export default function Interior3DStep() {
     const rawEstimate = computedHeight ?? omni3dHeight ?? sam3dHeight ?? roomSize.width * 0.2
 
     const camHeight = estimateCameraHeightM(roomCameraPose)
+    const PLANE_KO = { floor: '바닥평면', back_wall: '뒷벽', left_wall: '좌벽', right_wall: '우벽', ceiling: '천장평면' }
     let sourceLabel
     if (computedHeight != null) {
-      sourceLabel = `카메라 pose 기반 계산값 (mode=${roomCameraPoseMode ?? 'unknown'}, 카메라 추정 높이=${camHeight != null ? (camHeight * 100).toFixed(1) + 'cm' : 'N/A'})`
+      sourceLabel = `기하 계산값 · ${PLANE_KO[geo.plane] ?? geo.plane} 교차 (mode=${roomCameraPoseMode ?? 'unknown'}, 카메라 추정 높이=${camHeight != null ? (camHeight * 100).toFixed(1) + 'cm' : 'N/A'})`
     } else if (omni3dHeight != null) {
       sourceLabel = scaleCalib.kOmni
         ? `Omni3D(Cube R-CNN) 추정값 ${omni3dRaw.toFixed(3)}m × 캘리브레이션 ${scaleCalib.kOmni.toFixed(3)} (기준쌍 ${scaleCalib.nOmni}개)`
