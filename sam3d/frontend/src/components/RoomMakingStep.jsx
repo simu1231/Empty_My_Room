@@ -5,9 +5,9 @@ import toast from 'react-hot-toast'
 
 export default function RoomMakingStep() {
   const {
-    emptyRoomUrl, emptyRoomFile, maskB64, originalFile,
+    emptyRoomUrl, emptyRoomFile, maskB64,
     setStep, setRoomSize, setRoomMesh, setRoomColors, setRoomSurfaceTextures, setRoomBoxTextures,
-    setRoomCameraPose, setRoomCameraPoseMode, setRoomCameraHeightM, setLoading, reset
+    setRoomCameraPose, setRoomCameraPoseMode, setLoading, reset
   } = useStore()
 
   const [width,  setW] = useState(4.5)
@@ -30,49 +30,9 @@ export default function RoomMakingStep() {
       layoutForm.append('image', emptyRoomFile)
       const rectifyForm = new FormData()
       rectifyForm.append('image', emptyRoomFile)
-      // 카메라 높이 역산에는 빈방이 아니라 **가구가 그대로 있는 원본 사진**을 쓴다.
-      // 역산 원리가 "바닥에 닿은 가구의 3D bbox 밑면 = 바닥 평면"이라서, 가구를 지운
-      // 빈방에서는 근거가 되는 물체가 사라져 검출 수가 줄고 실패 확률이 올라간다.
-      // 카메라 위치는 두 사진이 동일하므로(빈방은 같은 사진에서 가구만 지운 것) 원본으로
-      // 구한 높이를 빈방 레이아웃에 그대로 써도 된다. 원본이 없는 세션(저장된 디자인
-      // 불러오기)에서는 빈방으로 폴백한다.
-      const chForm = new FormData()
-      chForm.append('image', originalFile || emptyRoomFile)
 
-      // 카메라 높이를 먼저 확정한다. 방 치수(uLayout)와 가구 높이(광선-바닥평면 교차)가
-      // 둘 다 이 값에 선형 비례하므로, layout/rectify가 같은 값을 공유해야 스케일 기준이
-      // 하나로 유지된다. 여기서 한 번만 구해 넘기면 Omni3D 추론도 1회로 끝난다
-      // (안 넘기면 백엔드가 두 요청에서 각각 역산 → 중복 추론).
-      // 색상 분석은 카메라 높이와 무관하므로 같이 병렬로 돌린다.
-      const [chRes, colorRes] = await Promise.allSettled([
-        fetch(API.cameraHeight, { method: 'POST', body: chForm }),
+      const [colorRes, layoutRes, rectifyRes] = await Promise.allSettled([
         fetch(`${API.generate3d.replace('generate3d', 'extract-colors')}`, { method: 'POST', body: colorForm }),
-      ])
-
-      let cameraHeightM = null
-      if (chRes.status === 'fulfilled') {
-        try {
-          const chData = await chRes.value.json()
-          if (chData.success && chData.camera_height_m) {
-            cameraHeightM = chData.camera_height_m
-            const d = chData.diagnostics || {}
-            console.log(`[카메라 높이] ${cameraHeightM}m — Omni3D 바닥접촉 가구 ${d.n_samples ?? '?'}개 기준 ` +
-                        `(편차 ${d.spread_m ?? '?'}m, K=${d.K_source ?? '?'})`)
-          } else {
-            console.log(`[카메라 높이] 역산 실패 → 백엔드 기본값(${chData.fallback_m ?? 1.6}m) 사용: ${chData.diagnostics?.error ?? ''}`)
-          }
-        } catch (e) {
-          console.log('[카메라 높이] 응답 파싱 실패 → 백엔드 기본값 사용', e)
-        }
-      } else {
-        console.log('[카메라 높이] 요청 실패 → 백엔드 기본값 사용')
-      }
-      if (cameraHeightM != null) {
-        layoutForm.append('camera_height_m', cameraHeightM)
-        rectifyForm.append('camera_height_m', cameraHeightM)
-      }
-
-      const [layoutRes, rectifyRes] = await Promise.allSettled([
         fetch(API.layout, { method: 'POST', body: layoutForm }),
         fetch(API.rectifyTextures, { method: 'POST', body: rectifyForm }),
       ])
@@ -110,8 +70,6 @@ export default function RoomMakingStep() {
 
       // 벽/바닥/천장 실사 텍스처 rectify — 실패해도 위 분석 결과는 그대로 사용,
       // Interior3DStep이 procedural 단색/패턴으로 폴백함
-      setPreview(p => ({ ...p, cameraHeightM }))
-
       if (rectifyRes.status === 'fulfilled') {
         const rectifyData = await rectifyRes.value.json()
         if (rectifyData.success) {
@@ -139,7 +97,6 @@ export default function RoomMakingStep() {
     setRoomBoxTextures(preview.boxTextures || null)
     setRoomCameraPose(preview.cameraPose || null)   // 가구 실제 크기 추정용 (uLayout solvePnP)
     setRoomCameraPoseMode(preview.cameraPoseMode || null)   // 'precise' | 'approx' — 실험 시 어느 pose로 계산됐는지 구분용
-    setRoomCameraHeightM(preview.cameraHeightM ?? null)   // 스케일 캘리브레이션 진단용
     setRoomMesh(null)   // SAM3D 메시 없이 Three.js 박스 방 사용
     setStep('interior3d')
   }
