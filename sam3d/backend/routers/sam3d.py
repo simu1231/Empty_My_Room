@@ -140,24 +140,26 @@ async def generate_mesh(
     print("Meta SAM3D 3D 메쉬 생성 중...")
 
     pipeline = getattr(request.app.state, 'sam3d_pipeline', None) if CACHE_SAM3D_PIPELINE else None
-    if pipeline is None:
-        from omegaconf import OmegaConf
-        from hydra.utils import instantiate
-        config = OmegaConf.load(PIPELINE_CONFIG)
-        config.rendering_engine   = 'pytorch3d'
-        config.compile_model      = False
-        config.workspace_dir      = WORKSPACE_DIR
-        config.ss_inference_steps   = 25  # 초기 3D 포인트 밀도
-        config.slat_inference_steps = 25  # 3D 잠재 구조 정확도
-        config.slat_cfg_strength    = 1   # YAML 기본값
-        pipeline = instantiate(config)
-        if CACHE_SAM3D_PIPELINE:
-            request.app.state.sam3d_pipeline = pipeline
-            print("SAM3D 파이프라인 캐시 완료!")
-
     custom_pointmap = None
 
     try:
+        # 파이프라인 로드도 try 안에서 한다. 밖에 두면 로드 중 OOM이 났을 때
+        # except/finally를 타지 않아 부분 할당된 텐서가 그대로 GPU에 남는다.
+        if pipeline is None:
+            from omegaconf import OmegaConf
+            from hydra.utils import instantiate
+            config = OmegaConf.load(PIPELINE_CONFIG)
+            config.rendering_engine   = 'pytorch3d'
+            config.compile_model      = False
+            config.workspace_dir      = WORKSPACE_DIR
+            config.ss_inference_steps   = 25  # 초기 3D 포인트 밀도
+            config.slat_inference_steps = 25  # 3D 잠재 구조 정확도
+            config.slat_cfg_strength    = 1   # YAML 기본값
+            pipeline = instantiate(config)
+            if CACHE_SAM3D_PIPELINE:
+                request.app.state.sam3d_pipeline = pipeline
+                print("SAM3D 파이프라인 캐시 완료!")
+
         import random
 
         _t_sam3d_total = time.time()
@@ -196,9 +198,18 @@ async def generate_mesh(
             if score > best_stage1_score:
                 best_stage1_score = score
                 best_seed = seed
+            # 탐색 결과는 seed 순위 판정에만 쓰고 버린다. 5회분이 캐싱 할당자에
+            # 쌓인 채 본 실행에 들어가면 가장 무거운 단계에서 OOM이 난다.
+            del r1
+            torch.cuda.empty_cache()
 
         print(f"[⏱ 처리시간] SAM3D Stage1 탐색 ({NUM_STAGE1_TRIES}회 × {SEARCH_INFERENCE_STEPS}스텝): {time.time()-_t_stage1:.2f}초")
         print(f"[최적 seed 선택] seed={best_seed} score={best_stage1_score:.4f}")
+
+        # 본 실행(25스텝 + decode + 메쉬 후처리)은 이 함수에서 가장 메모리를 많이
+        # 쓰는 구간이다. 탐색 잔여물을 완전히 비우고 최대 여유 상태로 들어간다.
+        gc.collect()
+        torch.cuda.empty_cache()
 
         # 최적 seed로 full 파이프라인 실행
         _t_stage2 = time.time()
@@ -319,8 +330,11 @@ async def generate_mesh(
             request.app.state.sam3d_pipeline = None
         raise HTTPException(500, f"메쉬 생성 실패: {e}")
     finally:
-        if not CACHE_SAM3D_PIPELINE:
-            del pipeline
+        # 로컬 참조를 반드시 끊는다. 실패 시 app.state만 None으로 되돌리면 이 지역
+        # 변수가 파이프라인을 계속 붙들고 있어서 아래 empty_cache()가 헛돈다
+        # (실측: 실패 1회당 약 13.5GB가 GPU에 잔류해 재시작 전까지 복구 불가였음).
+        # 성공한 경우엔 app.state가 객체를 참조하므로 캐시는 그대로 유지된다.
+        pipeline = None
         gc.collect()
         torch.cuda.empty_cache()
         print("SAM3D GPU 캐시 정리 완료")

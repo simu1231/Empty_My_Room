@@ -46,9 +46,13 @@ skip_if_up() {  # $1=port $2=name
 
 start_backend() {
   skip_if_up 8001 backend && return 0
+  # expandable_segments: 캐싱 할당자가 세그먼트를 넓혀 쓰게 해 단편화를 줄인다.
+  # 2026-09 OOM 추적 중 넣었으나 그 건의 원인은 아니었다(원인은 C드라이브 부족 →
+  # Windows WDDM이 GPU 할당 거부). 단편화 자체엔 도움이 되고 부작용이 없어 유지한다.
   ( cd "$REPO/sam3d/backend" \
     && conda activate sam3d \
-    && nohup python -m uvicorn main:app --host 0.0.0.0 --port 8001 \
+    && PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+       nohup python -m uvicorn main:app --host 0.0.0.0 --port 8001 \
          > "$LOG_DIR/backend.log" 2>&1 & )
   wait_port 8001 300 backend   # SAM2 + LaMa 로드 대기
 }
