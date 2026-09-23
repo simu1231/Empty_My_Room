@@ -1,0 +1,132 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="시스템 아키텍처" id="emr-arch">
+    <mxGraphModel dx="1400" dy="1290" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1290" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Empty My Room — 시스템 아키텍처" style="text;html=1;align=left;verticalAlign=middle;fontSize=32;fontStyle=1;fontColor=#222222;" vertex="1" parent="1">
+          <mxGeometry x="60" y="24" width="1280" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="사진 한 장으로 실내 가구를 분할·제거하고 3D로 재구성·재배치" style="text;html=1;align=left;verticalAlign=middle;fontSize=17;fontColor=#777777;" vertex="1" parent="1">
+          <mxGeometry x="60" y="68" width="1280" height="28" as="geometry" />
+        </mxCell>
+
+        <mxCell id="user" value="사용자" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#555555;fontSize=23;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="118" width="170" height="82" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fe" value="&lt;b&gt;Frontend&lt;/b&gt;&#160;&#160;&lt;font style=&quot;font-size:18px;color:#4a6785&quot;&gt;React · Three.js&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:19px;color:#4a6785&quot;&gt;&lt;b&gt;3D 인테리어 시뮬레이션&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:16px;color:#5a6b7d&quot;&gt;빈 방에서 가구를 드래그 · 회전 · 스케일 조정하며 직접 배치&lt;br&gt;AABB · Raycaster 충돌 판정&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=29;" vertex="1" parent="1">
+          <mxGeometry x="325" y="250" width="760" height="140" as="geometry" />
+        </mxCell>
+
+        <mxCell id="be" value="&lt;b&gt;Backend&lt;/b&gt;&#160;&#160;&lt;font style=&quot;font-size:18px;color:#4a7a45&quot;&gt;FastAPI&lt;/font&gt;" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=29;verticalAlign=top;spacingTop=14;" vertex="1" parent="1">
+          <mxGeometry x="110" y="480" width="1190" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="m1" value="&lt;b&gt;SAM2 + LaMa · SD&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:17px;color:#666&quot;&gt;가구 분할 · 배경 복원&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#8a8a8a;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="150" y="558" width="350" height="148" as="geometry" />
+        </mxCell>
+        <mxCell id="m2" value="&lt;b&gt;SAM3D&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:17px;color:#8a4a48&quot;&gt;가구 3D 메쉬&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="530" y="558" width="350" height="148" as="geometry" />
+        </mxCell>
+        <mxCell id="m3" value="&lt;b&gt;색상 · 패치 추출&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:17px;color:#666&quot;&gt;벽 · 바닥 텍스처&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#8a8a8a;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="910" y="558" width="350" height="148" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fbbox" value="&lt;b&gt;폴백 구조&lt;/b&gt;&#160;&#160;&lt;font style=&quot;font-size:17px;color:#8a8a8a&quot;&gt;왼쪽 단계가 실패하면 오른쪽 단계로 내려간다&#160;·&#160;Backend 내부 결정 로직&lt;/font&gt;" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#f7f7f7;strokeColor=#b0b0b0;fontSize=29;fontColor=#333333;verticalAlign=top;spacingTop=14;dashed=1;dashPattern=8 6;" vertex="1" parent="1">
+          <mxGeometry x="110" y="820" width="1190" height="412" as="geometry" />
+        </mxCell>
+        <mxCell id="scnote" value="&lt;b&gt;uLayout&lt;/b&gt; · &lt;b&gt;Omni3D&lt;/b&gt; 는 의존성 스택 충돌로 별도 프로세스 · 별도 conda env 로 분리 &#160;—&#160; &lt;font color=&quot;#d79b00&quot;&gt;&lt;b&gt;주황색 박스&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=15;fontColor=#888888;" vertex="1" parent="1">
+          <mxGeometry x="140" y="874" width="1130" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="h1" value="1순위" style="text;html=1;align=center;verticalAlign=middle;fontSize=16;fontStyle=1;fontColor=#aaaaaa;" vertex="1" parent="1">
+          <mxGeometry x="520" y="906" width="185" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="h2" value="2순위" style="text;html=1;align=center;verticalAlign=middle;fontSize=16;fontStyle=1;fontColor=#aaaaaa;" vertex="1" parent="1">
+          <mxGeometry x="720" y="906" width="185" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="h3" value="3순위" style="text;html=1;align=center;verticalAlign=middle;fontSize=16;fontStyle=1;fontColor=#aaaaaa;" vertex="1" parent="1">
+          <mxGeometry x="920" y="906" width="170" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="h4" value="최종" style="text;html=1;align=center;verticalAlign=middle;fontSize=16;fontStyle=1;fontColor=#aaaaaa;" vertex="1" parent="1">
+          <mxGeometry x="1105" y="906" width="165" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="txlbl" value="&lt;b&gt;텍스처&lt;/b&gt;" style="text;html=1;align=right;verticalAlign=middle;fontSize=20;fontColor=#444444;" vertex="1" parent="1">
+          <mxGeometry x="140" y="936" width="365" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="tx1" value="&lt;b&gt;uLayout&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px;color:#8a6a20&quot;&gt;rectify 실사 텍스처&lt;/font&gt;" style="rounded=1;arcSize=24;whiteSpace=wrap;html=1;fontSize=18;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="520" y="936" width="185" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="tx2" value="사진 패치 타일링" style="rounded=1;arcSize=24;whiteSpace=wrap;html=1;fontSize=18;fillColor=#ffffff;strokeColor=#999999;" vertex="1" parent="1">
+          <mxGeometry x="720" y="936" width="185" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="tx3" value="단색" style="rounded=1;arcSize=24;whiteSpace=wrap;html=1;fontSize=18;fillColor=#ffffff;strokeColor=#999999;" vertex="1" parent="1">
+          <mxGeometry x="920" y="936" width="170" height="56" as="geometry" />
+        </mxCell>
+
+        <mxCell id="szlbl" value="&lt;b&gt;가구 크기&lt;/b&gt;" style="text;html=1;align=right;verticalAlign=middle;fontSize=20;fontColor=#444444;" vertex="1" parent="1">
+          <mxGeometry x="140" y="1012" width="150" height="184" as="geometry" />
+        </mxCell>
+        <mxCell id="cA" value="&lt;b&gt;바닥 접촉&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:15px;color:#999999&quot;&gt;의자 · 소파 · 책상&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=17;fontColor=#444444;" vertex="1" parent="1">
+          <mxGeometry x="305" y="1012" width="200" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="cB" value="&lt;b&gt;벽 부착&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:15px;color:#999999&quot;&gt;액자 · 거울 · 커튼&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=17;fontColor=#444444;" vertex="1" parent="1">
+          <mxGeometry x="305" y="1076" width="200" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="cC" value="&lt;b&gt;그 외&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:15px;color:#999999&quot;&gt;시계 · 화분 · 꽃&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=17;fontColor=#444444;" vertex="1" parent="1">
+          <mxGeometry x="305" y="1140" width="200" height="56" as="geometry" />
+        </mxCell>
+
+        <mxCell id="szA" value="&lt;b&gt;카메라 pose&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px;color:#4a6785&quot;&gt;광선-바닥평면 교차&lt;/font&gt;" style="rounded=1;arcSize=24;whiteSpace=wrap;html=1;fontSize=18;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="520" y="1012" width="185" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="dA2" value="—" style="text;html=1;align=center;verticalAlign=middle;fontSize=22;fontColor=#cccccc;" vertex="1" parent="1">
+          <mxGeometry x="720" y="1012" width="185" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="dB1" value="—" style="text;html=1;align=center;verticalAlign=middle;fontSize=22;fontColor=#cccccc;" vertex="1" parent="1">
+          <mxGeometry x="520" y="1076" width="185" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="szB" value="&lt;b&gt;Omni3D&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px;color:#8a6a20&quot;&gt;oracle2D 주입&lt;/font&gt;" style="rounded=1;arcSize=24;whiteSpace=wrap;html=1;fontSize=18;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="720" y="1076" width="185" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="dC1" value="—" style="text;html=1;align=center;verticalAlign=middle;fontSize=22;fontColor=#cccccc;" vertex="1" parent="1">
+          <mxGeometry x="520" y="1140" width="185" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="dC2" value="—" style="text;html=1;align=center;verticalAlign=middle;fontSize=22;fontColor=#cccccc;" vertex="1" parent="1">
+          <mxGeometry x="720" y="1140" width="185" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="szD" value="&lt;b&gt;SAM3D scale&lt;/b&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontSize=18;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="920" y="1012" width="170" height="184" as="geometry" />
+        </mxCell>
+        <mxCell id="szE" value="&lt;b&gt;방 크기 비례&lt;/b&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontSize=18;fillColor=#ffffff;strokeColor=#999999;" vertex="1" parent="1">
+          <mxGeometry x="1105" y="1012" width="165" height="184" as="geometry" />
+        </mxCell>
+
+        <mxCell id="note" value="— 표시는 그 카테고리가 해당 단계를 건너뛴다는 뜻&#160;&#160;·&#160;&#160;박스 색은 그 계산을 담당하는 컴포넌트와 동일 (연파랑 Frontend · 연분홍 SAM3D · 주황 사이드카)" style="text;html=1;align=left;verticalAlign=middle;fontSize=15;fontColor=#999999;" vertex="1" parent="1">
+          <mxGeometry x="140" y="1202" width="1130" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" value="①&#160;&#160;사진 1장 업로드" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#333333;fontSize=20;fontStyle=1;labelBackgroundColor=#ffffff;endArrow=blockThin;endFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="user" target="fe">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="②&#160;&#160;단계별 API 호출&#160;(순차 · 병렬)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#333333;fontSize=20;fontStyle=1;labelBackgroundColor=#ffffff;exitX=0.230;exitY=1;exitDx=0;exitDy=0;entryX=0.328;entryY=0;entryDx=0;entryDy=0;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="fe" target="be">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="③&#160;&#160;텍스처 · 가구 크기 확정 요청" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#82b366;fontSize=20;fontStyle=1;fontColor=#4a7a45;labelBackgroundColor=#ffffff;exitX=0.38;exitY=1;exitDx=0;exitDy=0;entryX=0.38;entryY=0;entryDx=0;entryDy=0;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="be" target="fbbox">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="④&#160;&#160;확정된 크기 · 텍스처 반환" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#82b366;fontSize=20;fontStyle=1;fontColor=#4a7a45;labelBackgroundColor=#ffffff;exitX=0.66;exitY=0;exitDx=0;exitDy=0;entryX=0.66;entryY=1;entryDx=0;entryDy=0;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="fbbox" target="be">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="⑤&#160;&#160;3D 씬 데이터&lt;br&gt;&lt;font style=&quot;font-size:15px;font-weight:normal;color:#777&quot;&gt;확정된 크기 · 텍스처가 적용된 상태&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#333333;fontSize=20;fontStyle=1;labelBackgroundColor=#ffffff;exitX=0.594;exitY=0;exitDx=0;exitDy=0;entryX=0.647;entryY=1;entryDx=0;entryDy=0;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="be" target="fe">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="30" y="0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

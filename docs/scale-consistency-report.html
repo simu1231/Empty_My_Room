@@ -1,0 +1,738 @@
+<title>방·가구 스케일 정합</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=Noto+Serif+KR:wght@500;600;700&display=swap">
+
+<style>
+  /* ── 토큰: 라이트가 기본, 다크는 아래 두 블록에서 값만 재정의 ───────── */
+  :root {
+    --ground:      #F6F7F9;
+    --surface:     #FFFFFF;
+    --surface-2:   #EFF2F5;
+    --ink:         #131C26;
+    --ink-soft:    #3A4753;
+    --muted:       #5C6875;
+    --rule:        #DDE2E8;
+    --rule-strong: #C3CBD4;
+    --accent:      #1F5C8B;
+    --accent-soft: #E3ECF4;
+    --warn:        #A8443A;
+    --warn-soft:   #F6E7E4;
+    --good:        #14705F;
+    --good-soft:   #E0F0EC;
+    --shadow:      0 1px 2px rgba(19, 28, 38, .06), 0 8px 24px -16px rgba(19, 28, 38, .28);
+
+    --f-display: "Noto Serif KR", Spectral, Georgia, serif;
+    --f-body:    "IBM Plex Sans KR", "Segoe UI", system-ui, sans-serif;
+    --f-mono:    "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0E141A;
+      --surface:     #151D26;
+      --surface-2:   #1D2731;
+      --ink:         #E6EBF0;
+      --ink-soft:    #C2CCD6;
+      --muted:       #8B98A5;
+      --rule:        #26313D;
+      --rule-strong: #384654;
+      --accent:      #7FB2DC;
+      --accent-soft: #17293A;
+      --warn:        #E0907F;
+      --warn-soft:   #33201C;
+      --good:        #5FBFA8;
+      --good-soft:   #122E28;
+      --shadow:      0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0E141A;
+    --surface:     #151D26;
+    --surface-2:   #1D2731;
+    --ink:         #E6EBF0;
+    --ink-soft:    #C2CCD6;
+    --muted:       #8B98A5;
+    --rule:        #26313D;
+    --rule-strong: #384654;
+    --accent:      #7FB2DC;
+    --accent-soft: #17293A;
+    --warn:        #E0907F;
+    --warn-soft:   #33201C;
+    --good:        #5FBFA8;
+    --good-soft:   #122E28;
+    --shadow:      0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-weight: 300;
+    font-size: 16.5px;
+    line-height: 1.72;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: clamp(2.5rem, 6vw, 5rem) clamp(1.1rem, 4vw, 2rem) 6rem;
+  }
+
+  /* ── 머리말 ──────────────────────────────────────────────────────── */
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: .7rem;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 1.1rem;
+  }
+  h1 {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: clamp(2rem, 5.5vw, 2.9rem);
+    line-height: 1.22;
+    letter-spacing: -.015em;
+    text-wrap: balance;
+    margin: 0 0 1rem;
+  }
+  .standfirst {
+    font-size: clamp(1.02rem, 2.2vw, 1.14rem);
+    color: var(--ink-soft);
+    max-width: 40rem;
+    margin: 0 0 2rem;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.4rem;
+    font-family: var(--f-mono);
+    font-size: .74rem;
+    color: var(--muted);
+    padding-top: 1.3rem;
+    border-top: 1px solid var(--rule);
+  }
+  .meta b { font-weight: 500; color: var(--ink-soft); }
+
+  /* ── 치수선: 이 문서의 주제(측정)를 섹션 구분에 그대로 씀 ─────────── */
+  .dimline {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin: 3.6rem 0 1.6rem;
+  }
+  .dimline::before,
+  .dimline::after {
+    content: "";
+    height: 7px;
+    width: 1px;
+    background: var(--rule-strong);
+    flex: none;
+  }
+  .dimline i {
+    flex: 1;
+    height: 1px;
+    background: var(--rule-strong);
+    font-style: normal;
+  }
+  .dimline span {
+    font-family: var(--f-mono);
+    font-size: .68rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  h2 {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: clamp(1.4rem, 3.4vw, 1.72rem);
+    line-height: 1.34;
+    letter-spacing: -.01em;
+    text-wrap: balance;
+    margin: 0 0 .9rem;
+  }
+  h3 {
+    font-family: var(--f-body);
+    font-weight: 600;
+    font-size: 1.02rem;
+    letter-spacing: .005em;
+    margin: 2rem 0 .55rem;
+  }
+  p { margin: 0 0 1.05rem; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 600; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible,
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+  code {
+    font-family: var(--f-mono);
+    font-size: .845em;
+    background: var(--surface-2);
+    padding: .12em .38em;
+    border-radius: 3px;
+    word-break: break-word;
+  }
+
+  ul { margin: 0 0 1.05rem; padding-left: 1.15rem; }
+  li { margin-bottom: .42rem; }
+  li::marker { color: var(--rule-strong); }
+
+  /* ── 카드 / 판정 ─────────────────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 1.25rem 1.35rem;
+    box-shadow: var(--shadow);
+  }
+  .verdict {
+    display: flex;
+    gap: .9rem;
+    align-items: baseline;
+    padding: 1rem 1.2rem;
+    border-radius: 5px;
+    margin: 1.4rem 0;
+    font-size: .95rem;
+    border-left: 3px solid;
+  }
+  .verdict.no  { background: var(--warn-soft); border-color: var(--warn); }
+  .verdict.yes { background: var(--good-soft); border-color: var(--good); }
+  .verdict-tag {
+    font-family: var(--f-mono);
+    font-size: .7rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  .verdict.no  .verdict-tag { color: var(--warn); }
+  .verdict.yes .verdict-tag { color: var(--good); }
+  .verdict p { margin: 0; color: var(--ink); }
+
+  /* ── 표 ──────────────────────────────────────────────────────────── */
+  .tablewrap { overflow-x: auto; margin: 1.4rem 0; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 33rem;
+    font-size: .89rem;
+  }
+  caption {
+    caption-side: bottom;
+    text-align: left;
+    font-size: .78rem;
+    color: var(--muted);
+    padding-top: .7rem;
+  }
+  th, td {
+    text-align: left;
+    padding: .62rem .8rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  thead th {
+    font-family: var(--f-mono);
+    font-weight: 500;
+    font-size: .7rem;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--rule-strong);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, th.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rowhead { font-weight: 500; }
+  .bad  { color: var(--warn); }
+  .good { color: var(--good); }
+
+  /* ── 수치 비교 ───────────────────────────────────────────────────── */
+  .compare {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 1.1rem 1.2rem 1.2rem;
+    border-top: 3px solid var(--rule-strong);
+  }
+  .panel.before { border-top-color: var(--warn); }
+  .panel.after  { border-top-color: var(--good); }
+  .panel-label {
+    font-family: var(--f-mono);
+    font-size: .68rem;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: .75rem;
+  }
+  .bignum {
+    font-family: var(--f-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.62rem;
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: -.02em;
+    margin-bottom: .1rem;
+  }
+  .panel.before .bignum { color: var(--warn); }
+  .panel.after  .bignum { color: var(--good); }
+  .bignum-sub { font-size: .8rem; color: var(--muted); margin-bottom: .95rem; }
+  .kv {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: .84rem;
+    padding: .3rem 0;
+    border-top: 1px dotted var(--rule);
+  }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+  dl { margin: 0; }
+
+  /* ── 다이어그램 ──────────────────────────────────────────────────── */
+  .diagrams {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    gap: 1rem;
+    margin: 1.6rem 0 .6rem;
+  }
+  .diagram {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 1rem 1rem .8rem;
+  }
+  .diagram svg { width: 100%; height: auto; display: block; }
+  .diagram figcaption {
+    font-size: .78rem;
+    color: var(--muted);
+    margin-top: .6rem;
+    padding-top: .6rem;
+    border-top: 1px solid var(--rule);
+  }
+  .d-box  { fill: var(--surface-2); stroke: var(--rule-strong); stroke-width: 1; }
+  .d-box-a{ fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; }
+  .d-box-w{ fill: var(--warn-soft); stroke: var(--warn); stroke-width: 1.2; }
+  .d-box-g{ fill: var(--good-soft); stroke: var(--good); stroke-width: 1.2; }
+  .d-t    { font-family: var(--f-body); font-size: 10.5px; font-weight: 400; fill: var(--ink); }
+  .d-t-s  { font-family: var(--f-mono); font-size: 8.5px; fill: var(--muted); }
+  .d-line { stroke: var(--rule-strong); stroke-width: 1.2; fill: none; }
+  .d-line-a { stroke: var(--accent); stroke-width: 1.6; fill: none; }
+  .d-line-w { stroke: var(--warn); stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+  .d-line-g { stroke: var(--good); stroke-width: 1.6; fill: none; }
+
+  /* ── 변경 파일 ───────────────────────────────────────────────────── */
+  .files { display: flex; flex-direction: column; gap: .1rem; margin: 1.3rem 0; }
+  .file {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: .15rem;
+    padding: .68rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .file:last-child { border-bottom: none; }
+  .file-path {
+    font-family: var(--f-mono);
+    font-size: .8rem;
+    color: var(--accent);
+    word-break: break-all;
+  }
+  .file-note { font-size: .855rem; color: var(--ink-soft); }
+  .file-tag {
+    font-family: var(--f-mono);
+    font-size: .66rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .footnote {
+    font-size: .855rem;
+    color: var(--muted);
+    border-top: 1px solid var(--rule);
+    padding-top: 1.3rem;
+    margin-top: 3.4rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">Empty My Room · 기술 검토</p>
+  <h1>방과 가구는 같은 자를 쓰고 있는가</h1>
+  <p class="standfirst">
+    추천받은 Total3DUnderstanding과 PlaneRCNN을 검토한 결과, 두 논문이 지적하는 문제는
+    우리 파이프라인에 실재했습니다. 다만 원인은 예상과 달랐고, 해결에는 두 저장소의 코드가
+    필요하지 않았습니다. 진단과 적용, 그리고 실측 결과를 정리합니다.
+  </p>
+  <div class="meta">
+    <span><b>대상</b> 단일 이미지 방·가구 실측 스케일</span>
+    <span><b>검토</b> Total3D (CVPR 2020) · PlaneRCNN (CVPR 2019)</span>
+    <span><b>적용</b> 3건 + 버그 수정 1건</span>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <div class="dimline"><span>01 · 검토</span><i></i></div>
+  <h2>두 논문은 무엇을 겨냥하는가</h2>
+
+  <p>
+    두 저장소 모두 <strong>단일 이미지에서 실내 기하를 metric으로 복원</strong>하는 문제를 다룹니다.
+    우리 파이프라인이 세 모델(uLayout · Omni3D · SAM3D)로 나눠 하는 일과 정확히 겹칩니다.
+  </p>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>논문</th><th>핵심 기여</th><th>우리 쪽 대응</th><th>실행 가능성</th><th>라이선스</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="rowhead">Total3D<br><span class="d-t-s">CVPR 2020</span></td>
+          <td>layout · object · mesh를 <strong>하나의 좌표계에서 joint로</strong> 추정</td>
+          <td>uLayout + Omni3D + SAM3D를 합친 것</td>
+          <td class="bad">낮음 — PyTorch 1.1.0 / CUDA 9.0<br>(RTX 4090은 sm_89, 구동 불가)</td>
+          <td>MIT</td>
+        </tr>
+        <tr>
+          <td class="rowhead">PlaneRCNN<br><span class="d-t-s">CVPR 2019</span></td>
+          <td>평면 검출 + <strong>미터 단위 평면 파라미터</strong></td>
+          <td>대응 없음 (바닥 평면을 안 구함)</td>
+          <td class="bad">매우 낮음 — PyTorch 0.4.1<br>CUDA 10.0 미지원, nms/roialign 수동 빌드</td>
+          <td class="bad">CC BY-NC-SA<br>(상업적 이용 불가)</td>
+        </tr>
+      </tbody>
+    </table>
+      <caption>요구 환경과 라이선스는 각 저장소 README 기준.</caption>
+  </div>
+
+  <div class="verdict no">
+    <span class="verdict-tag">코드 미채택</span>
+    <p>
+      두 구현체 모두 현재 GPU에서 그대로 돌지 않고, 성능 면에서도 이미 우리가 앞서 있습니다.
+      Total3D의 객체 검출(ODN)은 Omni3D(Cube R-CNN, 2023)의 이전 세대이고, 메쉬 생성(MGN)은
+      Pix3D 소수 카테고리 기반이라 SAM3D와 비교 대상이 아닙니다. PlaneRCNN은 라이선스가
+      비상업적 이용으로 제한됩니다.
+    </p>
+  </div>
+  <div class="verdict yes">
+    <span class="verdict-tag">문제 제기는 유효</span>
+    <p>
+      그러나 두 논문이 공통으로 지적하는 <strong>“기하를 metric으로 붙들 근거가 필요하다”</strong>는
+      문제의식은 우리 코드에 그대로 해당했습니다. 아래가 실제로 찾은 것입니다.
+    </p>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <div class="dimline"><span>02 · 진단</span><i></i></div>
+  <h2>스케일은 상수 하나에 매달려 있었다</h2>
+
+  <p>
+    코드를 따라가 보니 방 치수와 가구 높이가 <strong>같은 변수 하나에서 파생</strong>되고 있었습니다.
+    uLayout은 바닥 경계를 카메라 높이로 역투영해 방 크기를 냅니다.
+  </p>
+  <p>
+    <code>uLayout/infer_single_image.py:151</code> —
+    <code>scale_floor = camera_height_m / bearing_floor[1, :]</code>
+  </p>
+  <p>
+    가구 높이(광선–바닥평면 교차)도 마찬가지입니다. <code>build_approx_pose</code>의 주석이
+    이를 명시합니다: <em>“대수적으로 전개하면 R의 up 축 컬럼과 camera_height_m만 결과에 영향을 준다.”</em>
+  </p>
+
+  <div class="diagrams">
+    <figure class="diagram">
+      <svg viewBox="0 0 300 210" role="img" aria-label="종전 구조: camera_height_m이 1.6 상수로 고정되어 방 치수와 가구 높이가 함께 틀리고, Omni3D와 SAM3D는 별도 스케일을 씀">
+        <rect class="d-box-w" x="86" y="6" width="128" height="26" rx="3"/>
+        <text class="d-t" x="150" y="19" text-anchor="middle">camera_height_m</text>
+        <text class="d-t-s" x="150" y="28" text-anchor="middle">= 1.6 고정</text>
+
+        <path class="d-line-w" d="M120 32 L70 60"/>
+        <path class="d-line-w" d="M180 32 L230 60"/>
+
+        <rect class="d-box" x="8" y="60" width="124" height="26" rx="3"/>
+        <text class="d-t" x="70" y="77" text-anchor="middle">방 치수 (uLayout)</text>
+
+        <rect class="d-box" x="168" y="60" width="124" height="26" rx="3"/>
+        <text class="d-t" x="230" y="72" text-anchor="middle">가구 높이</text>
+        <text class="d-t-s" x="230" y="81" text-anchor="middle">경로1 · 광선-바닥</text>
+
+        <text class="d-t-s" x="150" y="105" text-anchor="middle">비율은 보존 · 절대값은 함께 틀림</text>
+
+        <line class="d-line" x1="20" y1="120" x2="280" y2="120" stroke-dasharray="3 3"/>
+
+        <rect class="d-box-w" x="8" y="136" width="124" height="30" rx="3"/>
+        <text class="d-t" x="70" y="149" text-anchor="middle">Omni3D 경로2</text>
+        <text class="d-t-s" x="70" y="159" text-anchor="middle">독립 metric</text>
+
+        <rect class="d-box-w" x="168" y="136" width="124" height="30" rx="3"/>
+        <text class="d-t" x="230" y="149" text-anchor="middle">SAM3D 경로3</text>
+        <text class="d-t-s" x="230" y="159" text-anchor="middle">독립 metric</text>
+
+        <text class="d-t-s" x="150" y="186" text-anchor="middle">방과 무관한 자 — 벽걸이 가구가</text>
+        <text class="d-t-s" x="150" y="198" text-anchor="middle">여기서만 나와 비율이 어긋남</text>
+      </svg>
+      <figcaption>종전. 상수 하나가 절대 스케일을 결정하고, 경로2·3은 그 바깥에 있었다.</figcaption>
+    </figure>
+
+    <figure class="diagram">
+      <svg viewBox="0 0 300 210" role="img" aria-label="개선 구조: 사진에서 카메라 높이를 역산하고, 경로2와 경로3을 캘리브레이션 계수로 방 좌표계에 정렬한 뒤 sanity check를 거침">
+        <rect class="d-box" x="98" y="6" width="104" height="22" rx="3"/>
+        <text class="d-t" x="150" y="21" text-anchor="middle">원본 사진</text>
+
+        <path class="d-line-a" d="M150 28 L150 42"/>
+        <rect class="d-box-a" x="76" y="42" width="148" height="30" rx="3"/>
+        <text class="d-t" x="150" y="55" text-anchor="middle">camera_height_m</text>
+        <text class="d-t-s" x="150" y="65" text-anchor="middle">Omni3D 바닥접촉 가구로 역산</text>
+
+        <path class="d-line-a" d="M115 72 L70 96"/>
+        <path class="d-line-a" d="M185 72 L230 96"/>
+
+        <rect class="d-box" x="8" y="96" width="124" height="26" rx="3"/>
+        <text class="d-t" x="70" y="113" text-anchor="middle">방 치수 (uLayout)</text>
+
+        <rect class="d-box" x="168" y="96" width="124" height="26" rx="3"/>
+        <text class="d-t" x="230" y="113" text-anchor="middle">가구 높이 경로1</text>
+
+        <path class="d-line-g" d="M230 122 L230 138"/>
+        <rect class="d-box-g" x="148" y="138" width="144" height="30" rx="3"/>
+        <text class="d-t" x="220" y="151" text-anchor="middle">캘리브레이션 계수 k</text>
+        <text class="d-t-s" x="220" y="161" text-anchor="middle">경로2·3 → 방 좌표계</text>
+
+        <path class="d-line-g" d="M148 153 L70 153 L70 138"/>
+        <text class="d-t-s" x="66" y="133" text-anchor="end">기준쌍</text>
+
+        <rect class="d-box-g" x="76" y="180" width="148" height="24" rx="3"/>
+        <text class="d-t" x="150" y="196" text-anchor="middle">표준 크기 · 방 높이 검증</text>
+        <path class="d-line-g" d="M220 168 L220 174 L150 174 L150 180"/>
+      </svg>
+      <figcaption>개선. 사진에서 역산한 높이가 기준이 되고, 경로2·3은 계수로 정렬된 뒤 제약을 통과한다.</figcaption>
+    </figure>
+  </div>
+
+  <p>
+    여기서 나온 결론이 예상과 달랐습니다. <strong>방과 가구의 비율은 이미 맞고 있었습니다</strong> —
+    둘 다 같은 상수에 선형 비례하므로 그 값이 틀려도 비율은 보존됩니다. 실제 문제는 두 가지였습니다.
+  </p>
+  <ul>
+    <li><strong>절대 치수가 통째로 틀린다.</strong> <code>camera_height_m</code>이 <code>1.6</code> 고정이라, 실제 촬영 높이가 다르면 방과 가구가 같은 비율로 함께 틀립니다. “이 방은 3.2m”라는 숫자를 믿을 수 없습니다.</li>
+    <li><strong>경로2·3만 다른 자를 쓴다.</strong> Omni3D와 SAM3D는 방과 무관하게 각자 metric을 추정합니다. 이 경로로만 크기가 나오는 벽걸이 가구(액자·거울·커튼)는 방과 다른 자로 잰 값이 그대로 배치됩니다.</li>
+  </ul>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <div class="dimline"><span>03 · 적용</span><i></i></div>
+  <h2>세 가지 개선</h2>
+
+  <h3>1. 카메라 높이를 사진에서 역산</h3>
+  <p>
+    PlaneRCNN이 주려는 것은 <em>미터 단위 바닥 평면</em>이고, 바닥 평면까지의 거리가 곧 카메라 높이입니다.
+    같은 결과를 <strong>이미 떠 있는 Omni3D로</strong> 얻었습니다. oracle2D 없이 전체 이미지를 추론해
+    바닥에 닿는 가구(침대·의자·책상·문 등 20개 클래스)를 찾고, 각 3D bbox 밑면의 중앙값을 카메라 높이로 삼습니다.
+    새 모델도, 추가 GPU 부담도 없습니다.
+  </p>
+  <p>
+    부수적으로 카메라 intrinsic도 개선했습니다. 종전에는 초점거리를 항상
+    <code>focal = 2h</code>로 가정했는데, EXIF에 35mm 환산 초점거리가 있으면 그 값을 씁니다.
+  </p>
+
+  <h3>2. 경로2·3을 방 좌표계로 정렬</h3>
+  <p>
+    바닥 접촉 가구는 경로1로도, Omni3D로도 잴 수 있습니다. <strong>같은 가구를 두 방법으로 잰 비의
+    중앙값</strong>이 두 자 사이의 환산 계수입니다. 이 계수를 벽걸이 가구에 곱하면 방 좌표계로 정렬됩니다.
+    Total3D가 layout과 object를 한 좌표계에서 푸는 것과 목적이 같고, 학습 대신 추론 후 보정으로 구현했습니다.
+  </p>
+  <p>
+    이를 위해 Omni3D 카테고리 매핑을 6개에서 26개로 넓혔습니다. 바닥 가구를 추가한 것은 그 가구의
+    크기를 Omni3D로 정하려는 게 아니라, <strong>두 방법이 겹치는 “기준쌍”을 만들기 위해서</strong>입니다.
+    기준쌍이 하나도 없으면 보정을 적용하지 않고 기존 동작을 유지합니다.
+  </p>
+
+  <h3>3. 표준 크기·방 높이 제약</h3>
+  <p>
+    추정 높이가 표준 크기 테이블의 0.4~2.5배를 벗어나면 신뢰하지 않고 표준값으로 되돌리고,
+    방 높이를 넘으면 방 안에 들어가도록 클램프합니다. 후자가 Total3D의
+    <em>“물체는 layout 안에 있어야 한다”</em>는 제약에 해당합니다. 종전에는 어떤 검증도 없어서
+    추정이 크게 틀리면 방을 뚫고 나가는 가구가 그대로 배치됐습니다.
+  </p>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <div class="dimline"><span>04 · 부산물</span><i></i></div>
+  <h2>작업 중 발견한 버그</h2>
+  <p>
+    개선 1을 붙이고 나서도 방 치수가 전혀 바뀌지 않아 추적한 결과, uLayout 사이드카가
+    <code>camera_height_m</code>을 <strong>애초에 받지 못하고 있었습니다.</strong>
+  </p>
+  <div class="card">
+    <p style="margin-bottom:.5rem"><code>async def infer(image: UploadFile = File(...), camera_height_m: float = 1.6)</code></p>
+    <p style="margin:0; font-size:.88rem; color:var(--ink-soft)">
+      <code>Form()</code>이 빠져 있어 FastAPI가 이 인자를 <strong>쿼리 파라미터</strong>로 해석합니다.
+      호출부는 계속 multipart body로 보내왔으므로 그 값은 조용히 버려지고 항상 기본값 1.6이 쓰였습니다.
+      종전에는 늘 1.6을 보냈기 때문에 결과가 같아 드러나지 않았습니다.
+    </p>
+  </div>
+  <p style="margin-top:1.1rem">
+    <code>infer</code>와 <code>rectify</code> 두 곳을 <code>Form(1.6)</code>으로 고쳤습니다.
+    이 버그가 남아 있었다면 개선 1은 코드상으로만 동작하고 실제 치수에는 아무 영향이 없었을 것입니다.
+  </p>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <div class="dimline"><span>05 · 실측</span><i></i></div>
+  <h2>결과</h2>
+
+  <p>
+    테스트 사진(<code>empty_room.jpg</code>, 좁은 침실)에 대해 종전 동작과 개선 동작을 비교했습니다.
+    카메라 높이는 바닥 접촉 가구 8개(문 2 · 의자 · 책상 · 테이블 · 책장 · 선반 · 수납장)에서 역산했고,
+    표본 간 편차는 0.26m였습니다.
+  </p>
+
+  <div class="compare">
+    <div class="panel before">
+      <div class="panel-label">종전 · 1.6m 고정</div>
+      <div class="bignum">3.35 m</div>
+      <div class="bignum-sub">추정 천장 높이</div>
+      <dl>
+        <div class="kv"><dt>가로 × 깊이</dt><dd>4.30 × 3.03 m</dd></div>
+        <div class="kv"><dt>바닥 면적</dt><dd>13.02 m²</dd></div>
+        <div class="kv"><dt>카메라 높이</dt><dd>1.600 m (가정)</dd></div>
+      </dl>
+    </div>
+    <div class="panel after">
+      <div class="panel-label">개선 · 사진에서 역산</div>
+      <div class="bignum">2.27 m</div>
+      <div class="bignum-sub">추정 천장 높이</div>
+      <dl>
+        <div class="kv"><dt>가로 × 깊이</dt><dd>2.91 × 2.05 m</dd></div>
+        <div class="kv"><dt>바닥 면적</dt><dd>5.96 m²</dd></div>
+        <div class="kv"><dt>카메라 높이</dt><dd>1.083 m (역산)</dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <p>
+    <strong>천장 높이가 판정 근거입니다.</strong> 국내 주거 천장고는 2.3m 전후이므로 3.35m는
+    성립하지 않습니다. 2.27m는 정확히 그 범위이고, 사진의 문 상단(약 2.0m) 위 여유와 몰딩 위치와도 맞습니다.
+    카메라 1.083m 역시 사진의 시선 높이(문 손잡이 근처)와 일치합니다.
+  </p>
+  <p>
+    치수가 정확히 <code>1.6 / 1.083 = 1.477</code>배만큼 축소된 것도 확인됩니다
+    (<code>4.30 / 2.91 = 1.478</code>). 앞서 진단한 선형 비례 관계가 그대로 나타난 것입니다.
+  </p>
+
+  <h3>로직 검증</h3>
+  <p>
+    개선 2·3은 브라우저 상호작용이 필요해 실사진 대신 실제 함수 소스를 추출해 시나리오 테스트를 돌렸습니다.
+    <strong>16개 항목 전부 통과</strong>했습니다.
+  </p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>시나리오</th><th>기대</th><th class="num">결과</th></tr></thead>
+      <tbody>
+        <tr><td>Omni3D가 일관되게 1.5배 크게 측정</td><td>계수 k = 1/1.5</td><td class="num good">0.6667</td></tr>
+        <tr><td>SAM3D가 일관되게 0.5배 작게 측정</td><td>계수 k = 1/0.5</td><td class="num good">2.0000</td></tr>
+        <tr><td>벽걸이 액자 0.400m에 계수 적용</td><td>방 좌표계로 정렬</td><td class="num good">0.267 m</td></tr>
+        <tr><td>기준쌍 없음</td><td>보정 미적용 (기존 동작)</td><td class="num good">k = null</td></tr>
+        <tr><td>100배 이상치 기준쌍</td><td>중앙값 오염 전 제거</td><td class="num good">1개 제외</td></tr>
+        <tr><td>카메라 pose 없음</td><td>안전하게 비활성</td><td class="num good">n = 0</td></tr>
+        <tr><td>침대 높이 5.5m (표준의 10배)</td><td>표준값으로 대체</td><td class="num good">0.55 m</td></tr>
+        <tr><td>침대 높이 0.62m (정상 편차)</td><td>그대로 통과</td><td class="num good">0.62 m</td></tr>
+        <tr><td>옷장 2.6m, 방 높이 2.27m</td><td>방 안으로 클램프</td><td class="num good">2.156 m</td></tr>
+      </tbody>
+    </table>
+      <caption>전체 16개 중 대표 9개. 나머지는 카테고리 매칭 우선순위 및 경계 조건.</caption>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <div class="dimline"><span>06 · 한계</span><i></i></div>
+  <h2>남은 문제</h2>
+
+  <p>
+    개선했다고 해서 절대 치수가 <em>정확해졌다</em>고 말할 수는 없습니다. 근거가 상수에서
+    사진으로 옮겨갔을 뿐, 정확도는 Cube R-CNN의 metric 추정에 의존합니다.
+  </p>
+  <ul>
+    <li>
+      <strong>카메라 intrinsic 가정.</strong> EXIF가 없으면 여전히 <code>focal = 2h</code>를 씁니다.
+      진단용으로 넣은 문 높이 검증에서 두 사진 모두 표준(2.0m) 대비 <span class="bad">1.16배 · 1.25배</span>로
+      일관되게 크게 측정됐는데, 이는 초점거리 가정이 실제보다 작다는 신호일 수 있습니다.
+      자동 보정은 넣지 않았습니다 — 문 검출 신뢰도가 낮고(0.32~0.93) 실제 문 높이도 편차가 있어,
+      잘못된 보정이 더 위험하다고 판단했습니다.
+    </li>
+    <li>
+      <strong>캘리브레이션은 기준쌍이 있어야 작동합니다.</strong> 바닥 접촉 가구가 하나도 3D 변환되지
+      않은 세션에서는 계수를 구할 수 없어 기존 동작으로 남습니다.
+    </li>
+    <li>
+      <strong>표준 크기 테이블은 손으로 넣은 값입니다.</strong> 국내 가구 기준이라 해외 가구나
+      비정형 가구에서는 정상값을 이상치로 판정할 수 있습니다. 범위를 0.4~2.5배로 넓게 잡은 이유입니다.
+    </li>
+    <li>
+      <strong>빈방에서는 근거가 줄어듭니다.</strong> 그래서 카메라 높이 역산에는 가구를 지우기 전
+      원본 사진을 씁니다. 카메라 위치가 동일하므로 유효하지만, 저장된 디자인을 불러온 세션은
+      원본이 없어 빈방으로 폴백합니다.
+    </li>
+  </ul>
+  <p>
+    다음으로 유효한 작업은 <strong>단일 이미지 metric depth 모델</strong>(Depth Pro, Metric3D v2, UniDepth 등)로
+    카메라 높이를 교차 검증하는 것입니다. 두 경로가 독립적으로 같은 값을 내면 초점거리 가정 문제까지
+    함께 좁힐 수 있습니다.
+  </p>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <div class="dimline"><span>07 · 변경</span><i></i></div>
+  <h2>수정한 파일</h2>
+
+  <div class="files">
+    <div class="file">
+      <span class="file-tag">사이드카 · 별도 저장소</span>
+      <span class="file-path">~/omni3d/server.py</span>
+      <span class="file-note"><code>/camera_height</code> 엔드포인트 신규. 카테고리 매핑 6 → 26개 확장, EXIF 기반 intrinsic, <code>/estimate</code>에 3D bbox 밑면 추가 반환.</span>
+    </div>
+    <div class="file">
+      <span class="file-tag">사이드카 · 별도 저장소</span>
+      <span class="file-path">~/uLayout/server.py</span>
+      <span class="file-note"><code>camera_height_m</code>을 <code>Form()</code>으로 수정 — 위 04의 버그.</span>
+    </div>
+    <div class="file">
+      <span class="file-tag">백엔드</span>
+      <span class="file-path">sam3d/backend/routers/room.py</span>
+      <span class="file-note"><code>_resolve_camera_height()</code> 추가, <code>/camera-height</code> 프록시. <code>/layout</code>·<code>/rectify_textures</code>가 값을 안 받으면 자동 역산하고 실패 시 1.6으로 폴백.</span>
+    </div>
+    <div class="file">
+      <span class="file-tag">프론트엔드</span>
+      <span class="file-path">sam3d/frontend/src/components/RoomMakingStep.jsx</span>
+      <span class="file-note">카메라 높이를 먼저 확정해 layout·rectify에 함께 전달(Omni3D 추론 1회). 색상 분석은 병렬 유지.</span>
+    </div>
+    <div class="file">
+      <span class="file-tag">프론트엔드</span>
+      <span class="file-path">sam3d/frontend/src/components/Interior3DStep.jsx</span>
+      <span class="file-note"><code>computeScaleCalibration()</code>·<code>sanityCheckHeight()</code> 추가. 우선순위 체인에 계수 적용과 제약 검증 삽입.</span>
+    </div>
+    <div class="file">
+      <span class="file-tag">프론트엔드</span>
+      <span class="file-path">sam3d/frontend/src/{utils/api.js, store/useStore.js}</span>
+      <span class="file-note">엔드포인트 및 카메라 높이 상태 추가.</span>
+    </div>
+  </div>
+
+  <p class="footnote">
+    사이드카 두 개(<code>~/omni3d</code>, <code>~/uLayout</code>)는 <code>Empty_My_Room</code>과 별개의
+    git 저장소이므로 본 저장소 커밋에 포함되지 않습니다. 배포 시 함께 반영해야 합니다.
+    실측값은 <code>empty_room.jpg</code>·<code>bedroom.png</code> 두 장에 대한 것으로, 표본이 적어
+    추세 확인 용도입니다.
+  </p>
+
+</div>

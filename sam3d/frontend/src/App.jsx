@@ -1,4 +1,5 @@
 import { useStore } from './store/useStore'
+import LandingPage from './components/LandingPage'
 import UploadStep from './components/UploadStep'
 import SegmentStep from './components/SegmentStep'
 import RoomMakingStep from './components/RoomMakingStep'
@@ -7,9 +8,18 @@ import { Toaster } from 'react-hot-toast'
 import './App.css'
 
 function App() {
-  
-  const { step, loading, loadingMsg } = useStore()
-  
+
+  const { step, setStep, loading, loadingMsg } = useStore()
+
+  if (step === 'landing') {
+    return (
+      <>
+        <Toaster position="top-center" />
+        <LandingPage onStart={() => setStep('upload')} />
+      </>
+    )
+  }
+
   return (
     <div className="app">
       <Toaster position="top-center" />

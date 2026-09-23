@@ -1,0 +1,578 @@
+<title>두 모델을 쓰지 않은 이유</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=Noto+Serif+KR:wght@500;600;700&display=swap">
+
+<style>
+  :root {
+    --ground:      #F6F7F9;
+    --surface:     #FFFFFF;
+    --surface-2:   #EFF2F5;
+    --ink:         #131C26;
+    --ink-soft:    #3A4753;
+    --muted:       #5C6875;
+    --rule:        #DDE2E8;
+    --rule-strong: #C3CBD4;
+    --accent:      #1F5C8B;
+    --accent-soft: #E3ECF4;
+    --warn:        #A8443A;
+    --warn-soft:   #F6E7E4;
+    --good:        #14705F;
+    --good-soft:   #E0F0EC;
+    --script-bg:   #F0EEE9;
+    --script-rule: #CFC7B8;
+    --shadow:      0 1px 2px rgba(19,28,38,.06), 0 8px 24px -16px rgba(19,28,38,.28);
+
+    --f-display: "Noto Serif KR", Georgia, serif;
+    --f-body:    "IBM Plex Sans KR", "Segoe UI", system-ui, sans-serif;
+    --f-mono:    "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0E141A;
+      --surface:     #151D26;
+      --surface-2:   #1D2731;
+      --ink:         #E6EBF0;
+      --ink-soft:    #C2CCD6;
+      --muted:       #8B98A5;
+      --rule:        #26313D;
+      --rule-strong: #384654;
+      --accent:      #7FB2DC;
+      --accent-soft: #17293A;
+      --warn:        #E0907F;
+      --warn-soft:   #33201C;
+      --good:        #5FBFA8;
+      --good-soft:   #122E28;
+      --script-bg:   #1B1E22;
+      --script-rule: #3D3A33;
+      --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0E141A;
+    --surface:     #151D26;
+    --surface-2:   #1D2731;
+    --ink:         #E6EBF0;
+    --ink-soft:    #C2CCD6;
+    --muted:       #8B98A5;
+    --rule:        #26313D;
+    --rule-strong: #384654;
+    --accent:      #7FB2DC;
+    --accent-soft: #17293A;
+    --warn:        #E0907F;
+    --warn-soft:   #33201C;
+    --good:        #5FBFA8;
+    --good-soft:   #122E28;
+    --script-bg:   #1B1E22;
+    --script-rule: #3D3A33;
+    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-weight: 300;
+    font-size: 17px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 52rem; margin: 0 auto; padding: clamp(2.2rem,5vw,4rem) clamp(1.1rem,4vw,2rem) 6rem; }
+
+  .eyebrow {
+    font-family: var(--f-mono); font-size: .7rem; letter-spacing: .13em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 1rem;
+  }
+  h1 {
+    font-family: var(--f-display); font-weight: 700;
+    font-size: clamp(2rem,5.5vw,3rem); line-height: 1.2; letter-spacing: -.015em;
+    text-wrap: balance; margin: 0 0 1.1rem;
+  }
+  .standfirst { font-size: clamp(1.02rem,2.2vw,1.15rem); color: var(--ink-soft); max-width: 40rem; margin: 0 0 1.8rem; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: .45rem 1.4rem;
+    font-family: var(--f-mono); font-size: .74rem; color: var(--muted);
+    padding-top: 1.2rem; border-top: 1px solid var(--rule);
+  }
+  .meta b { font-weight: 500; color: var(--ink-soft); }
+
+  /* 섹션 번호 = 발표 순서 */
+  .sec { margin-top: 3.4rem; }
+  .sec-head { display: flex; align-items: baseline; gap: .85rem; margin-bottom: 1rem; }
+  .sec-num {
+    font-family: var(--f-mono); font-size: .78rem; font-weight: 500;
+    color: var(--accent); border: 1px solid var(--accent); border-radius: 3px;
+    padding: .08rem .42rem; flex: none; letter-spacing: .04em;
+  }
+  h2 {
+    font-family: var(--f-display); font-weight: 600;
+    font-size: clamp(1.4rem,3.4vw,1.78rem); line-height: 1.3; letter-spacing: -.01em;
+    text-wrap: balance; margin: 0;
+  }
+  h3 { font-family: var(--f-body); font-weight: 600; font-size: 1.03rem; margin: 1.8rem 0 .5rem; }
+  p { margin: 0 0 1rem; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 600; }
+  code {
+    font-family: var(--f-mono); font-size: .845em; background: var(--surface-2);
+    padding: .12em .38em; border-radius: 3px; word-break: break-word;
+  }
+  ul { margin: 0 0 1rem; padding-left: 1.1rem; }
+  li { margin-bottom: .38rem; }
+  li::marker { color: var(--rule-strong); }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+  /* 발표 대본 */
+  .script {
+    background: var(--script-bg);
+    border-left: 3px solid var(--script-rule);
+    border-radius: 0 5px 5px 0;
+    padding: 1rem 1.2rem;
+    margin: 1.3rem 0;
+  }
+  .script-tag {
+    font-family: var(--f-mono); font-size: .66rem; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--muted); display: block; margin-bottom: .45rem;
+  }
+  .script p { font-size: 1.01rem; color: var(--ink); margin: 0 0 .6rem; }
+  .script p:last-child { margin-bottom: 0; }
+
+  /* 이유 카드 */
+  .reasons { display: grid; grid-template-columns: repeat(auto-fit,minmax(14rem,1fr)); gap: .9rem; margin: 1.4rem 0; }
+  .reason {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 6px;
+    border-top: 3px solid var(--warn); padding: 1.05rem 1.1rem 1.15rem; box-shadow: var(--shadow);
+  }
+  .reason-rank {
+    font-family: var(--f-mono); font-size: .66rem; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--warn); margin-bottom: .5rem;
+  }
+  .reason h4 { font-family: var(--f-body); font-weight: 600; font-size: .98rem; margin: 0 0 .5rem; line-height: 1.4; }
+  .reason p { font-size: .87rem; color: var(--ink-soft); margin: 0; }
+
+  .tablewrap { overflow-x: auto; margin: 1.3rem 0; }
+  table { border-collapse: collapse; width: 100%; min-width: 32rem; font-size: .88rem; }
+  caption { caption-side: bottom; text-align: left; font-size: .77rem; color: var(--muted); padding-top: .65rem; }
+  th, td { text-align: left; padding: .6rem .78rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th {
+    font-family: var(--f-mono); font-weight: 500; font-size: .69rem; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--rule-strong); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rowhead { font-weight: 500; }
+  .bad { color: var(--warn); }
+  .ok  { color: var(--good); }
+
+  .pill {
+    display: inline-block; font-family: var(--f-mono); font-size: .68rem;
+    letter-spacing: .06em; padding: .1rem .45rem; border-radius: 3px; white-space: nowrap;
+  }
+  .pill.no  { background: var(--warn-soft); color: var(--warn); }
+  .pill.yes { background: var(--good-soft); color: var(--good); }
+
+  .callout {
+    display: flex; gap: .9rem; align-items: baseline;
+    padding: 1rem 1.2rem; border-radius: 5px; margin: 1.3rem 0;
+    border-left: 3px solid; font-size: .96rem;
+  }
+  .callout.key { background: var(--accent-soft); border-color: var(--accent); }
+  .callout.win { background: var(--good-soft); border-color: var(--good); }
+  .callout-tag {
+    font-family: var(--f-mono); font-size: .68rem; letter-spacing: .1em;
+    text-transform: uppercase; font-weight: 500; white-space: nowrap;
+  }
+  .callout.key .callout-tag { color: var(--accent); }
+  .callout.win .callout-tag { color: var(--good); }
+  .callout p { margin: 0; }
+
+  .compare { display: grid; grid-template-columns: repeat(auto-fit,minmax(14rem,1fr)); gap: .9rem; margin: 1.3rem 0; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 6px;
+    padding: 1rem 1.1rem 1.1rem; border-top: 3px solid var(--rule-strong);
+  }
+  .panel.before { border-top-color: var(--warn); }
+  .panel.after { border-top-color: var(--good); }
+  .panel-label {
+    font-family: var(--f-mono); font-size: .67rem; letter-spacing: .11em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: .6rem;
+  }
+  .bignum {
+    font-family: var(--f-mono); font-variant-numeric: tabular-nums;
+    font-size: 1.6rem; font-weight: 500; line-height: 1.1; letter-spacing: -.02em;
+  }
+  .panel.before .bignum { color: var(--warn); }
+  .panel.after .bignum { color: var(--good); }
+  .bignum-sub { font-size: .79rem; color: var(--muted); margin: .1rem 0 .85rem; }
+  .kv { display: flex; justify-content: space-between; gap: 1rem; font-size: .83rem; padding: .28rem 0; border-top: 1px dotted var(--rule); }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+  dl { margin: 0; }
+
+  /* 예상 질문 */
+  .qa { border-top: 1px solid var(--rule); }
+  .qa-item { padding: 1.1rem 0; border-bottom: 1px solid var(--rule); }
+  .qa-q {
+    font-family: var(--f-body); font-weight: 600; font-size: 1rem;
+    display: flex; gap: .6rem; margin-bottom: .55rem;
+  }
+  .qa-q::before { content: "Q"; font-family: var(--f-mono); color: var(--accent); font-weight: 500; flex: none; }
+  .qa-a { font-size: .93rem; color: var(--ink-soft); display: flex; gap: .6rem; }
+  .qa-a::before { content: "A"; font-family: var(--f-mono); color: var(--muted); font-weight: 500; flex: none; }
+  .qa-a > div { margin: 0; }
+  .qa-a p { margin: 0 0 .55rem; }
+
+  .footnote { font-size: .85rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 1.2rem; margin-top: 3.2rem; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">Empty My Room · 논문 검토 보고</p>
+  <h1>추천 모델 두 편을 쓰지 않은 이유</h1>
+  <p class="standfirst">
+    Total3DUnderstanding과 PlaneRCNN을 검토했습니다. 두 구현체 모두 채택하지 않았고,
+    대신 두 논문이 제기하는 문제를 기존 스택으로 해결했습니다. 판단 근거와 그 결과를 보고합니다.
+  </p>
+  <div class="meta">
+    <span><b>검토</b> Total3D (CVPR 2020) · PlaneRCNN (CVPR 2019)</span>
+    <span><b>결론</b> 코드 미채택 · 문제의식 채택</span>
+    <span><b>적용</b> 4건 + 버그 수정 1건</span>
+  </div>
+
+  <!-- 01 ─────────────────────────────────────────────────── -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">01</span><h2>결론</h2></div>
+
+    <div class="callout key">
+      <span class="callout-tag">핵심</span>
+      <p>
+        두 모델은 <strong>현재 GPU에서 구동되지 않습니다.</strong> 그리고 검토 과정에서
+        두 논문이 지적하는 문제가 우리 코드에 실재함을 확인해, 그 문제를 새 모델 없이 해결했습니다.
+      </p>
+    </div>
+
+    <div class="script">
+      <span class="script-tag">이렇게 말하세요</span>
+      <p>
+        “추천해 주신 두 논문을 검토했습니다. 결론부터 말씀드리면 <strong>구현체는 채택하지 못했고,
+        문제의식은 받아서 기존 스택으로 구현했습니다.</strong>”
+      </p>
+      <p>
+        “못 쓴 가장 큰 이유는 라이선스나 성능이 아니라 <strong>실행 환경</strong>입니다.
+        Total3D는 PyTorch 1.1·CUDA 9.0, PlaneRCNN은 PyTorch 0.4.1을 요구하는데,
+        저희 RTX 4090은 sm_89라 그 CUDA 빌드로는 아예 동작하지 않습니다.”
+      </p>
+    </div>
+  </section>
+
+  <!-- 02 ─────────────────────────────────────────────────── -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">02</span><h2>두 모델이 하는 일</h2></div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>모델</th><th>입력 → 출력</th><th>구성</th><th>우리 쪽 대응</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="rowhead">Total3D</td>
+            <td>사진 1장 → 방 구조 + 가구 3D bbox + 가구 메쉬</td>
+            <td>LEN(레이아웃) · ODN(물체) · MGN(메쉬)를 <strong>한 좌표계에서 joint 학습</strong></td>
+            <td>uLayout + Omni3D + SAM3D를 합친 것</td>
+          </tr>
+          <tr>
+            <td class="rowhead">PlaneRCNN</td>
+            <td>사진 1장 + intrinsic → 평면 마스크 + <strong>미터 단위</strong> 평면 파라미터</td>
+            <td>Mask R-CNN을 평면 검출로 전환</td>
+            <td>대응 없음 (바닥·벽 평면을 관측하지 않았음)</td>
+          </tr>
+        </tbody>
+      </table>
+      <caption>PlaneRCNN README에 평면 파라미터가 “absolute scale (in terms of meters)”로 명시됨.</caption>
+    </div>
+
+    <div class="script">
+      <span class="script-tag">이렇게 말하세요</span>
+      <p>
+        “Total3D는 저희가 세 모델로 나눠 하는 일을 하나로 묶은 구조입니다.
+        PlaneRCNN은 방을 평면 조각으로 분해하면서 <strong>미터 단위 거리</strong>를 함께 줍니다.
+        두 논문을 추천하신 의도가 <strong>‘기하를 metric으로 붙들 근거가 필요하다’</strong>는
+        지적이라고 이해했고, 그 지적은 정확했습니다.”
+      </p>
+    </div>
+  </section>
+
+  <!-- 03 ─────────────────────────────────────────────────── -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">03</span><h2>쓰지 못한 이유 — 우선순위 순</h2></div>
+
+    <div class="reasons">
+      <div class="reason">
+        <div class="reason-rank">1순위 · 결정적</div>
+        <h4>실행 환경이 맞지 않습니다</h4>
+        <p>
+          Total3D: Python 3.6 / PyTorch 1.1.0 / <strong>cudatoolkit 9.0</strong>.
+          PlaneRCNN: <strong>PyTorch 0.4.1</strong>, CUDA 10.0 미지원, gcc 7 이하.
+          <code>nms</code>·<code>roialign</code>을 직접 빌드해야 하는데 README 아키텍처 예시는
+          sm_61까지입니다. 저희 GPU는 sm_89입니다.
+        </p>
+      </div>
+      <div class="reason">
+        <div class="reason-rank">2순위</div>
+        <h4>이미 상위 세대를 쓰고 있습니다</h4>
+        <p>
+          Total3D의 물체 검출(ODN)은 저희가 쓰는 <strong>Omni3D / Cube R-CNN(2023)의 이전
+          세대</strong>이고, 메쉬 생성(MGN)은 Pix3D 소수 카테고리 기반이라 SAM3D와 비교 대상이
+          아닙니다. 교체하면 성능이 떨어집니다.
+        </p>
+      </div>
+      <div class="reason">
+        <div class="reason-rank">3순위 · PlaneRCNN만</div>
+        <h4>라이선스 제약이 있습니다</h4>
+        <p>
+          <strong>CC BY-NC-SA 4.0</strong> — 상업적 이용 금지, 파생물도 동일 조건 배포.
+          연구·포트폴리오 용도라면 문제없지만 서비스화 가능성을 고려하면 부담입니다.
+          Total3D는 MIT라 이 문제가 없습니다.
+        </p>
+      </div>
+    </div>
+
+    <p>
+      덧붙여 PlaneRCNN 저자는 배포 모델이 논문 수치를 재현하지 못한다고 README에 명시했습니다
+      (<em>“the numbers are off with the provided model”</em>). 포팅에 성공해도 논문 성능이 보장되지 않습니다.
+    </p>
+
+    <div class="script">
+      <span class="script-tag">이렇게 말하세요</span>
+      <p>
+        “포팅을 검토했지만 2019~2020년 커스텀 CUDA 연산자를 최신 스택으로 옮기는 작업이라
+        비용이 큰데, <strong>결과적으로 그럴 필요가 없었습니다.</strong> 두 논문이 주려는 정보를
+        이미 가진 것으로 얻을 수 있었기 때문입니다.”
+      </p>
+    </div>
+  </section>
+
+  <!-- 04 ─────────────────────────────────────────────────── -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">04</span><h2>검토가 찾아낸 실제 문제</h2></div>
+
+    <p>
+      논문의 문제의식을 기준으로 코드를 되짚자 <strong>스케일 근거가 상수 하나에 매달려 있었습니다.</strong>
+      방 치수와 가구 높이가 같은 변수에서 파생됩니다.
+    </p>
+    <p>
+      <code>uLayout/infer_single_image.py:151</code> —
+      <code>scale_floor = camera_height_m / bearing_floor[1,:]</code>
+    </p>
+
+    <div class="callout key">
+      <span class="callout-tag">진단</span>
+      <p>
+        방과 가구가 <strong>둘 다 <code>camera_height_m</code>에 선형 비례</strong>합니다.
+        따라서 그 값이 틀려도 <strong>비율은 보존되고</strong>, 대신 절대 치수가 통째로 틀립니다.
+        그 값은 <strong>1.6m 고정</strong>이었습니다.
+      </p>
+    </div>
+
+    <p>문제는 두 갈래였습니다.</p>
+    <ul>
+      <li><strong>절대 치수</strong>가 촬영 높이와 무관하게 1.6m 가정 위에 서 있었습니다.</li>
+      <li><strong>Omni3D·SAM3D는 방과 무관하게 각자 metric을 추정</strong>합니다. 이 경로로만 크기가 나오는 벽걸이 가구(액자·거울·커튼)는 방과 다른 자로 잰 값이 배치됩니다.</li>
+    </ul>
+  </section>
+
+  <!-- 05 ─────────────────────────────────────────────────── -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">05</span><h2>대신 적용한 것</h2></div>
+
+    <h3>① 카메라 높이를 사진에서 역산 — PlaneRCNN의 목적을 대체</h3>
+    <p>
+      PlaneRCNN이 주려는 것은 <em>미터 단위 바닥 평면</em>이고, 바닥까지의 거리가 곧 카메라 높이입니다.
+      같은 값을 <strong>이미 떠 있는 Omni3D</strong>로 얻었습니다 — 전체 이미지를 추론해 바닥에 닿는
+      가구 20개 클래스를 찾고, 각 3D bbox 밑면의 중앙값을 카메라 높이로 삼습니다.
+      새 모델도, 추가 GPU 부담도 없습니다.
+    </p>
+
+    <div class="compare">
+      <div class="panel before">
+        <div class="panel-label">종전 · 1.6m 고정</div>
+        <div class="bignum">3.35 m</div>
+        <div class="bignum-sub">추정 천장 높이</div>
+        <dl>
+          <div class="kv"><dt>가로 × 깊이</dt><dd>4.30 × 3.03 m</dd></div>
+          <div class="kv"><dt>바닥 면적</dt><dd>13.02 m²</dd></div>
+        </dl>
+      </div>
+      <div class="panel after">
+        <div class="panel-label">개선 · 사진에서 역산</div>
+        <div class="bignum">2.27 m</div>
+        <div class="bignum-sub">추정 천장 높이</div>
+        <dl>
+          <div class="kv"><dt>가로 × 깊이</dt><dd>2.91 × 2.05 m</dd></div>
+          <div class="kv"><dt>카메라 높이</dt><dd>1.083 m</dd></div>
+        </dl>
+      </div>
+    </div>
+    <p>
+      <strong>천장 높이가 판정 근거입니다.</strong> 국내 주거 천장고는 2.3m 전후이므로 3.35m는
+      성립하지 않습니다. 2.27m는 사진의 문 상단(약 2.0m)과 몰딩 위치와도 일치합니다.
+    </p>
+
+    <h3>② 스케일 정합 — Total3D의 joint 개념을 후처리로</h3>
+    <p>
+      바닥 접촉 가구는 기하로도, Omni3D로도 잴 수 있습니다. 같은 가구를 두 방법으로 잰 비의
+      중앙값이 두 스케일의 환산 계수이고, 이를 벽걸이 가구에 적용해 방 좌표계로 정렬합니다.
+      학습 대신 추론 후 보정으로 구현했습니다.
+    </p>
+
+    <h3>③ 물체–레이아웃 제약</h3>
+    <p>
+      추정 높이가 표준 크기의 0.4~2.5배를 벗어나면 표준값으로 되돌리고, 방 높이를 넘으면
+      클램프합니다. 후자가 Total3D의 <em>“물체는 layout 안에 있어야 한다”</em>는 제약에 해당합니다.
+    </p>
+
+    <h3>④ 벽·천장 평면 제약 — PlaneRCNN이 필요 없었던 이유</h3>
+    <p>
+      단일 이미지에서 bbox는 “시야에서 몇 도를 차지하는가”만 알려주므로, 깊이를 모르면 실제 크기를
+      구할 수 없습니다. 깊이를 얻는 기하적 방법은 <strong>“물체가 알려진 평면 위에 있다”</strong>는
+      제약뿐이고, 종전에는 그 평면이 바닥 하나였습니다.
+    </p>
+
+    <div class="callout win">
+      <span class="callout-tag">검토의 성과</span>
+      <p>
+        벽 평면 방정식이 <strong>이미 우리 코드에 있었습니다.</strong>
+        <code>uLayout/room_rectify.py</code>가 텍스처 rectify를 위해 뒷벽·좌벽·우벽·바닥·천장
+        5면을 정의해 쓰고 있었습니다. 방 치수와 카메라 pose만으로 나오는 값입니다.
+        <strong>평면 검출 모델이 필요하지 않았습니다.</strong>
+      </p>
+    </div>
+
+    <p>
+      광선을 후보 평면 전부와 교차시켜 <strong>카메라에서 가장 먼저 만나는 면</strong>을 택하면
+      “어느 벽인가” 판정도 됩니다. 그 결과 액자·거울·시계·커튼·천장 조명이 Omni3D(학습 기반) 대신
+      <strong>방과 같은 기하 기준</strong>으로 계산됩니다. 같은 작업에서, 바닥에 서 있는데도
+      제외돼 있던 <code>스탠드 조명</code>도 바닥 교차로 되돌렸습니다.
+    </p>
+  </section>
+
+  <!-- 06 ─────────────────────────────────────────────────── -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">06</span><h2>부산물 — 기존 버그 발견</h2></div>
+    <p>
+      ①을 붙였는데도 방 치수가 바뀌지 않아 추적한 결과, uLayout 사이드카가
+      <code>camera_height_m</code>을 <strong>애초에 받지 못하고 있었습니다.</strong>
+      <code>Form()</code>이 빠져 FastAPI가 쿼리 파라미터로 해석해, multipart로 보낸 값이
+      조용히 버려지고 항상 기본값 1.6이 쓰였습니다.
+    </p>
+    <div class="script">
+      <span class="script-tag">이렇게 말하세요</span>
+      <p>
+        “이 버그를 못 찾았다면 개선이 <strong>코드상으로만 동작하고 실제 치수는 그대로</strong>였을
+        겁니다. 종전에는 항상 1.6을 보내고 있었기 때문에 값이 같아 드러나지 않았습니다.”
+      </p>
+    </div>
+  </section>
+
+  <!-- 07 ─────────────────────────────────────────────────── -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">07</span><h2>한계 — 먼저 인정할 것</h2></div>
+
+    <div class="callout key">
+      <span class="callout-tag">정직하게</span>
+      <p>
+        <strong>개선됐다는 것은 검증됐고, 얼마나 정확한지는 모릅니다.</strong>
+        정답(GT)이 없어 절대 오차를 측정할 수 없습니다.
+      </p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>항목</th><th>논문</th><th>우리</th></tr></thead>
+        <tbody>
+          <tr><td class="rowhead">평가 규모</td><td>SUN RGB-D · NYU v2 벤치마크</td><td class="bad">실사진 2장 + 로직 테스트 24개</td></tr>
+          <tr><td class="rowhead">정량 지표</td><td>있음</td><td class="bad">없음 (GT 부재)</td></tr>
+          <tr><td class="rowhead">카메라 intrinsic</td><td>입력으로 받음</td><td class="bad">EXIF 없으면 <code>focal = 2h</code> 가정</td></tr>
+          <tr><td class="rowhead">평면</td><td>관측된 평면</td><td class="bad">“방은 직육면체” 가정에서 나온 이상적 평면</td></tr>
+          <tr><td class="rowhead">구동 여부</td><td class="bad">불가 (sm_89)</td><td class="ok">정상</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      초점거리 가정과 관련해, 진단용으로 넣은 문 높이 검증에서 두 사진 모두 표준(2.0m) 대비
+      <span class="bad">1.16배·1.25배</span>로 일관되게 크게 측정됐습니다. 가정이 실제보다 작다는
+      신호일 수 있으나, 문 검출 신뢰도가 낮아(0.32~0.93) 자동 보정은 넣지 않았습니다.
+    </p>
+
+    <div class="script">
+      <span class="script-tag">이렇게 말하세요</span>
+      <p>
+        “정량 평가를 못 한 것이 가장 큰 한계입니다. 다음 단계로 <strong>줄자로 방 3~5개를 실측해
+        GT를 만들고</strong>, 1.6m 고정 방식과 오차를 비교하려 합니다. GT가 없으면 어떤 모델을
+        붙여도 나아졌는지 판단할 수 없기 때문에, 모델 추가보다 이 작업을 먼저 두겠습니다.”
+      </p>
+    </div>
+  </section>
+
+  <!-- 08 ─────────────────────────────────────────────────── -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">08</span><h2>예상 질문</h2></div>
+
+    <div class="qa">
+      <div class="qa-item">
+        <div class="qa-q"><span>포팅을 시도해 보지 않았나요?</span></div>
+        <div class="qa-a"><div>
+          검토했지만 두 저장소 모두 커스텀 CUDA 연산자를 포함해 최신 PyTorch로의 이식 비용이 큽니다.
+          PlaneRCNN은 저자도 배포 모델의 논문 수치 재현 실패를 명시했습니다. 그리고 필요한 정보
+          — 바닥·벽 평면 — 가 기존 코드에서 이미 얻어져 포팅의 실익이 사라졌습니다.
+        </div></div>
+      </div>
+      <div class="qa-item">
+        <div class="qa-q"><span>그러면 논문에서 얻은 것이 없는 건가요?</span></div>
+        <div class="qa-a"><div>
+          진단이 논문에서 나왔습니다. <strong>“스케일 근거가 무엇인가”</strong>라는 관점 없이는
+          방 치수와 가구 높이가 같은 상수에 묶여 있다는 사실을 찾지 못했을 것입니다.
+          벽 평면 제약도 Total3D의 좌표계 통일 개념에서 나왔습니다.
+        </div></div>
+      </div>
+      <div class="qa-item">
+        <div class="qa-q"><span>2.27m가 맞다는 근거가 사진 판독뿐인가요?</span></div>
+        <div class="qa-a"><div>
+          맞습니다. 그래서 “3.35m는 물리적으로 불가능하다”까지만 주장하고, 2.27m의 오차는
+          주장하지 않습니다. 정량 근거는 GT 실측 후에 제시하겠습니다.
+        </div></div>
+      </div>
+      <div class="qa-item">
+        <div class="qa-q"><span>최신 모델을 쓰면 더 낫지 않나요?</span></div>
+        <div class="qa-a"><div>
+          단일 이미지 metric depth 모델(Depth Pro, Metric3D v2, UniDepth)로 카메라 높이를
+          교차 검증하는 것이 다음 후보입니다. 두 경로가 독립적으로 같은 값을 내면 초점거리
+          가정 문제까지 좁힐 수 있습니다. 다만 그 판단에도 GT가 먼저 필요합니다.
+        </div></div>
+      </div>
+      <div class="qa-item">
+        <div class="qa-q"><span>왜 처음부터 바닥 접촉 가구만 계산했나요?</span></div>
+        <div class="qa-a"><div>
+          기하적 제약 때문입니다. bbox는 각도만 알려주므로 깊이가 미지수인데, 떠 있는 물체는
+          미지수가 둘(깊이·뜬 높이)이고 방정식은 하나여서 불결정입니다. 바닥 접촉은 방정식을
+          하나 더 주고, 바닥은 카메라 pose에서 공짜로 얻어지는 유일한 평면이었습니다.
+          이번에 벽·천장 평면을 추가해 그 제한을 풀었습니다.
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <p class="footnote">
+    커밋: <code>a574d09</code>(카메라 높이·정합·제약), <code>8ae2f99</code>(벽·천장 평면).
+    사이드카 두 개(<code>~/omni3d</code>, <code>~/uLayout</code>)는 upstream이 원격이라
+    본 저장소 커밋에 포함되지 않으며, 배포 시 별도 반영이 필요합니다.
+    실측값은 <code>empty_room.jpg</code>·<code>bedroom.png</code> 두 장 기준으로 표본이 적어
+    추세 확인 용도입니다.
+  </p>
+
+</div>

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 export const useStore = create((set) => ({
-  step: 'upload',
+  step: 'landing',
   setStep: (step) => set({ step }),
   originalFile: null,
   originalUrl: null,
