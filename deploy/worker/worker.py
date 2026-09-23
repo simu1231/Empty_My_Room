@@ -26,6 +26,17 @@ TABLE_NAME = os.getenv("DDB_TABLE", "emr-jobs")
 QUEUE_NAME = os.getenv("QUEUE_NAME", "emr-sam3d")
 MOCK       = os.getenv("MOCK", "0") == "1"
 
+# SAM3D 추론 모듈이 있는 디렉터리. 컨테이너 안에서도 호스트와 같은 절대경로로
+# 마운트한다(conda prefix와 editable 설치가 경로에 박혀 있어서 옮길 수 없다).
+BACKEND_DIR = os.getenv(
+    "SAM3D_BACKEND_DIR", "/home/tmvlem5671/Empty_My_Room/sam3d/backend"
+)
+
+# 사이드카 주소. 로컬에서는 localhost, 컴포즈/운영에서는 서비스 이름이 들어온다.
+ULAYOUT_URL = os.getenv("ULAYOUT_URL", "http://localhost:8002")
+OMNI3D_URL  = os.getenv("OMNI3D_URL",  "http://localhost:8003")
+SIDECAR_TIMEOUT = int(os.getenv("SIDECAR_TIMEOUT", "120"))
+
 # 유휴 종료: 이 시간 동안 작업이 없으면 프로세스를 끝낸다.
 # 스케일투제로의 실제 구현부다. 4단계에서 ASG가 이 종료를 감지해 인스턴스를 회수한다.
 IDLE_EXIT_SEC = int(os.getenv("IDLE_EXIT_SEC", "900"))  # 15분
@@ -90,27 +101,144 @@ def heartbeat(queue_url: str, receipt: str, stop: threading.Event):
             return
 
 
+# ── 실제 추론 ─────────────────────────────────────────────────────────────
+#
+# 작업 세 종류의 성격이 완전히 다르다.
+#
+#   sam3d_mesh  : 무거운 GPU 추론(25초). 이 프로세스 안에서 직접 돌린다.
+#   room_layout : uLayout 사이드카로 HTTP 전달.
+#   omni3d      : Omni3D 사이드카로 HTTP 전달.
+#
+# 왜 뒤의 둘은 직접 안 돌리는가? conda 환경이 서로 다르기 때문이다. uLayout과
+# Omni3D는 torch/pytorch3d 버전이 충돌해서 한 파이썬 프로세스에 같이 올릴 수 없다.
+# 그래서 원래도 별도 서버(:8002, :8003)로 띄워 HTTP로 부르고 있었고, 워커도
+# 그 구조를 그대로 쓴다. 워커는 "큐에서 꺼내 사이드카에 넘기고 결과를 S3에 올리는"
+# 역할만 한다.
+
+_pipeline = None  # SAM3D 파이프라인 캐시(프로세스 수명 동안 유지)
+
+
+def _get_pipeline():
+    """
+    SAM3D 파이프라인을 한 번만 로드해서 재사용한다.
+
+    로드 자체가 수십 초 걸리므로 매 작업마다 다시 만들면 추론(25초)보다 준비가
+    더 오래 걸린다. 워커가 살아 있는 동안 캐시해두면 두 번째 작업부터는 바로 돈다.
+    스케일투제로로 인스턴스가 내려가면 캐시도 같이 사라지는데, 그게 콜드스타트의
+    실체다(4단계에서 이 비용과 유휴 비용을 저울질한다).
+    """
+    global _pipeline
+    if _pipeline is None:
+        import sys
+        if BACKEND_DIR not in sys.path:
+            sys.path.insert(0, BACKEND_DIR)
+        from services import sam3d_runner
+        print("[worker] SAM3D 파이프라인 로드 중...")
+        t0 = time.time()
+        _pipeline = sam3d_runner.load_pipeline()
+        print(f"[worker] SAM3D 파이프라인 로드 완료 ({time.time() - t0:.1f}초)")
+    return _pipeline
+
+
+def _drop_pipeline():
+    """추론이 실패하면 캐시를 버린다 — 반쯤 망가진 GPU 상태를 다음 작업에 물려주지 않기 위함."""
+    global _pipeline
+    _pipeline = None
+    try:
+        import gc
+        import torch
+        gc.collect()
+        torch.cuda.empty_cache()
+        print("[worker] GPU 캐시 정리 완료")
+    except Exception as e:
+        print(f"[worker] GPU 캐시 정리 실패(무시): {e}")
+
+
+def _run_sam3d_mesh(job, local_input, local_inputs):
+    import sys
+    if BACKEND_DIR not in sys.path:
+        sys.path.insert(0, BACKEND_DIR)
+    from services import sam3d_runner
+
+    with open(local_input, "rb") as f:
+        img_bytes = f.read()
+    category = (job.get("params") or {}).get("category", "")
+
+    pipeline = _get_pipeline()
+    try:
+        payload = sam3d_runner.generate(pipeline, img_bytes, category)
+    except Exception:
+        _drop_pipeline()
+        raise
+
+    import orjson
+    return orjson.dumps(payload), "application/json"
+
+
+def _post_sidecar(url: str, local_input: str, data: dict):
+    """사이드카에 이미지 + 폼 데이터를 보내고 JSON 응답 바이트를 그대로 돌려준다."""
+    import requests
+
+    with open(local_input, "rb") as f:
+        files = {"image": ("input.png", f.read(), "image/png")}
+    resp = requests.post(url, files=files, data=data, timeout=SIDECAR_TIMEOUT)
+    resp.raise_for_status()
+    # 사이드카 JSON을 가공 없이 그대로 올린다. 프런트엔드가 동기 호출 때 받던
+    # 응답과 한 글자도 다르지 않아야 결과 처리 코드를 손대지 않아도 된다.
+    return resp.content, "application/json"
+
+
+def _run_room_layout(job, local_input, local_inputs):
+    params = job.get("params") or {}
+    return _post_sidecar(
+        f"{ULAYOUT_URL}/infer",
+        local_input,
+        {"camera_height_m": params.get("camera_height_m", 1.6)},
+    )
+
+
+def _run_omni3d(job, local_input, local_inputs):
+    params = job.get("params") or {}
+    missing = [k for k in ("bbox", "category") if k not in params]
+    if missing:
+        raise ValueError(f"omni3d 작업에 필요한 파라미터 누락: {missing}")
+    return _post_sidecar(
+        f"{OMNI3D_URL}/estimate",
+        local_input,
+        {"bbox": params["bbox"], "category": params["category"]},
+    )
+
+
+HANDLERS = {
+    "sam3d_mesh":  _run_sam3d_mesh,
+    "room_layout": _run_room_layout,
+    "omni3d":      _run_omni3d,
+}
+
+
 def run_inference(job: dict, local_input: str, local_inputs: dict | None = None) -> tuple[bytes, str]:
     """
-    실제 추론이 들어갈 자리. 반환값은 (결과 바이트, content-type).
+    실제 추론. 반환값은 (결과 바이트, content-type).
 
     local_input은 주 입력(image), local_inputs는 파트 이름 → 경로 전체.
-
-    3단계에서 여기에 기존 sam3d/backend/routers/sam3d.py의 추론 코드를 옮긴다.
-    지금은 배관 검증용 더미다.
     """
+    job_type = job["job_type"]
+
     if MOCK:
-        print(f"[worker] MOCK 처리 중... (job_type={job['job_type']})")
+        print(f"[worker] MOCK 처리 중... (job_type={job_type})")
         time.sleep(float(os.getenv("MOCK_SEC", "5")))
         dummy = {
             "success": True,
             "mock": True,
-            "job_type": job["job_type"],
+            "job_type": job_type,
             "mesh": {"vertices": [[0, 0, 0], [1, 0, 0], [0, 1, 0]], "faces": [[0, 1, 2]]},
         }
         return json.dumps(dummy).encode(), "application/json"
 
-    raise NotImplementedError("3단계에서 실제 모델을 연결합니다")
+    handler = HANDLERS.get(job_type)
+    if handler is None:
+        raise ValueError(f"처리할 수 없는 job_type: {job_type}")
+    return handler(job, local_input, local_inputs or {"image": local_input})
 
 
 def process(queue_url: str, msg: dict):
@@ -140,7 +268,7 @@ def process(queue_url: str, msg: dict):
         payload, content_type = run_inference(job, local_input, local_inputs)
         elapsed = time.time() - t0
 
-        result_key = f"result/{job_id}/mesh.json"
+        result_key = f"result/{job_id}/result.json"
         s3.put_object(Bucket=BUCKET, Key=result_key, Body=payload, ContentType=content_type)
         set_status(job_id, "done", result_key=result_key, elapsed_sec=int(elapsed))
 

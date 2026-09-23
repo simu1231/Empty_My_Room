@@ -42,7 +42,7 @@ services:
 
   # SAM3D 워커. 운영에서는 이것만 GPU 인스턴스로 뜨고 0대까지 줄어든다.
   worker-sam3d:
-    build: {context: ./worker, dockerfile: Dockerfile.mock}
+    build: ./worker
     environment:
       <<: *aws_env
       QUEUE_NAME: emr-sam3d
@@ -54,7 +54,7 @@ services:
 
   # uLayout + Omni3D 워커. 둘 다 2GB 미만이라 운영에서 한 인스턴스에 같이 올린다.
   worker-scene:
-    build: {context: ./worker, dockerfile: Dockerfile.mock}
+    build: ./worker
     environment:
       <<: *aws_env
       QUEUE_NAME: emr-scene

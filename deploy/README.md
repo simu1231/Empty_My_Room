@@ -22,8 +22,8 @@ React ──► API 서버 ──► SQS ──► GPU Worker ──► S3
 ## 단계
 
 - [x] 1. 큐 배관 + 로컬 검증 (GPU 없이 가짜 워커로 검증)
-- [x] **2. 프런트엔드 비동기 전환** ← 현재
-- [ ] 3. 실제 모델 이식 + GPU 이미지 빌드
+- [x] 2. 프런트엔드 비동기 전환
+- [x] **3. 실제 모델 이식 + GPU 이미지 빌드** ← 현재
 - [ ] 4. ASG 오토스케일링 + 스케일투제로
 - [ ] 5. AWS 배포 (Terraform)
 - [ ] 6. 동시 요청 부하 테스트
@@ -50,6 +50,61 @@ React ──► API 서버 ──► SQS ──► GPU Worker ──► S3
 **S3 버킷 CORS는 필수다.** 브라우저가 presigned URL로 결과를 직접 받기 때문에
 버킷에 CORS가 없으면 응답이 버려진다. curl로 테스트하면 200이 나와서
 정상처럼 보이므로 반드시 브라우저나 `Origin` 헤더로 확인할 것.
+
+## 3단계에서 정한 것
+
+**추론 코드를 라우터에서 떼어냈다.** `sam3d/backend/routers/sam3d.py`에 있던
+추론 로직을 `sam3d/backend/services/sam3d_runner.py`로 옮겼다. 상시 서버(동기
+HTTP)와 큐 워커가 **같은 코드**를 쓰게 하기 위해서다. 복사해두면 한쪽만 고치는
+사고가 반드시 난다. 라우터는 340줄에서 57줄짜리 얇은 껍데기가 됐다.
+
+옮기면서 숨은 결합 하나를 발견해 같이 고쳤다. `sam3d_objects`는
+`LIDRA_SKIP_INIT` 환경변수가 있어야 import되는데 그걸 `main.py`가 설정하고
+있었다. 워커는 `main.py`를 거치지 않으므로 runner가 직접 설정하게 바꿨다.
+
+**워커의 세 갈래.** job_type별로 성격이 완전히 다르다.
+
+| job_type | 처리 방식 | 이유 |
+|---|---|---|
+| `sam3d_mesh` | 워커 프로세스 안에서 직접 추론 | 무거운 GPU 작업, 파이프라인 캐시가 이득 |
+| `room_layout` | uLayout 사이드카로 HTTP 전달 | conda 환경이 달라 한 프로세스에 못 올림 |
+| `omni3d` | Omni3D 사이드카로 HTTP 전달 | 위와 같음 |
+
+**GPU 이미지는 하나뿐이다.** 컨테이너는 셋인데 Dockerfile은 하나다. 환경과
+가중치를 전부 마운트하므로 셋의 차이가 "어느 python으로 뭘 실행하는가"밖에
+없기 때문이다. 자세한 내용은 [gpu/README.md](gpu/README.md).
+
+### 3단계 실측값
+
+실제 모델로 큐를 통과시킨 결과다(RTX 4090 24GB, LocalStack).
+
+| 작업 | 소요 | 비고 |
+|---|---|---|
+| `sam3d_mesh` (콜드) | 64.2초 | 파이프라인 로드 35.9초 + 추론 26.9초 |
+| `sam3d_mesh` (웜) | 24.1초 | 파이프라인 캐시 적중 |
+| `room_layout` | 2.5초 | |
+| `omni3d` | 0.8초 | |
+
+**콜드/웜 차이 36초가 4단계 설계의 핵심 숫자다.** 인스턴스를 0대로 줄이면
+매번 이 36초를 다시 낸다. 여기에 EC2 기동 시간까지 더한 것이 사용자가 느낄
+콜드스타트다. 이 비용과 유휴 GPU 비용을 어디서 맞바꿀지가 다음 단계다.
+
+결과 JSON이 기존 동기 응답과 같은 계약인지도 확인했다 —
+`success` / `type` / `mesh{vertices,faces,colors}` / `sam3d_size_m`.
+
+## 3단계 실행법
+
+```bash
+# GPU 스택 (오버라이드로 기본 compose 위에 덮어쓴다)
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml up --build
+```
+
+전제: `nvidia-container-toolkit`. 미설치면 컨테이너가 GPU를 못 본다.
+WSL에서는 **관리자가 아닌** PowerShell에서:
+
+```powershell
+wsl -d Ubuntu -u root -- bash -lc "apt-get update && apt-get install -y nvidia-container-toolkit && nvidia-ctk runtime configure --runtime=docker && service docker restart"
+```
 
 ## 1단계 실행법
 
