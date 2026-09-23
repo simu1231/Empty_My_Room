@@ -1,0 +1,65 @@
+# 1단계: 큐 배관 로컬 검증용. GPU 없이 돈다.
+#
+# LocalStack이 S3 / SQS / DynamoDB를 로컬에서 흉내낸다. 애플리케이션 코드는
+# boto3의 endpoint_url만 다를 뿐 실제 AWS와 완전히 동일하므로, 여기서 검증한
+# 로직이 5단계에서 그대로 올라간다.
+#
+# 실행:  docker compose -f deploy/docker-compose.yml up --build
+
+services:
+  localstack:
+    image: localstack/localstack:3.8
+    ports: ["4566:4566"]
+    environment:
+      SERVICES: s3,sqs,dynamodb
+      DEBUG: "0"
+    volumes:
+      # ready.d 에 넣은 스크립트는 LocalStack 기동 완료 후 자동 실행된다.
+      - ./init-localstack.sh:/etc/localstack/init/ready.d/init.sh:ro
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./api
+    ports: ["8000:8000"]
+    environment: &aws_env
+      AWS_ENDPOINT_URL: http://localstack:4566
+      # 브라우저가 직접 여는 주소(presigned URL 서명용). 컨테이너 내부 이름인
+      # localstack:4566으로 서명하면 사용자 브라우저에서 열리지 않는다.
+      # 운영에서는 이 변수를 비워두면 실제 S3 주소가 그대로 쓰인다.
+      AWS_PUBLIC_ENDPOINT_URL: http://localhost:4566
+      AWS_REGION: ap-northeast-2
+      # LocalStack은 자격증명을 검사하지 않지만 boto3가 요구하므로 더미를 넣는다.
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      S3_BUCKET: emr-jobs
+      DDB_TABLE: emr-jobs
+    depends_on:
+      localstack: {condition: service_healthy}
+
+  # SAM3D 워커. 운영에서는 이것만 GPU 인스턴스로 뜨고 0대까지 줄어든다.
+  worker-sam3d:
+    build: {context: ./worker, dockerfile: Dockerfile.mock}
+    environment:
+      <<: *aws_env
+      QUEUE_NAME: emr-sam3d
+      MOCK: "1"
+      MOCK_SEC: "5"        # SAM3D 실제 50초를 5초로 축약해 테스트
+      IDLE_EXIT_SEC: "99999"  # 로컬에서는 종료하지 않게 크게 둔다
+    depends_on:
+      localstack: {condition: service_healthy}
+
+  # uLayout + Omni3D 워커. 둘 다 2GB 미만이라 운영에서 한 인스턴스에 같이 올린다.
+  worker-scene:
+    build: {context: ./worker, dockerfile: Dockerfile.mock}
+    environment:
+      <<: *aws_env
+      QUEUE_NAME: emr-scene
+      MOCK: "1"
+      MOCK_SEC: "2"
+      IDLE_EXIT_SEC: "99999"
+    depends_on:
+      localstack: {condition: service_healthy}

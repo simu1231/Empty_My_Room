@@ -1,0 +1,11 @@
+# 1단계 전용 — 배관 검증용 가짜 워커. GPU도 torch도 필요 없다.
+# 3단계에서 CUDA 베이스 이미지 기반 Dockerfile로 교체한다.
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY worker.py .
+
+CMD ["python", "-u", "worker.py"]
