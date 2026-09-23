@@ -175,7 +175,7 @@ export default function LandingPage({ onStart }) {
       </section>
 
       <section className="lp-section-auto">
-        <div className="lp-wrap">
+        <div className="lp-wrap lp-wrap-lg">
           <h2>사진만 있으면 충분해요</h2>
           <p className="lp-section-sub lp-section-sub-nowrap">복잡한 치수 입력이나 도면 없이, 스마트폰으로 찍은 사진 한 장이면 시작할 수 있어요.</p>
           <div className="lp-signature-grid">
@@ -192,7 +192,7 @@ export default function LandingPage({ onStart }) {
       </section>
 
       <section className="lp-surface-soft lp-section-auto">
-        <div className="lp-wrap">
+        <div className="lp-wrap lp-wrap-lg">
           <h2>세 단계면 끝나요</h2>
           <p className="lp-section-sub">가입도, 도면 작업도 필요 없어요.</p>
           <div className="lp-steps">
