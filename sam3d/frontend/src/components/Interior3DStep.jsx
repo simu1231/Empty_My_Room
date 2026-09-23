@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useMemo } from 'react'
 import { useStore } from '../store/useStore'
 import toast from 'react-hot-toast'
+import { callModel, progressText } from '../utils/jobs'
  
 function MiniMeshViewer({ data }) {
   const mountRef = useRef(null)
@@ -1356,8 +1357,7 @@ export default function Interior3DStep() {
       omniForm.append('image', originalFile)
       omniForm.append('bbox', `${x0},${y0},${x1},${y1}`)
       omniForm.append('category', omni3dCategory)
-      const omniRes = await fetch('http://127.0.0.1:8001/api/omni3d/estimate', { method: 'POST', body: omniForm })
-      const omniData = await omniRes.json()
+      const omniData = await callModel('omni3dEstimate', omniForm)
       if (omniData.success) {
         console.log(`[Omni3D] ${name}: ${JSON.stringify(omniData.dimensions_m)} (score=${omniData.score?.toFixed(2)})`)
         return omniData.dimensions_m
@@ -1373,7 +1373,8 @@ export default function Interior3DStep() {
   const generate3DMesh = async (furniture) => {
     setGenerating(true)
     setGeneratingId(furniture.id)
-    toast.success('SAM3D로 3D 메쉬 생성 중...')
+    const toastId = `mesh-${furniture.id}`
+    toast.loading('SAM3D로 3D 메쉬 생성 중...', { id: toastId })
     // 버튼을 누르면 최소 이 로그 하나는 항상 남게 해서, 이후 단계가 조용히 스킵되더라도
     // 어디까지 갔는지 콘솔만 보고 판단할 수 있게 한다.
     console.log(`[3D 변환] 시작: ${furniture.name || '(이름없음)'} (id=${furniture.id}, bbox=${JSON.stringify(furniture.bbox)}, 원본사진=${originalFile ? 'O' : 'X'})`)
@@ -1394,8 +1395,11 @@ export default function Interior3DStep() {
         form.append('bbox', JSON.stringify(furniture.bbox))
       }
 
-      const res = await fetch('http://127.0.0.1:8001/api/sam3d/mesh', { method: 'POST', body: form })
-      const data = await res.json()
+      // 큐를 쓰는 배포 환경에서는 GPU가 0대에서 깨어나느라 몇 분이 걸릴 수 있다.
+      // 그동안 화면이 아무 말도 안 하면 사용자는 고장으로 여기고 새로고침한다.
+      const data = await callModel('sam3dMesh', form, {
+        onProgress: (p) => toast.loading(progressText(p), { id: toastId }),
+      })
       if (!data.success) throw new Error(data.error || '3D 생성 실패')
       const raw = data.mesh
       const processed = data.type === 'textured'
@@ -1410,12 +1414,12 @@ export default function Interior3DStep() {
         ...prev,
         [furniture.id]: { ...processed, name: furniture.name, omni3dSizeM, sam3dSizeM: data.sam3d_size_m || null },
       }))
-      toast.success('3D 변환 완료! 드래그해서 방에 배치하세요 🎉')
+      toast.success('3D 변환 완료! 드래그해서 방에 배치하세요 🎉', { id: toastId })
     } catch (e) {
       // 토스트는 금방 사라지므로 콘솔에도 남긴다 — SAM3D가 실패한 건지 Omni3D가
       // 스킵된 건지 콘솔 한 줄로 구분할 수 있어야 함.
       console.error(`[3D 변환] ${furniture.name || '(이름없음)'} 실패:`, e)
-      toast.error(`3D 생성 실패: ${e.message}`)
+      toast.error(`3D 생성 실패: ${e.message}`, { id: toastId })
     } finally {
       setGenerating(false)
       setGeneratingId(null)

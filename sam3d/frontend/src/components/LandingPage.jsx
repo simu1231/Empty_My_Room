@@ -180,8 +180,8 @@ export default function LandingPage({ onStart }) {
           <p className="lp-section-sub lp-section-sub-nowrap">복잡한 치수 입력이나 도면 없이, 스마트폰으로 찍은 사진 한 장이면 시작할 수 있어요.</p>
           <div className="lp-signature-grid">
             <div className="lp-sig-card lp-coral">
-              <h3>내 방 구조를 그대로 인식</h3>
-              <p>벽과 창문, 기존 가구 위치까지 사진에서 읽어내서 실제 공간에 맞는 배치를 제안해요.</p>
+              <h3>내 방 치수를 그대로 반영</h3>
+              <p>사진 속 방의 실제 크기와 카메라 각도를 분석하고,<br />벽과 바닥의 색·질감까지 그대로 옮겨와서 가구를 실제 크기에 맞게 배치해요.</p>
             </div>
             <div className="lp-sig-card lp-forest">
               <h3>여러 스타일로 비교</h3>

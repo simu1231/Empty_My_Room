@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import { API, b64ToFile } from '../utils/api'
+import { callModel, progressText } from '../utils/jobs'
 import toast from 'react-hot-toast'
 
 export default function RoomMakingStep() {
@@ -31,9 +32,14 @@ export default function RoomMakingStep() {
       const rectifyForm = new FormData()
       rectifyForm.append('image', emptyRoomFile)
 
+      // layout(uLayout)만 GPU 작업이라 큐를 탄다. 색상 추출과 텍스처 rectify는
+      // CPU 연산이라 상시 서버에서 바로 처리한다 — 이 둘까지 큐에 넣으면
+      // GPU가 깨어날 때까지 색상 미리보기도 못 보여주게 된다.
       const [colorRes, layoutRes, rectifyRes] = await Promise.allSettled([
         fetch(`${API.generate3d.replace('generate3d', 'extract-colors')}`, { method: 'POST', body: colorForm }),
-        fetch(API.layout, { method: 'POST', body: layoutForm }),
+        callModel('roomLayout', layoutForm, {
+          onProgress: (p) => setLoading(true, `방 치수 추정 — ${progressText(p)}`),
+        }),
         fetch(API.rectifyTextures, { method: 'POST', body: rectifyForm }),
       ])
 
@@ -51,7 +57,7 @@ export default function RoomMakingStep() {
 
       // 레이아웃(방 치수) 자동 추정 — 실패해도 색상 분석 결과는 그대로 사용, 수동 입력값 유지
       if (layoutRes.status === 'fulfilled') {
-        const layoutData = await layoutRes.value.json()
+        const layoutData = layoutRes.value
         if (layoutData.success) {
           const d = layoutData.room_dimensions_m
           setW(d.room_width_m.toFixed(2))

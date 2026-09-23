@@ -19,7 +19,8 @@ import uuid
 
 import boto3
 from botocore.config import Config
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException, Request
+from starlette.datastructures import UploadFile as StarletteUploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 # ── 설정 ──────────────────────────────────────────────────────────────
@@ -79,51 +80,72 @@ def table():
 
 # ── 1. 접수 ───────────────────────────────────────────────────────────
 @app.post("/api/jobs")
-async def create_job(
-    image: UploadFile = File(...),
-    job_type: str = Form(...),
-    params: str = Form("{}"),
-):
-    """작업을 접수하고 즉시 job_id를 돌려준다. 여기서 절대 기다리지 않는다."""
-    try:
-        parsed_params = json.loads(params)
-    except json.JSONDecodeError as e:
-        raise HTTPException(400, f"params가 올바른 JSON이 아닙니다: {e}")
+async def create_job(request: Request):
+    """
+    작업을 접수하고 즉시 job_id를 돌려준다. 여기서 절대 기다리지 않는다.
+
+    폼을 통째로 받아서 해석한다. 모델마다 필요한 입력이 달라서
+    (SAM3D는 얇은 가구일 때 full_image+bbox를 더 받고, Omni3D는 bbox+category를
+    받는다) 모델 수만큼 엔드포인트를 만들면 모델을 추가할 때마다 API 서버를
+    다시 배포해야 한다. 파일 파트는 전부 S3로, 텍스트 파트는 전부 params로
+    넘기면 API 서버는 무엇이 오든 그대로 워커에 전달하기만 하면 된다.
+    """
+    form = await request.form()
+
+    job_type = form.get("job_type")
+    if not isinstance(job_type, str) or job_type not in QUEUE_NAMES:
+        raise HTTPException(400, f"알 수 없는 job_type: {job_type}")
 
     job_id = uuid.uuid4().hex
     now = int(time.time())
-    input_key = f"input/{job_id}/{image.filename or 'image.png'}"
 
-    # 이미지는 S3로. SQS 메시지에 직접 넣으면 안 된다(메시지 최대 256KB).
-    body = await image.read()
-    s3.put_object(
-        Bucket=BUCKET, Key=input_key, Body=body,
-        ContentType=image.content_type or "application/octet-stream",
-    )
+    input_keys: dict[str, str] = {}
+    params: dict = {}
+
+    for field, value in form.multi_items():
+        if field == "job_type":
+            continue
+        if isinstance(value, StarletteUploadFile):
+            # 이미지는 S3로. SQS 메시지에 직접 넣으면 안 된다(메시지 최대 256KB).
+            key = f"input/{job_id}/{field}/{value.filename or 'file'}"
+            s3.put_object(
+                Bucket=BUCKET, Key=key, Body=await value.read(),
+                ContentType=value.content_type or "application/octet-stream",
+            )
+            input_keys[field] = key
+        elif field == "params":
+            # 구조가 있는 값은 params에 JSON으로 한 번에 보낼 수도 있다.
+            try:
+                params.update(json.loads(value))
+            except json.JSONDecodeError as e:
+                raise HTTPException(400, f"params가 올바른 JSON이 아닙니다: {e}")
+        else:
+            params[field] = value
+
+    if "image" not in input_keys:
+        raise HTTPException(400, "image 파일 파트가 필요합니다")
+
+    job_msg = {
+        "job_id": job_id,
+        "job_type": job_type,
+        # input_key는 주 입력. 워커의 기존 코드와 호환을 위해 남긴다.
+        "input_key": input_keys["image"],
+        "input_keys": input_keys,
+        "params": params,
+    }
 
     # 상태 레코드를 먼저 쓴다. 큐에 먼저 넣으면 워커가 즉시 집어갔을 때
     # 조회할 레코드가 없어서 404가 날 수 있다(경쟁 상태).
     table().put_item(Item={
-        "job_id": job_id,
+        **job_msg,
         "status": "queued",
-        "job_type": job_type,
-        "input_key": input_key,
-        "params": parsed_params,
         "created_at": now,
         "updated_at": now,
         # TTL: 7일 뒤 자동 삭제. 안 지우면 레코드가 무한히 쌓인다.
         "expires_at": now + 7 * 24 * 3600,
     })
 
-    sqs.send_message(
-        QueueUrl=queue_url(job_type),
-        MessageBody=json.dumps({
-            "job_id": job_id,
-            "job_type": job_type,
-            "input_key": input_key,
-            "params": parsed_params,
-        }),
-    )
+    sqs.send_message(QueueUrl=queue_url(job_type), MessageBody=json.dumps(job_msg))
 
     return {"job_id": job_id, "status": "queued"}
 

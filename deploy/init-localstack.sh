@@ -12,6 +12,20 @@ export AWS_DEFAULT_REGION=ap-northeast-2
 echo "▶ S3 버킷 생성"
 awslocal s3 mb s3://emr-jobs
 
+# 버킷 CORS. 브라우저는 결과 메쉬를 presigned URL로 S3에서 직접 받는데,
+# 이 설정이 없으면 S3가 Access-Control-Allow-Origin을 안 내려주고 브라우저가
+# 응답을 버린다. curl로 테스트하면 200이 나와서 정상처럼 보이는 게 함정이다.
+# 운영에서는 AllowedOrigins를 실제 도메인으로 좁힌다.
+awslocal s3api put-bucket-cors --bucket emr-jobs --cors-configuration '{
+  "CORSRules": [{
+    "AllowedOrigins": ["*"],
+    "AllowedMethods": ["GET", "PUT"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }]
+}'
+
 echo "▶ DLQ 생성 (실패한 작업이 모이는 곳)"
 # DLQ가 없으면 실패한 메시지가 무한 재시도되며 GPU 비용을 계속 태운다.
 DLQ_URL=$(awslocal sqs create-queue --queue-name emr-sam3d-dlq --output text --query QueueUrl)

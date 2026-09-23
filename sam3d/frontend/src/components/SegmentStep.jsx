@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { useStore } from '../store/useStore'
 import toast from 'react-hot-toast'
+import { API } from '../utils/api'
 
 const LABEL_COLORS = [
   'rgba(255,80,80,0.45)', 'rgba(80,160,255,0.45)', 'rgba(80,255,120,0.45)',
@@ -110,7 +111,7 @@ export default function SegmentStep() {
       const form = new FormData()
       form.append('image', file)
       form.append('points', JSON.stringify(labelPoints.map(p => [p.x, p.y])))
-      const res = await fetch('http://127.0.0.1:8001/api/segment/mask', { method: 'POST', body: form })
+      const res = await fetch(API.segment, { method: 'POST', body: form })
       const data = await res.json()
       if (data.success) {
         setMaskPreviews(prev => ({ ...prev, [label]: data.mask_b64 }))
@@ -183,7 +184,7 @@ export default function SegmentStep() {
       form1.append('image', originalFile)
       form1.append('points', JSON.stringify(clickPoints.map(p => [p.x, p.y])))
       form1.append('labels', JSON.stringify(clickPoints.map(p => p.label)))
-      const res1 = await fetch('http://127.0.0.1:8001/api/segment/mask', { method: 'POST', body: form1 })
+      const res1 = await fetch(API.segment, { method: 'POST', body: form1 })
       const data1 = await res1.json()
       if (!data1.success) throw new Error('마스크 생성 실패')
       maskB64    = data1.mask_b64
@@ -202,7 +203,7 @@ export default function SegmentStep() {
     form2.append('image', resizedFile)
     form2.append('mask', maskFile)
 
-    const res2 = await fetch('http://127.0.0.1:8001/api/inpaint/remove', {
+    const res2 = await fetch(API.inpaint, {
       method: 'POST',
       body: form2,
     })
@@ -221,7 +222,7 @@ export default function SegmentStep() {
     form3.append('points', JSON.stringify(clickPoints.map(p => [p.x, p.y])))
     form3.append('labels', JSON.stringify(clickPoints.map(p => p.label || '기타')))
 
-    const res3 = await fetch('http://127.0.0.1:8001/api/extract/furniture', {
+    const res3 = await fetch(API.extract, {
       method: 'POST',
       body: form3,
     })

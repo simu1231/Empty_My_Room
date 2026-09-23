@@ -90,9 +90,11 @@ def heartbeat(queue_url: str, receipt: str, stop: threading.Event):
             return
 
 
-def run_inference(job: dict, local_input: str) -> tuple[bytes, str]:
+def run_inference(job: dict, local_input: str, local_inputs: dict | None = None) -> tuple[bytes, str]:
     """
     실제 추론이 들어갈 자리. 반환값은 (결과 바이트, content-type).
+
+    local_input은 주 입력(image), local_inputs는 파트 이름 → 경로 전체.
 
     3단계에서 여기에 기존 sam3d/backend/routers/sam3d.py의 추론 코드를 옮긴다.
     지금은 배관 검증용 더미다.
@@ -124,11 +126,18 @@ def process(queue_url: str, msg: dict):
     try:
         set_status(job_id, "running")
 
-        local_input = f"/tmp/{job_id}"
-        s3.download_file(BUCKET, job["input_key"], local_input)
+        # 파트 이름 → 로컬 경로. SAM3D 얇은 가구 경로처럼 입력이 여러 개인
+        # 작업이 있어서, 주 입력만이 아니라 온 것을 전부 내려받는다.
+        input_keys = job.get("input_keys") or {"image": job["input_key"]}
+        local_inputs = {}
+        for field, key in input_keys.items():
+            path = f"/tmp/{job_id}.{field}"
+            s3.download_file(BUCKET, key, path)
+            local_inputs[field] = path
+        local_input = local_inputs["image"]
 
         t0 = time.time()
-        payload, content_type = run_inference(job, local_input)
+        payload, content_type = run_inference(job, local_input, local_inputs)
         elapsed = time.time() - t0
 
         result_key = f"result/{job_id}/mesh.json"
