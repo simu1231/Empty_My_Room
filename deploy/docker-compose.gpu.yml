@@ -16,10 +16,25 @@ x-mounts: &model_mounts
   - ${HOME}/sam-3d-objects:${HOME}/sam-3d-objects:ro
   - ${HOME}/uLayout:${HOME}/uLayout:ro
   - ${HOME}/omni3d:${HOME}/omni3d:ro
+  # omni3d 환경의 detectron2/pytorch3d는 editable 설치라 site-packages에
+  # 코드가 없고 아래 소스 디렉터리를 가리킨다. 안 붙이면 ModuleNotFoundError다.
+  # (pytorch3d는 ~/pytorch3d 가 아니라 omni3d 전용 빌드 쪽을 가리킨다)
+  - ${HOME}/detectron2:${HOME}/detectron2:ro
+  - ${HOME}/pytorch3d_omni3d_build:${HOME}/pytorch3d_omni3d_build:ro
   - ${HOME}/Empty_My_Room/sam3d/backend:${HOME}/Empty_My_Room/sam3d/backend:ro
   # HuggingFace 캐시(28GB)가 실질적인 가중치 저장소다. 락 파일을 쓰므로 rw로 붙인다.
   - ${HOME}/.cache/huggingface:${HOME}/.cache/huggingface
   - ${HOME}/.cache/torch:${HOME}/.cache/torch
+
+# WSL2의 dxg 드라이버는 공유 GPU 리소스마다 fd를 하나씩 쓴다. Docker 기본
+# 소프트 한도가 1024라서, 파이프라인을 캐시해 둔 채 두 번째 작업을 돌리면
+# fd가 바닥나 `CUDA driver error: unknown error`로 죽었다(dmesg에는
+# `dxgk: get_unused_fd_flags failed: ffffffe8` = -24 EMFILE로 찍힌다).
+# 호스트 하드 한도가 1048576이므로 소프트만 거기에 맞춘다.
+x-ulimits: &big_nofile
+  nofile:
+    soft: 1048576
+    hard: 1048576
 
 x-gpu: &gpu_reservation
   resources:
@@ -42,6 +57,7 @@ services:
       # 캐싱 할당자가 세그먼트를 넓혀 쓰게 해 단편화를 줄인다(services.sh와 동일).
       PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
     volumes: *model_mounts
+    ulimits: *big_nofile
     deploy: *gpu_reservation
 
   # ── scene 워커 (CPU, 사이드카로 전달만) ───────────────────────────────
@@ -65,6 +81,7 @@ services:
     environment:
       HOME: ${HOME}
     volumes: *model_mounts
+    ulimits: *big_nofile
     deploy: *gpu_reservation
 
   # ── Omni3D 사이드카 (GPU) ─────────────────────────────────────────────
@@ -79,4 +96,5 @@ services:
       # pytorch3d._C 로드에 이 env의 torch/lib이 필요하다(services.sh와 동일한 이유).
       LD_LIBRARY_PATH: ${HOME}/miniconda3/envs/omni3d/lib/python3.10/site-packages/torch/lib
     volumes: *model_mounts
+    ulimits: *big_nofile
     deploy: *gpu_reservation

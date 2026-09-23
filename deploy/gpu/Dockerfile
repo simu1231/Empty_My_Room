@@ -49,6 +49,13 @@ ARG APP_UID=1000
 RUN userdel -r ubuntu 2>/dev/null || true; \
     useradd -m -u ${APP_UID} -s /bin/bash ${APP_USER}
 
+# ~/.cache 를 이미지 안에 미리, 앱 사용자 소유로 만들어 둔다.
+# 안 만들면 docker가 .cache/huggingface 같은 마운트 지점의 없는 부모를
+# **root 소유로** 자동 생성하고, 그러면 uid 1000이 그 안에 새 캐시 디렉터리를
+# 못 만든다. 실제로 NVIDIA Warp가 ~/.cache/warp 생성에 실패해 첫 작업만
+# 죽는 현상이 있었다(두 번째부터는 우회 경로를 타서 성공 — 그래서 더 위험하다).
+RUN install -d -o ${APP_UID} -g ${APP_UID} /home/${APP_USER}/.cache
+
 COPY --chown=${APP_UID} worker.py /app/worker.py
 
 # 마운트된 소스 디렉터리에 .pyc를 흘리지 않는다.

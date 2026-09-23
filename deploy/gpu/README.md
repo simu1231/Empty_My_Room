@@ -68,8 +68,53 @@ uLayout과 Omni3D는 이미 HTTP 사이드카(server.py, :8002/:8003)라서
 ## 경로 규약
 
 컨테이너 안에서는 호스트와 같은 절대 경로를 쓴다. conda 환경에는 생성 당시의
-prefix가 스크립트와 설정에 박혀 있고, editable 설치(`sam3d_objects`,
-`detectron2`, `pytorch3d`)는 소스 디렉터리의 절대 경로를 가리킨다.
-경로를 맞춰주면 아무것도 고칠 필요가 없다.
+prefix가 스크립트와 설정에 박혀 있고, editable 설치는 소스 디렉터리의 절대
+경로를 가리킨다. 경로를 맞춰주면 아무것도 고칠 필요가 없다.
 
 운영에서는 conda-pack으로 prefix를 재배치한 뒤 `/opt/envs/...`로 옮긴다.
+
+### editable 설치를 빠짐없이 마운트하는 법
+
+환경만 마운트하면 되는 게 아니다. editable로 깔린 패키지는 site-packages에
+**코드가 없고** 바깥 소스 디렉터리를 가리키는 포인터만 있다. 그걸 안 붙이면
+`ModuleNotFoundError`가 난다. 짐작하지 말고 환경에 직접 물어본다.
+
+```bash
+for env in sam3d uLayout omni3d; do
+  echo "=== $env ==="
+  ~/miniconda3/envs/$env/bin/python - <<'EOF'
+import os, re, site, glob
+for sp in site.getsitepackages():
+    for f in glob.glob(os.path.join(sp, "*.pth")) + glob.glob(os.path.join(sp, "__editable__*")):
+        txt = open(f, encoding="utf-8", errors="ignore").read()
+        for p in sorted({m.group(1) for m in re.finditer(r"(/home/[^/]+/[^/'\"\s,)]+)", txt)}):
+            if "/miniconda3/" not in p:   # 환경 밖을 가리키는 것만이 마운트 대상
+                print(f"  {os.path.basename(f)} -> {p}")
+EOF
+done
+```
+
+실제 결과다.
+
+| 환경 | 가리키는 곳 |
+|---|---|
+| sam3d | `~/sam-3d-objects` |
+| uLayout | (없음) |
+| omni3d | `~/detectron2`, `~/pytorch3d_omni3d_build` |
+
+omni3d의 pytorch3d는 `~/pytorch3d`가 **아니라** `~/pytorch3d_omni3d_build`다.
+이름만 보고 마운트했으면 틀렸을 경로라, 이 조회를 꼭 거쳐야 한다.
+
+### ~/.cache 는 이미지 안에 미리 만들어 둔다
+
+`~/.cache/huggingface` 처럼 **하위** 경로만 마운트하면, docker가 없는 부모
+`~/.cache` 를 **root 소유로** 자동 생성한다. 그러면 uid 1000으로 도는 앱이
+그 안에 새 캐시 디렉터리를 만들지 못한다. 그래서 Dockerfile에서 먼저 만든다.
+
+```dockerfile
+RUN install -d -o ${APP_UID} -g ${APP_UID} /home/${APP_USER}/.cache
+```
+
+이 문제는 **첫 작업만 죽고 두 번째부터는 성공**하는 모습으로 나타나서
+특히 고약하다(NVIDIA Warp가 `~/.cache/warp` 생성에 실패한 뒤 우회 경로를
+탄다). 스케일투제로에서는 콜드스타트마다 첫 요청이 실패한다는 뜻이다.
