@@ -100,10 +100,29 @@ docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml up 
 ```
 
 전제: `nvidia-container-toolkit`. 미설치면 컨테이너가 GPU를 못 본다.
-WSL에서는 **관리자가 아닌** PowerShell에서:
 
-```powershell
-wsl -d Ubuntu -u root -- bash -lc "apt-get update && apt-get install -y nvidia-container-toolkit && nvidia-ctk runtime configure --runtime=docker && service docker restart"
+이 패키지는 **Ubuntu 기본 저장소에 없다.** NVIDIA 저장소를 먼저 등록해야
+`Unable to locate package`가 안 난다. WSL 안에서 root로:
+
+```bash
+# 관리자가 아닌 PowerShell에서:  wsl -d Ubuntu -u root
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+  | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+  > /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+apt-get update
+apt-get install -y nvidia-container-toolkit
+nvidia-ctk runtime configure --runtime=docker   # /etc/docker/daemon.json에 nvidia 런타임 등록
+service docker restart                          # 이걸 빼면 Docker가 런타임을 모른다
+```
+
+확인:
+
+```bash
+docker run --rm --gpus all ubuntu:24.04 nvidia-smi
 ```
 
 ## 1단계 실행법
