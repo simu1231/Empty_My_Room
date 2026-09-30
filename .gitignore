@@ -5,8 +5,19 @@ __pycache__/
 
 sam3d/backend/data/
 sam3d/frontend/.vercel/
-sam3d/frontend/.env.production
-sam3d/frontend/.env
+
+# 환경변수 파일 — 경로별로 하나씩 적으면 새 위치가 생길 때마다 빠진다.
+# (deploy/.env 가 실제로 빠져 있었다. aws/userdata.sh 가 인스턴스에서 이걸
+#  만들고, 로컬에서 git add -A 하면 그대로 올라갈 수 있는 상태였다.)
+# 이름만 보고 어느 깊이든 막는다. 예시 파일만 예외로 되살린다.
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# 자격증명
+.aws/
+*.pem
 
 # graphify 지식 그래프 생성물 (로컬 캐시)
 graphify-out/
