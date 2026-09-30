@@ -8,11 +8,34 @@ sam3d를 3번 돌리는 이유는 파이프라인 캐시(콜드/웜)를 보기 �
 리소스마다 fd가 하나씩 잡혀서, 여기가 늘어나기만 하면 오래 사는 워커가 언젠가
 `CUDA driver error`로 죽는다. 자세한 내용은 README의 "3단계에서 실제로 걸린 것".
 """
-import time, json, sys
+import os
+import sys
+import json
+import time
+import tempfile
+
 import requests
 
 API = "http://localhost:8000"
-IMG = "/tmp/test_sofa.png"
+IMG = os.path.join(tempfile.gettempdir(), "emr_test_input.png")
+
+
+def ensure_image():
+    """테스트 입력 이미지를 직접 만든다.
+
+    예전에는 /tmp에 손으로 만들어 둔 파일을 가리켰는데, /tmp는 주기적으로
+    비워지고 리포지터리에도 없어서 남의 머신에서는 그냥 깨졌다. 결정적으로
+    생성해두면 아무 준비 없이 실행된다.
+    """
+    if os.path.exists(IMG):
+        return
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", (64, 64), (200, 200, 205))      # 밝은 배경
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle([8, 26, 56, 52], radius=6, fill=(120, 85, 60))   # 몸통
+    d.rounded_rectangle([8, 16, 56, 34], radius=6, fill=(145, 105, 75))  # 등받이
+    im.save(IMG)
+    print(f"[준비] 테스트 이미지 생성: {IMG}")
 
 JOBS = [
     ("sam3d_mesh",  {"category": "소파"}),
@@ -56,6 +79,8 @@ def poll(job_id, timeout=300):
             return r, time.time() - t0
         time.sleep(1)
     return {"status": "TIMEOUT"}, time.time() - t0
+
+ensure_image()
 
 results = []
 for i, (jt, params) in enumerate(JOBS, 1):
