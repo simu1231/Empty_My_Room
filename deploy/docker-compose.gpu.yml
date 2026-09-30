@@ -50,6 +50,7 @@ services:
     build:
       context: ./worker
       dockerfile: ../gpu/Dockerfile
+    image: emr/gpu:${EMR_IMAGE_TAG:-dev}
     environment:
       MOCK: "0"
       HOME: ${HOME}
@@ -85,6 +86,7 @@ services:
     build:
       context: ./worker
       dockerfile: ../gpu/Dockerfile
+    image: emr/gpu:${EMR_IMAGE_TAG:-dev}
     working_dir: ${HOME}/uLayout
     command: ["${HOME}/miniconda3/envs/uLayout/bin/python", "-u", "server.py"]
     environment:
@@ -107,6 +109,7 @@ services:
     build:
       context: ./worker
       dockerfile: ../gpu/Dockerfile
+    image: emr/gpu:${EMR_IMAGE_TAG:-dev}
     working_dir: ${HOME}/omni3d
     command: ["${HOME}/miniconda3/envs/omni3d/bin/python", "-u", "server.py"]
     environment:

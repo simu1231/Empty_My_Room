@@ -16,8 +16,30 @@ sed -e "s|__REGION__|${AWS_REGION}|g" \
     -e "s|__Q_SAM3D__|${Q_SAM3D}|g" \
     -e "s|__Q_SCENE__|${Q_SCENE}|g" \
     -e "s|__IDLE_EXIT_SEC__|${IDLE_EXIT_SEC:-120}|g" \
+    -e "s|__REPO_DIR__|${EMR_REPO_DIR}|g" \
+    -e "s|__IMAGE_TAG__|${EMR_IMAGE_TAG}|g" \
+    -e "s|__WARM_DIRS__|${EMR_WARM_DIRS}|g" \
+    -e "s|__WARM_TIMEOUT__|${EMR_WARM_TIMEOUT}|g" \
     userdata.sh > /tmp/emr-userdata.rendered.sh
+
+# 치환이 빠지면 인스턴스가 "__IMAGE_TAG__" 라는 태그의 이미지를 찾다 죽는다.
+# 부팅 때 죽으면 회수는 되지만(요금은 안 새지만) 원인을 찾으러 인스턴스 로그를
+# 뒤져야 한다. 여기서 막는 편이 훨씬 싸다.
+if grep -n '__[A-Z_]*__' /tmp/emr-userdata.rendered.sh; then
+  echo "✗ 치환되지 않은 자리표시자가 남았습니다(위 줄) — config.sh 를 확인하세요."
+  exit 1
+fi
+bash -n /tmp/emr-userdata.rendered.sh || { echo "✗ 렌더된 유저데이터 문법 오류"; exit 1; }
+
 USERDATA_B64=$(base64 -w0 /tmp/emr-userdata.rendered.sh)
+# EC2 유저데이터 한도는 16KB(base64 인코딩 후 기준). 한글 주석은 글자당 3바이트라
+# 생각보다 빨리 찬다. 넘으면 시작 템플릿 생성이 실패하는 게 아니라 인스턴스가
+# 잘린 스크립트로 부팅한다.
+if [ "${#USERDATA_B64}" -gt 16384 ]; then
+  echo "✗ 유저데이터 ${#USERDATA_B64} 바이트 — 16384 한도 초과"
+  exit 1
+fi
+echo "  유저데이터 ${#USERDATA_B64}/16384 바이트, 태그 ${EMR_IMAGE_TAG}"
 
 cat > /tmp/emr-lt-data.json <<JSON
 {

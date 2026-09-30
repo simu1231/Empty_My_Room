@@ -24,6 +24,7 @@ services:
 
   api:
     build: ./api
+    image: emr/api:${EMR_IMAGE_TAG:-dev}
     ports: ["8000:8000"]
     environment: &aws_env
       AWS_ENDPOINT_URL: http://localstack:4566
@@ -43,6 +44,7 @@ services:
   # SAM3D 워커. 운영에서는 이것만 GPU 인스턴스로 뜨고 0대까지 줄어든다.
   worker-sam3d:
     build: ./worker
+    image: emr/worker:${EMR_IMAGE_TAG:-dev}
     environment:
       <<: *aws_env
       QUEUE_NAME: emr-sam3d
@@ -60,6 +62,7 @@ services:
   # uLayout + Omni3D 워커. 둘 다 2GB 미만이라 운영에서 한 인스턴스에 같이 올린다.
   worker-scene:
     build: ./worker
+    image: emr/worker:${EMR_IMAGE_TAG:-dev}
     environment:
       <<: *aws_env
       QUEUE_NAME: emr-scene
@@ -76,6 +79,7 @@ services:
   # 로컬에서는 DRY_RUN=1이라 판단만 로그로 찍고 아무것도 죽이지 않는다.
   reaper:
     build: ./worker
+    image: emr/worker:${EMR_IMAGE_TAG:-dev}
     command: ["python", "-u", "idle_reaper.py"]
     environment:
       <<: *aws_env
