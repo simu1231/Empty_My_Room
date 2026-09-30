@@ -58,6 +58,12 @@ RUN install -d -o ${APP_UID} -g ${APP_UID} /home/${APP_USER}/.cache
 
 COPY --chown=${APP_UID} worker.py /app/worker.py
 
+# 워커와 리퍼가 상태를 주고받는 디렉터리. 이미지 안에 미리 만들어야 한다.
+# 도커는 빈 named volume을 마운트할 때 **이미지 쪽 경로의 소유권/권한을 복사**하므로,
+# 여기서 안 만들면 볼륨이 root 소유로 생기고 uid 1000인 이 컨테이너가 못 쓴다.
+# 0777인 이유는 CPU 워커(root)와 GPU 워커(uid 1000)가 같은 볼륨을 공유하기 때문이다.
+RUN install -d -m 0777 /state
+
 # 마운트된 소스 디렉터리에 .pyc를 흘리지 않는다.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

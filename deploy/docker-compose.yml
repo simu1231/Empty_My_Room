@@ -48,7 +48,12 @@ services:
       QUEUE_NAME: emr-sam3d
       MOCK: "1"
       MOCK_SEC: "5"        # SAM3D 실제 50초를 5초로 축약해 테스트
-      IDLE_EXIT_SEC: "99999"  # 로컬에서는 종료하지 않게 크게 둔다
+      IDLE_EXIT_SEC: "0"   # 스스로 안 끝낸다 — 인스턴스 회수는 reaper가 판단한다
+      STATE_DIR: /state
+    volumes: ["emr-state:/state"]
+    # 스팟 회수 시 도커가 SIGTERM을 보낸 뒤 기다려주는 시간. 기본값 10초로는
+    # SAM3D 작업(30~50초)을 마칠 수 없어 그냥 SIGKILL 당한다.
+    stop_grace_period: 90s
     depends_on:
       localstack: {condition: service_healthy}
 
@@ -60,6 +65,30 @@ services:
       QUEUE_NAME: emr-scene
       MOCK: "1"
       MOCK_SEC: "2"
-      IDLE_EXIT_SEC: "99999"
+      IDLE_EXIT_SEC: "0"
+      STATE_DIR: /state
+    volumes: ["emr-state:/state"]
+    stop_grace_period: 30s
     depends_on:
       localstack: {condition: service_healthy}
+
+  # 유휴 리퍼. 인스턴스당 하나만 뜬다(워커가 몇이든).
+  # 로컬에서는 DRY_RUN=1이라 판단만 로그로 찍고 아무것도 죽이지 않는다.
+  reaper:
+    build: ./worker
+    command: ["python", "-u", "idle_reaper.py"]
+    environment:
+      <<: *aws_env
+      STATE_DIR: /state
+      EXPECT_WORKERS: emr-sam3d,emr-scene
+      WATCH_QUEUES: emr-sam3d,emr-scene
+      IDLE_EXIT_SEC: "120"
+      DRY_RUN: "1"
+    volumes: ["emr-state:/state"]
+    depends_on:
+      localstack: {condition: service_healthy}
+
+volumes:
+  # 워커들과 리퍼가 상태 파일을 주고받는 곳. 컨테이너가 재시작해도 내용이 남아야
+  # 리퍼가 "방금 죽었다 살아난 워커"를 미기동과 구분할 수 있다.
+  emr-state:

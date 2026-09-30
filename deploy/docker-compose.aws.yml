@@ -1,0 +1,67 @@
+# 4단계: AWS GPU 인스턴스에서 도는 오버라이드.
+#
+#   docker compose -f deploy/docker-compose.yml \
+#                  -f deploy/docker-compose.gpu.yml \
+#                  -f deploy/docker-compose.aws.yml up -d
+#
+# 로컬과 달라지는 건 딱 네 가지다. 나머지는 전부 같은 파일을 쓴다 —
+# "로컬에선 됐는데 배포에서 안 되는" 경우를 줄이려면 차이를 최대한 줄여야 한다.
+#
+#   1. LocalStack이 없다 → AWS_ENDPOINT_URL을 비워 실제 AWS를 보게 한다.
+#   2. API 서버는 여기 없다 → 별도 t4g.small에서 돈다.
+#   3. 리퍼가 진짜로 인스턴스를 회수한다(DRY_RUN=0).
+#   4. 자격증명은 IAM 역할에서 온다 → 더미 키를 지운다.
+
+services:
+  # LocalStack은 이미지 자체를 띄우지 않는다. scale: 0 으로 비활성화한다.
+  localstack:
+    scale: 0
+  api:
+    scale: 0
+
+  worker-sam3d:
+    environment: &aws_real
+      # 빈 문자열이면 boto3가 실제 AWS 엔드포인트를 쓴다(worker.py가 `or None` 처리).
+      AWS_ENDPOINT_URL: ""
+      AWS_PUBLIC_ENDPOINT_URL: ""
+      AWS_ACCESS_KEY_ID: ""      # IAM 역할에서 받는다 — 키를 넣으면 오히려 역할을 가린다
+      AWS_SECRET_ACCESS_KEY: ""
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      QUEUE_NAME: ${Q_SAM3D:-emr-sam3d}
+      MOCK: "0"
+      IDLE_EXIT_SEC: "0"          # 스스로 안 끝낸다 — 리퍼가 인스턴스째 회수한다
+    # localstack 의존만 끊고 사이드카 의존은 반드시 남긴다. 여기서 통째로 비우면
+    # ①(세 컨테이너 한 대)의 전제인 "scene이 VRAM을 먼저 확보한다"가 깨진다.
+    # depends_on은 맵이라 병합되므로, 기본 파일의 localstack 항목을 !reset으로
+    # 지우고 사이드카 둘을 다시 적는다.
+    depends_on:
+      localstack: !reset null
+      ulayout: {condition: service_healthy}
+      omni3d:  {condition: service_healthy}
+
+  worker-scene:
+    environment:
+      <<: *aws_real
+      QUEUE_NAME: ${Q_SCENE:-emr-scene}
+    depends_on:
+      localstack: !reset null
+      ulayout: {condition: service_healthy}
+      omni3d:  {condition: service_healthy}
+
+  reaper:
+    environment:
+      <<: *aws_real
+      QUEUE_NAME: ""
+      STATE_DIR: /state
+      EXPECT_WORKERS: ${Q_SAM3D:-emr-sam3d},${Q_SCENE:-emr-scene}
+      WATCH_QUEUES: ${Q_SAM3D:-emr-sam3d},${Q_SCENE:-emr-scene}
+      # 비용 모델 결과: 20세션/일 기준 유휴 900초면 월 $148, 120초면 $65다.
+      # 부팅 3분을 어차피 감수하는 구성이므로 유휴를 길게 둘 이유가 없다.
+      IDLE_EXIT_SEC: ${IDLE_EXIT_SEC:-120}
+      DRY_RUN: "0"
+    depends_on: !reset []
+    # 리퍼는 인스턴스 메타데이터(169.254.169.254)를 읽어야 자기 instance-id와
+    # 스팟 회수 통지를 안다. 브리지 네트워크에서도 닿긴 하지만, IMDS 기본 홉 한도가
+    # 1이라 컨테이너에서는 막힌다. 시작 템플릿에서 홉 한도를 2로 올려두었다
+    # (20-launch-template.sh의 MetadataOptions 참고).
+    restart: unless-stopped

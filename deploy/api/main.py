@@ -20,6 +20,8 @@ import uuid
 import boto3
 from botocore.config import Config
 from fastapi import FastAPI, HTTPException, Request
+
+import capacity
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -146,6 +148,11 @@ async def create_job(request: Request):
     })
 
     sqs.send_message(QueueUrl=queue_url(job_type), MessageBody=json.dumps(job_msg))
+
+    # GPU 워커가 0대일 수 있다. 큐에 넣는 것만으로는 아무도 안 깨어난다 —
+    # CloudWatch는 잠든 큐가 깨어날 때 최대 15분 늦으므로 여기서 직접 깨운다.
+    # (자세한 이유는 capacity.py 주석)
+    capacity.request_capacity()
 
     return {"job_id": job_id, "status": "queued"}
 

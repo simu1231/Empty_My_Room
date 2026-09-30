@@ -40,8 +40,15 @@ OMNI3D_URL  = os.getenv("OMNI3D_URL",  "http://localhost:8003")
 SIDECAR_TIMEOUT = int(os.getenv("SIDECAR_TIMEOUT", "120"))
 
 # 유휴 종료: 이 시간 동안 작업이 없으면 프로세스를 끝낸다.
-# 스케일투제로의 실제 구현부다. 4단계에서 ASG가 이 종료를 감지해 인스턴스를 회수한다.
+# 0 이하면 스스로 끝내지 않는다 — ①(세 컨테이너 한 대) 구성의 기본값이다.
+# 그 구성에서는 한 인스턴스에 워커가 둘이라, 한쪽이 마음대로 프로세스를 끝내면
+# 재시작 루프만 돌 뿐 인스턴스는 안 내려간다. 종료 판단은 리퍼가 모아서 한다.
 IDLE_EXIT_SEC = int(os.getenv("IDLE_EXIT_SEC", "900"))  # 15분
+
+# 인스턴스 단위 스케일투제로용 상태 공유 디렉터리(리퍼와 함께 마운트한다).
+# 비어 있으면 상태를 안 쓴다 — 리퍼 없이 단독으로 돌릴 때의 기본값.
+STATE_DIR  = os.getenv("STATE_DIR", "")
+DRAIN_FILE = os.path.join(STATE_DIR, "DRAIN") if STATE_DIR else ""
 
 _cfg = Config(region_name=REGION, retries={"max_attempts": 3, "mode": "standard"})
 s3  = boto3.client("s3",         endpoint_url=ENDPOINT, config=_cfg)
@@ -63,6 +70,43 @@ def _on_signal(signum, _frame):
 
 signal.signal(signal.SIGTERM, _on_signal)
 signal.signal(signal.SIGINT, _on_signal)
+
+
+def publish_state(busy: bool):
+    """
+    내 상태를 파일 하나로 알린다. 리퍼(idle_reaper.py)가 이걸 읽어서
+    "이 인스턴스의 워커가 전부 놀고 있는가"를 판단한다.
+
+    왜 파일인가? 같은 인스턴스 안이라 네트워크를 쓸 이유가 없고, 컨테이너가
+    죽어도 마지막 상태와 mtime이 남아서 리퍼가 "응답이 끊겼다"를 구분할 수 있다.
+    임시 파일에 쓰고 rename 으로 갈아끼운다 — 그래야 리퍼가 반쯤 쓰인 JSON을
+    읽고 죽는 일이 없다(rename은 같은 파일시스템에서 원자적이다).
+    """
+    if not STATE_DIR:
+        return
+    path = os.path.join(STATE_DIR, f"{QUEUE_NAME}.state")
+    body = json.dumps({"queue": QUEUE_NAME, "busy": bool(busy),
+                       "updated_at": int(time.time()), "pid": os.getpid()})
+    try:
+        os.makedirs(STATE_DIR, exist_ok=True)
+        tmp = f"{path}.{os.getpid()}.tmp"
+        with open(tmp, "w") as f:
+            f.write(body)
+        os.replace(tmp, path)
+    except Exception as e:
+        print(f"[worker] 상태 파일 기록 실패(무시): {e}")
+
+
+def draining() -> bool:
+    """
+    리퍼가 DRAIN 파일을 만들면 새 작업을 그만 받는다.
+
+    스팟 회수 통지(2분 전)를 받았을 때 쓴다. 도커가 SIGTERM을 보내는 건 실제
+    종료 직전이라, 그때까지 새 SAM3D 작업(30초)을 계속 집어가면 중간에 잘린다.
+    잘린 작업이 사라지진 않지만(가시성 타임아웃이 지나면 큐로 돌아온다) 그만큼
+    GPU 시간을 버리는 셈이라, 미리 받기를 멈추는 편이 싸다.
+    """
+    return bool(DRAIN_FILE) and os.path.exists(DRAIN_FILE)
 
 
 def set_status(job_id: str, status: str, **extra):
@@ -252,6 +296,7 @@ def process(queue_url: str, msg: dict):
     stop_hb = threading.Event()
     hb = threading.Thread(target=heartbeat, args=(queue_url, receipt, stop_hb), daemon=True)
     hb.start()
+    publish_state(busy=True)
 
     try:
         set_status(job_id, "running")
@@ -287,6 +332,7 @@ def process(queue_url: str, msg: dict):
         print(f"[worker] 실패 job_id={job_id}: {e}")
     finally:
         stop_hb.set()
+        publish_state(busy=False)
 
 
 def resolve_queue_url(retries: int = 30, delay: float = 2.0) -> str:
@@ -310,10 +356,16 @@ def resolve_queue_url(retries: int = 30, delay: float = 2.0) -> str:
 
 def main():
     queue_url = resolve_queue_url()
-    print(f"[worker] 시작 queue={QUEUE_NAME} mock={MOCK} 유휴종료={IDLE_EXIT_SEC}초")
+    idle_desc = f"{IDLE_EXIT_SEC}초" if IDLE_EXIT_SEC > 0 else "안 함(리퍼가 판단)"
+    print(f"[worker] 시작 queue={QUEUE_NAME} mock={MOCK} 자가유휴종료={idle_desc}")
     last_work = time.time()
+    publish_state(busy=False)   # 리퍼에게 "나 떴고 지금은 논다"를 먼저 알린다
 
     while not _shutdown.is_set():
+        if draining():
+            print("[worker] DRAIN 감지 — 새 작업을 받지 않고 종료합니다")
+            break
+
         # 롱폴링(WaitTimeSeconds=20): 메시지가 없으면 최대 20초 기다렸다 응답한다.
         # 짧은 폴링으로 계속 두드리면 SQS 요청 수가 수백 배로 늘어 요금이 붙는다.
         resp = sqs.receive_message(
@@ -323,7 +375,10 @@ def main():
         )
         msgs = resp.get("Messages", [])
         if not msgs:
-            if time.time() - last_work > IDLE_EXIT_SEC:
+            # 놀고 있어도 주기적으로 상태를 갱신한다. 리퍼는 파일 mtime이 오래되면
+            # "워커가 멎었다"고 보고 종료를 보류하므로, 갱신을 멈추면 안 내려간다.
+            publish_state(busy=False)
+            if IDLE_EXIT_SEC > 0 and time.time() - last_work > IDLE_EXIT_SEC:
                 print(f"[worker] {IDLE_EXIT_SEC}초 동안 작업 없음 — 종료(스케일투제로)")
                 break
             continue
