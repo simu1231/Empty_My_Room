@@ -9,25 +9,36 @@
   50초짜리 작업 하나를 위해 부팅 + 작업 + IDLE_EXIT_SEC 만큼 인스턴스를 켜 둔다.
   IDLE_EXIT_SEC를 줄이면 요금이 바로 줄지만, 대신 콜드스타트를 더 자주 낸다.
 
-가격 출처: DoiT Compute, ap-northeast-2(서울), 2026-09 조회. 스팟가는 변동하므로
-배포 직전에 describe-spot-price-history로 반드시 다시 확인할 것.
+가격 출처: 온디맨드는 AWS 공식 가격표, 스팟은 describe-spot-price-history
+실측(ap-northeast-2, 2026-09-30). 스팟가는 계속 변동하므로 비용이 예상과
+어긋나면 여기부터 다시 확인할 것.
 """
 from dataclasses import dataclass
 
 # ── 가격 (ap-northeast-2, USD/hr) ────────────────────────────────────
 # 온디맨드는 AWS 공식 가격표(pricing.us-east-1.amazonaws.com, ap-northeast-2,
-# 2026-09-30 조회)에서 그대로 가져온 값이다. 스팟은 공개 가격표에 없어서
-# describe-spot-price-history 없이는 확정할 수 없다 — g5/g4dn은 DoiT 실측값을
-# 쓰고, g6/g6e는 g5의 스팟 할인율(45.9%)을 적용한 **추정치**다(아래 SPOT_EST).
+# 2026-09-30 조회)에서 그대로 가져온 값이다.
+#
+# 스팟은 2026-09-30 describe-spot-price-history 실측값으로 교체했다(그 전에는
+# g5의 할인율 45.9%를 g6/g6e에 적용한 추정치였다). 값은 서울 3개 AZ 중
+# **최저가 AZ** 기준 — price-capacity-optimized가 싼 풀을 먼저 고르므로.
+#
+# 추정이 어디서 맞고 어디서 틀렸는지가 중요하다:
+#   g6.xlarge   추정 0.4543 → 실측 0.4535  (-0.2%)  할인율 외삽이 통했다
+#   g6e.xlarge  추정 1.0502 → 실측 1.2399 (+18.1%)  L40S는 할인율이 더 낮다
+#   g4dn.xlarge 추정 0.2740 → 실측 0.3204 (+16.9%)  제시 범위의 최상단이었다
+# 즉 우리가 고른 ①(g6.xlarge)만 정확했고, 비교 대상인 ②(g4dn)·③(g6e)은
+# 둘 다 실제로 더 비쌌다 — ① 선택은 약화되지 않고 강화된다.
 PRICES = {
     #                 온디맨드   스팟      VRAM(MiB)  비고
-    "g5.xlarge":   (1.2370, 0.5674, 23028),  # A10G — 24GB가 아니라 23028 MiB다
-    "g6.xlarge":   (0.9896, 0.4543, 23034),  # L4  — 같은 24GB급인데 g5보다 20% 싸다
-    "g6e.xlarge":  (2.2880, 1.0502, 46068),  # L40S 48GB — 세 컨테이너가 다 들어간다
-    "g4dn.xlarge": (0.6470, 0.2740, 15360),  # T4  — 스팟은 0.22~0.33 범위의 중앙값
+    "g5.xlarge":   (1.2370, 0.5669, 23028),  # A10G — 24GB가 아니라 23028 MiB다
+    "g6.xlarge":   (0.9896, 0.4535, 23034),  # L4  — 같은 24GB급인데 g5보다 20% 싸다
+    "g6e.xlarge":  (2.2880, 1.2399, 46068),  # L40S 48GB — 세 컨테이너가 다 들어간다
+    "g4dn.xlarge": (0.6470, 0.3204, 15360),  # T4  — 15GB라 ①에는 못 쓴다
 }
-# 스팟 가격을 실측하지 않은 인스턴스(추정치를 쓴 것) — 보고서에 표시하려고 둔다
-SPOT_EST = {"g6.xlarge", "g6e.xlarge"}
+# 스팟 가격을 실측하지 않은 인스턴스(추정치를 쓴 것) — 보고서에 표시하려고 둔다.
+# 2026-09-30에 네 타입 전부 실측해서 비었다.
+SPOT_EST = set()
 
 SPOT_FALLBACK_RATE = 0.10   # 스팟 용량을 못 잡아 온디맨드로 떨어지는 비율(중단율 5~10%)
 
@@ -76,7 +87,7 @@ def hourly(instance, spot=True):
     return rate + EBS_HOURLY
 
 
-def option1(w: Workload, spot=True, inst="g5.xlarge"):
+def option1(w: Workload, spot=True, inst="g6.xlarge"):
     """① 한 인스턴스에 셋 다.
 
     A10G 용량으로 좁힌 카드에서 8회 반복 부하로 실제 통과를 확인했다
@@ -128,7 +139,7 @@ def report(sessions_list=(5, 20, 50, 200), spot=True, idle=None):
             kw.update(idle_sam3d=idle, idle_scene=idle)
         w = Workload(**kw)
         vals = {
-            "①g5":  sum(option1(w, spot)[0].values()) + base,
+            "①g5":  sum(option1(w, spot, "g5.xlarge")[0].values()) + base,
             "①g6":  sum(option1(w, spot, "g6.xlarge")[0].values()) + base,
             "②":    sum(option2(w, spot)[0].values()) + base,
             "③g6e": sum(option3(w, spot)[0].values()) + base,
@@ -165,15 +176,15 @@ def boot_sensitivity(sessions=20, spot=True, inst="g6.xlarge", idle=120):
 def idle_sensitivity(sessions=20, spot=True):
     """유휴 타임아웃이 비용을 얼마나 지배하는지 — 이 표가 이 문서의 핵심이다."""
     base = sum(ALWAYS_ON.values())
-    print(f"\n유휴 타임아웃 민감도 (세션 {sessions}/일, 구성 ①)")
+    print(f"\n유휴 타임아웃 민감도 (세션 {sessions}/일, 구성 ① g6.xlarge)")
     print(f"{'IDLE_EXIT':>10} {'월 비용':>10} {'유휴가 차지하는 비중':>22}")
     print("-"*46)
     for idle in (60, 120, 300, 600, 900, 1800):
         w = Workload(sessions_per_day=sessions, idle_sam3d=idle, idle_scene=idle)
-        c, h = option1(w, spot)
+        c, h = option1(w, spot, "g6.xlarge")
         total = sum(c.values())
         work_only = Workload(sessions_per_day=sessions, idle_sam3d=0, idle_scene=0)
-        cw, _ = option1(work_only, spot)
+        cw, _ = option1(work_only, spot, "g6.xlarge")
         share = (total - sum(cw.values())) / total * 100 if total else 0
         print(f"{idle:>8}초 {total+base:>9.0f}$ {share:>21.0f}%")
 
