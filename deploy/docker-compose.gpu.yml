@@ -58,6 +58,13 @@ services:
       PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
     volumes: *model_mounts
     ulimits: *big_nofile
+    # PyTorch 캐시는 프로세스 간에 공유되지 않는다. 이 워커가 먼저 작업을 받아
+    # 캐시를 22GB로 불려버리면, 뒤늦게 뜨는 scene 모델(약 1.9GB)은 들어갈 자리가
+    # 없어 죽는다. 세 컨테이너를 한 GPU에 올리는 구성에서는 scene이 자기 몫을
+    # 먼저 확보한 뒤에 이 워커가 확장해야 한다. 그 순서를 여기서 강제한다.
+    depends_on:
+      ulayout:  {condition: service_healthy}
+      omni3d:   {condition: service_healthy}
     deploy: *gpu_reservation
 
   # ── scene 워커 (CPU, 사이드카로 전달만) ───────────────────────────────
@@ -67,9 +74,11 @@ services:
       MOCK: "0"
       ULAYOUT_URL: http://ulayout:8002
       OMNI3D_URL: http://omni3d:8003
+    # service_started는 컨테이너 프로세스가 떴다는 뜻일 뿐 모델 로드가 끝났다는
+    # 보장이 아니다. 모델이 없으면 첫 요청이 그냥 실패한다.
     depends_on:
-      ulayout:  {condition: service_started}
-      omni3d:   {condition: service_started}
+      ulayout:  {condition: service_healthy}
+      omni3d:   {condition: service_healthy}
 
   # ── uLayout 사이드카 (GPU) ────────────────────────────────────────────
   ulayout:
@@ -80,6 +89,15 @@ services:
     command: ["${HOME}/miniconda3/envs/uLayout/bin/python", "-u", "server.py"]
     environment:
       HOME: ${HOME}
+    # /health는 모델이 안 올라가도 status:ok 를 반환한다. 그래서 status가 아니라
+    # ulayout_loaded 플래그를 봐야 한다. 이미지에 curl이 없어 python으로 짠다.
+    healthcheck:
+      test: ["CMD", "${HOME}/miniconda3/envs/uLayout/bin/python", "-c",
+             "import urllib.request,json,sys; d=json.load(urllib.request.urlopen('http://localhost:8002/health',timeout=5)); sys.exit(0 if d.get('ulayout_loaded') else 1)"]
+      interval: 10s
+      timeout: 10s
+      retries: 40        # 모델 로드가 느려도 기다린다 (start_period 뒤 40회 x 10초)
+      start_period: 120s
     volumes: *model_mounts
     ulimits: *big_nofile
     deploy: *gpu_reservation
@@ -95,6 +113,15 @@ services:
       HOME: ${HOME}
       # pytorch3d._C 로드에 이 env의 torch/lib이 필요하다(services.sh와 동일한 이유).
       LD_LIBRARY_PATH: ${HOME}/miniconda3/envs/omni3d/lib/python3.10/site-packages/torch/lib
+    # /health는 모델이 안 올라가도 status:ok 를 반환한다. 그래서 status가 아니라
+    # omni3d_loaded 플래그를 봐야 한다. 이미지에 curl이 없어 python으로 짠다.
+    healthcheck:
+      test: ["CMD", "${HOME}/miniconda3/envs/omni3d/bin/python", "-c",
+             "import urllib.request,json,sys; d=json.load(urllib.request.urlopen('http://localhost:8003/health',timeout=5)); sys.exit(0 if d.get('omni3d_loaded') else 1)"]
+      interval: 10s
+      timeout: 10s
+      retries: 40        # 모델 로드가 느려도 기다린다 (start_period 뒤 40회 x 10초)
+      start_period: 120s
     volumes: *model_mounts
     ulimits: *big_nofile
     deploy: *gpu_reservation
