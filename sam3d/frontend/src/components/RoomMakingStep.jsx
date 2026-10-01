@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
-import { API, b64ToFile } from '../utils/api'
+import { API } from '../utils/api'
 import { callModel, progressText } from '../utils/jobs'
 import toast from 'react-hot-toast'
 
 export default function RoomMakingStep() {
   const {
-    emptyRoomUrl, emptyRoomFile, maskB64,
-    setStep, setRoomSize, setRoomMesh, setRoomColors, setRoomSurfaceTextures, setRoomBoxTextures,
+    emptyRoomUrl, emptyRoomFile,
+    setStep, setRoomSize, setRoomMesh, setRoomColors, setRoomBoxTextures,
     setRoomCameraPose, setRoomCameraPoseMode, setLoading, reset
   } = useStore()
 
@@ -25,8 +25,6 @@ export default function RoomMakingStep() {
     try {
       const colorForm = new FormData()
       colorForm.append('image', emptyRoomFile)
-      // 가구/창문/커튼을 지울 때 쓴 SAM2 마스크 — 있으면 패치 후보 선정 시 제외 영역으로 재사용
-      if (maskB64) colorForm.append('mask', b64ToFile(maskB64, 'mask.png', 'image/png'))
       const layoutForm = new FormData()
       layoutForm.append('image', emptyRoomFile)
       const rectifyForm = new FormData()
@@ -51,8 +49,6 @@ export default function RoomMakingStep() {
         floorColor: data.floor_color,
         wallTex:    data.wall_texture,
         floorTex:   data.floor_texture,
-        wallPatch:  data.wall_patch,   // 타일링용 균일 패치 (RANSAC 실패 시 기본 폴백)
-        floorPatch: data.floor_patch,
       })
 
       // 레이아웃(방 치수) 자동 추정 — 실패해도 색상 분석 결과는 그대로 사용, 수동 입력값 유지
@@ -82,8 +78,8 @@ export default function RoomMakingStep() {
           setPreview(p => ({ ...p, boxTextures: rectifyData.textures, cameraPose: rectifyData.camera_pose, cameraPoseMode: rectifyData.camera_pose_mode }))
         } else if (rectifyData.camera_pose) {
           // 정밀 텍스처 rectify(코너 검출/solvePnP)는 실패했지만, 근사 pose(camera_pose_mode:
-          // "approx" — roll/pitch만 사용, 코너 불필요)는 왔음. 텍스처는 패치 타일 폴백을 쓰되,
-          // 가구 실제 크기 추정에는 이 근사 pose를 계속 재사용.
+          // "approx" — roll/pitch만 사용, 코너 불필요)는 왔음. 텍스처는 단색/절차적 패턴으로
+          // 폴백하되, 가구 실제 크기 추정에는 이 근사 pose를 계속 재사용.
           setPreview(p => ({ ...p, cameraPose: rectifyData.camera_pose, cameraPoseMode: rectifyData.camera_pose_mode }))
         }
       }
@@ -99,7 +95,6 @@ export default function RoomMakingStep() {
     if (!preview) { toast.error('먼저 방을 분석해주세요'); return }
     setRoomSize({ width: parseFloat(width), depth: parseFloat(depth), height: parseFloat(height) })
     setRoomColors({ wall: preview.wallColor, floor: preview.floorColor })
-    setRoomSurfaceTextures({ wall: preview.wallPatch, floor: preview.floorPatch })
     setRoomBoxTextures(preview.boxTextures || null)
     setRoomCameraPose(preview.cameraPose || null)   // 가구 실제 크기 추정용 (uLayout solvePnP)
     setRoomCameraPoseMode(preview.cameraPoseMode || null)   // 'precise' | 'approx' — 실험 시 어느 pose로 계산됐는지 구분용

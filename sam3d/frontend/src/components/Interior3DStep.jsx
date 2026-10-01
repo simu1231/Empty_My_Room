@@ -110,7 +110,7 @@ function MiniMeshViewer({ data }) {
   return <div ref={mountRef} style={{ width: '100%', height: '120px', borderRadius: '6px', overflow: 'hidden' }} />
 }
  
-function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, roomBoxTextures, roomMesh, placedMeshes, onDrop, onDelete, onCopy, viewMode }) {
+function RoomViewer({ roomSize, roomColors, roomTextures, roomBoxTextures, roomMesh, placedMeshes, onDrop, onDelete, onCopy, viewMode }) {
   const createDynamicTexture = (baseColor, type = 'plank') => {
     const canvas = document.createElement('canvas')
     canvas.width = 512
@@ -352,25 +352,12 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       const rectLeft  = roomBoxTextures && makeRectifiedMat(roomBoxTextures.left_wall)
       const rectFloor = roomBoxTextures && makeRectifiedMat(roomBoxTextures.floor)
 
-      // 원본 사진에서 오려낸 "무늬 균일한" 패치를 타일링하는 폴백 (RANSAC 코너 검출 실패 시에도
-      // 단색 대신 사진 질감이 살아있도록 함). rectify 실사 텍스처가 있으면 그게 우선.
-      const makeTiledPatchMat = (b64, repeatX, repeatY, side = THREE.FrontSide) => {
-        if (!b64) return null
-        const tex = applyFiltering(loader.load(`data:image/jpeg;base64,${b64}`))
-        tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-        tex.repeat.set(repeatX, repeatY)
-        return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0, side })
-      }
-      const tileWall  = roomSurfaceTextures?.wall  && makeTiledPatchMat(roomSurfaceTextures.wall, 4, 3)
-      const tileBack  = roomSurfaceTextures?.wall  && makeTiledPatchMat(roomSurfaceTextures.wall, 4, 3, THREE.DoubleSide)
-      const tileFloor = roomSurfaceTextures?.floor && makeTiledPatchMat(roomSurfaceTextures.floor, 5, 5)
-
-      // 벽: 1순위 rectify 실사, 2순위 사진 패치 타일링, 3순위(둘 다 없으면) 추출 색상 단색
-      const wallMat = rectLeft || tileWall || new THREE.MeshStandardMaterial({
+      // 벽: 1순위 rectify 실사, 2순위(없으면) 추출 색상 단색
+      const wallMat = rectLeft || new THREE.MeshStandardMaterial({
         color: new THREE.Color(...wc), roughness: 0.92, metalness: 0, side: THREE.FrontSide
       })
-      // 바닥: 1순위 rectify 실사, 2순위 사진 패치 타일링, 3순위 절차적 나무 패턴
-      const floorMat = rectFloor || tileFloor || new THREE.MeshStandardMaterial({
+      // 바닥: 1순위 rectify 실사, 2순위 절차적 나무 패턴
+      const floorMat = rectFloor || new THREE.MeshStandardMaterial({
         map: createDynamicTexture(fColor, 'plank'), roughness: 0.75, metalness: 0
       })
       // 걸레받이: 벽보다 약간 어두운 단색
@@ -383,7 +370,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomSurfaceTextures, r
       scene.add(floor); floorRef.current = floor
 
       // 뒷벽
-      const backWallMat = rectBack || tileBack || new THREE.MeshStandardMaterial({ color: new THREE.Color(...wc), roughness: 0.92, metalness: 0, side: THREE.DoubleSide })
+      const backWallMat = rectBack || new THREE.MeshStandardMaterial({ color: new THREE.Color(...wc), roughness: 0.92, metalness: 0, side: THREE.DoubleSide })
       const backWall = new THREE.Mesh(new THREE.BoxGeometry(w, h, WT), backWallMat)
       backWall.position.set(0, 0, -d / 2 - WT / 2); backWall.name = 'wall_back'
       scene.add(backWall); backWallRef.current = backWall
@@ -1255,7 +1242,7 @@ async function dbDeleteDesign(id) {
 }
  
 export default function Interior3DStep() {
-  const { furnitureList, roomSize, roomColors, roomTextures, roomSurfaceTextures, roomBoxTextures, roomCameraPose, roomCameraPoseMode, roomMesh, reset, originalFile,
+  const { furnitureList, roomSize, roomColors, roomTextures, roomBoxTextures, roomCameraPose, roomCameraPoseMode, roomMesh, reset, originalFile,
           savedDesignToLoad, clearSavedDesignToLoad, setSavedDesignToLoad, setStep } = useStore()
   const roomColorsMemo = useMemo(() => ({
     wall: roomColors?.wall || [0.9, 0.9, 0.9],
@@ -1481,7 +1468,6 @@ export default function Interior3DStep() {
           roomSize={roomSize}
           roomColors={roomColorsMemo}
           roomTextures={roomTextures}
-          roomSurfaceTextures={roomSurfaceTextures}
           roomBoxTextures={roomBoxTextures}
           roomMesh={roomMesh}
           placedMeshes={placedMeshes}
