@@ -106,6 +106,15 @@ echo "  ⚠ 버킷에 '7일 후 삭제' 수명주기가 걸려 있습니다(모�
 echo "    올린 뒤 7일 안에 AMI를 구우세요. 지나면 이 스크립트를 다시 돌리면 됩니다."
 echo
 
+# `pack-envs.sh check` 로 전제만 보고 끝낸다. 51GB 업로드는 몇 시간짜리라,
+# 두 시간 올린 뒤에 "체크포인트 링크가 끊겨 있습니다"를 보는 건 너무 비싸다.
+# 위 사전 점검이 여기까지 왔다면 올릴 것은 전부 제자리에 있다는 뜻이다.
+if [ "${1:-}" = "check" ]; then
+  echo "✔ 전제 검사 통과 — 올릴 준비가 됐습니다."
+  echo "  실제 업로드: bash $0"
+  exit 0
+fi
+
 # ── 유틸 ─────────────────────────────────────────────────────────────────
 # 이미 올라가 있고 크기가 같으면 건너뛴다. 51GB 업로드가 한 번에 끝나는 일은
 # 드물어서(회선이 끊기거나 노트북이 잠든다) 재실행이 싸야 한다.
@@ -124,6 +133,11 @@ put() {       # put <로컬파일> <s3키>
 # 만드는 데 몇 분씩 걸리는 조각은 만들기 전에 S3를 먼저 본다.
 uploaded() { aws s3api head-object --bucket "$S3_BUCKET" --key "$PREFIX/$1" >/dev/null 2>&1; }
 
+# conda-pack 의 진행바는 터미널이 아니면 \r 대신 줄을 계속 덧붙여서, 로그로
+# 리다이렉트하면 수천 줄이 쌓이고 정작 봐야 할 메시지가 묻힌다. 로그로 돌릴
+# 때만(= stdout이 터미널이 아닐 때) 조용히 시킨다.
+CP_QUIET=""; [ -t 1 ] || CP_QUIET="--quiet"
+
 # ── 1. conda 환경 ────────────────────────────────────────────────────────
 # --dest-prefix: 환경 안에 **절대경로가 구워져 있다**(shebang, conda-meta, .pth).
 #   복원 경로로 미리 바꿔서 포장한다. 안 주면 EC2에서 /home/<나>/... 를 찾다 죽는다.
@@ -134,9 +148,19 @@ for e in $ENVS; do
   key="envs/$e.tar.gz"
   if uploaded "$key"; then echo "▶ 환경 $e — 이미 올라가 있음, 건너뜀"; continue; fi
   echo "▶ 환경 $e 포장 (몇 분 걸립니다)"
+  # --ignore-missing-files 가 없으면 sam3d 에서 conda-pack 이 거부한다.
+  # conda-meta 는 setuptools 82.0.1 을 기록해 뒀는데 pip 가 그 위에 81.0.0 을
+  # 덮어써서, conda 가 "있어야 한다"고 아는 파일 89개가 실제로는 없다.
+  # 세어 보니 82개는 .pyc(파이썬이 다시 만든다), 7개는 egg-info 메타데이터와
+  # Windows 런처 manifest 다. **기능 파일은 세 환경 통틀어 0개**라서 무시해도 된다.
+  #
+  # 환경을 "고쳐서" 통과시키면 안 된다. conda 기록과 실제가 어긋났다는 건 이
+  # 환경을 conda 로 재현할 수 없다는 뜻이고, 그래서 애초에 통째로 옮기는 중이다.
+  # setuptools 를 다시 깔면 그 위에 얹힌 pip 패키지들이 어떻게 될지 알 수 없다.
+  # 이 플래그는 검사만 건너뛸 뿐, 포장되는 건 디스크에 **실제로 있는 것**이다.
   "$CONDA_PACK" -p "$SRC_ROOT/miniconda3/envs/$e" \
     --dest-prefix "$EMR_ROOT/miniconda3/envs/$e" \
-    --ignore-editable-packages \
+    --ignore-editable-packages --ignore-missing-files $CP_QUIET \
     --format tar.gz --compress-level 4 --n-threads -1 \
     --output "$STAGE/$e.tar.gz" --force
   put "$STAGE/$e.tar.gz" "$key"
