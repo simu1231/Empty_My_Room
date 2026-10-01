@@ -1,7 +1,10 @@
 """컨테이너 안의 실제 모델로 세 job_type 전부 큐를 통과시키는 종단 검증.
 
     docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml up -d
-    ~/miniconda3/envs/sam3d/bin/python deploy/test_e2e.py
+    "${EMR_ROOT:-$HOME}/miniconda3/envs/sam3d/bin/python" deploy/test_e2e.py
+
+EC2 빌더에서는 HOME이 /home/ubuntu 라 ~ 로 적으면 틀린다. 환경은 EMR_ROOT
+(/opt/emr) 아래에 풀려 있다 — deploy/aws/config.sh 와 같은 규칙이다.
 
 sam3d를 3번 돌리는 이유는 파이프라인 캐시(콜드/웜)를 보기 위해서이기도 하지만,
 워커의 fd 수가 작업마다 **누적되는지**를 확인하기 위해서다. WSL2에서는 공유 GPU
