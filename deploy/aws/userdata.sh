@@ -136,7 +136,19 @@ systemctl daemon-reload
 warm() {
   local t0 raw=/run/emr-warmlist.raw list=/run/emr-warmlist done=/run/emr-warmdone
   local flag=/run/emr-warming deadline bytes files el mbps pat read_bytes mon
+  local s0 disk_mb
   set +x
+  # 읽은 양은 **디스크에게 직접 묻는다.** 다 읽은 파일만 더하면 상한에 걸렸을 때
+  # 중간까지 읽힌 수십 GB가 통째로 빠진다 — 실제로 26GB를 읽고 16.6GB로 보고해
+  # 속도를 39 MB/s 로 과소평가했다(CloudWatch 실측은 70 MB/s 였다). 그 숫자가
+  # 다음 조정의 유일한 근거라 틀리면 엉뚱한 데를 고치게 된다.
+  # /sys/block/<디스크>/stat 의 3번째 값이 누적 읽기 섹터(512B)다. 파티션은
+  # /sys/block 에 없으므로 중복 집계되지 않는다.
+  rdsect() { local t=0 f n
+    for f in /sys/block/*/stat; do n=${f%/stat}; n=${n##*/}
+      case "$n" in loop*|ram*|zram*) continue;; esac
+      t=$(( t + $(awk '{print $3}' "$f") ))
+    done; echo "$t"; }
   t0=$(date +%s)
   deadline=$(( t0 + WARM_TIMEOUT ))
 
@@ -180,11 +192,12 @@ warm() {
   # 한 번으로 재우고 나중에 kill 하면 안 된다 — 서브셸만 죽고 자식 sleep 은
   # init 에 입양돼 cloud-init 이 끝난 뒤까지 상속받은 fd 를 붙들고 남는다.
   : > "$done"; : > "$flag"
+  s0=$(rdsect)
   ( n=0
     while [ -e "$flag" ]; do
       sleep 1; n=$(( n + 1 ))
       if [ $(( n % 60 )) -eq 0 ]; then
-        echo "[warm] 진행 $(wc -l < "$done")/${files}개, ${n}초"
+        echo "[warm] 진행 $(wc -l < "$done")/${files}개, $(( ($(rdsect) - s0) / 2048 ))MB, ${n}초"
       fi
     done ) &
   mon=$!
@@ -200,11 +213,12 @@ warm() {
 
   el=$(( $(date +%s) - t0 ))
   if [ "$el" -lt 1 ]; then el=1; fi
+  disk_mb=$(( ($(rdsect) - s0) / 2048 ))
   read_bytes=$(awk -F'\t' 'NR==FNR{sz[$2]=$1; next} ($0 in sz){t+=sz[$0]} END{print t+0}' "$list" "$done")
-  mbps=$(( read_bytes / 1048576 / el ))
-  echo "[warm] $(wc -l < "$done")/${files}개 $(( read_bytes / 1048576 ))MB, ${el}초, 약 ${mbps} MB/s"
+  mbps=$(( disk_mb / el ))
+  echo "[warm] 디스크 ${disk_mb}MB, ${el}초, 약 ${mbps} MB/s (끝까지 읽은 파일 $(wc -l < "$done")/${files}개 $(( read_bytes / 1048576 ))MB)"
   if [ "$el" -ge "$WARM_TIMEOUT" ]; then
-    echo "[warm] 상한에 걸렸다 — 나머지 $(( (bytes - read_bytes) / 1048576 ))MB 는 첫 요청 때 읽힌다"
+    echo "[warm] 상한에 걸렸다 — 나머지 약 $(( bytes / 1048576 - disk_mb ))MB 는 첫 요청 때 읽힌다"
   fi
   set -x
   return 0
