@@ -143,18 +143,32 @@ python3 - "$RUN" "$IMG_KEY" "$SESSIONS" "$DDB_TABLE" <<'PY'
 import json, sys, time, uuid, os
 run, img_key, sessions, table = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
 MIX = ["sam3d_mesh"] * 3 + ["room_layout"] + ["omni3d"] * 3
+# 작업 종류마다 필요한 파라미터가 다르다. 전부 빈 dict 로 보냈다가
+# omni3d 6건이 전부 "필요한 파라미터 누락: ['bbox','category']" 로 죽었다
+# (worker.py _run_omni3d). 값은 test_e2e.py 가 쓰던, 통과가 확인된 것과 같다.
+# bbox 는 위에서 그린 64x64 안의 밝은 사각형(12..52)을 가리킨다.
+#
+# 이건 테스트만의 문제가 아니었다. 실패한 작업은 가시성 시간이 지나면 큐로
+# 돌아오고, 백로그 알람은 ">0" 에 걸려 있다. 그래서 절대 성공 못 할 6건이
+# DLQ 로 빠질 때까지 함대를 계속 깨웠다 — 테스트가 끝난 뒤에도 인스턴스가
+# 한 대 더 떠서 아무 일도 안 하고 내려갔다. 못 고치는 작업은 빨리 죽여야 싸다.
+PARAMS = {
+    "omni3d":      {"bbox": "10,10,54,54", "category": "액자"},
+    "room_layout": {"camera_height_m": "1.6"},
+}
 now = int(time.time())
 jobs, ddb_items, keys = [], [], []
 for s in range(sessions):
     for t in MIX:
         jid = uuid.uuid4().hex
+        prm = PARAMS.get(t, {})
         msg = {"job_id": jid, "job_type": t, "input_key": img_key,
-               "input_keys": {"image": img_key}, "params": {}}
+               "input_keys": {"image": img_key}, "params": prm}
         jobs.append(msg)
         ddb_items.append({**{k: {"S": v} for k, v in
                              (("job_id", jid), ("job_type", t), ("input_key", img_key))},
                           "input_keys": {"M": {"image": {"S": img_key}}},
-                          "params": {"M": {}},
+                          "params": {"M": {k: {"S": v} for k, v in prm.items()}},
                           "status": {"S": "queued"},
                           "created_at": {"N": str(now)},
                           "updated_at": {"N": str(now)},
