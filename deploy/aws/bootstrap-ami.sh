@@ -302,4 +302,7 @@ du -sh "$EMR_ROOT" 2>/dev/null | awk '{print "  "$2" 사용량: "$1}'
 df -h / | tail -1 | awk '{print "  루트 "$3" 사용 / "$4" 남음"}'
 echo
 echo "  다음: cd $EMR_REPO_DIR/deploy/aws"
-echo "        ./bake-ami.sh && ./verify-ami.sh"
+# && 로 묶지 않는다. 중간이 실패하면 어디서 멈췄는지 덜 보인다.
+echo "        bash bake-ami.sh     # 세 이미지를 git SHA 태그로 빌드"
+echo "        bash smoke-test.sh   # 스택을 띄워 세 모델에 진짜 작업을 통과시킨다"
+echo "        bash verify-ami.sh   # AMI가 되기 위한 조건 점검"
