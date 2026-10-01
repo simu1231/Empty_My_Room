@@ -151,9 +151,9 @@ stream "torchcache" "torchhub.tar" "" "$EMR_ROOT/.cache"
 # editable로 깔려 있어서 환경 밖 소스 트리를 가리키는데(`__editable___*_finder.py`,
 # `*.pth`), 그 경로는 conda-pack이 손댈 수 없다. 여기서 바꾼다.
 #
-# -I 로 텍스트 파일만 고른다. 개발 PC에서 재어보니 구경로를 담은 파일은
-# 전부 텍스트였고(sam3d 697 / uLayout 192 / omni3d 335개) **바이너리는 0개**였다.
-# 바이너리에 박혀 있었다면 sed로는 못 고치고 길이가 달라져 깨진다 — 그래서 셌다.
+# -I 로 **텍스트 파일만** 고른다. 바이너리는 sed로 못 고친다 — 길이가 달라지면
+# 파일이 깨진다. 개발 PC에서는 sam3d 697 / uLayout 192 / omni3d 335개가 걸렸다.
+# 바이너리에 남은 구경로(.pyc, .so)는 아래 6a / 6b 에서 종류별로 따로 처리한다.
 echo "▶ 환경 안에 남은 구경로 치환 ($SRC_ROOT → $EMR_ROOT)"
 for e in $ENVS; do
   d=$EMR_ROOT/miniconda3/envs/$e
@@ -165,14 +165,95 @@ for e in $ENVS; do
   echo "  $e: ${n}개 파일 치환"
 done
 
-# 위 sed는 텍스트 파일만 고쳤다. 그래서 **지금 남아 있는 건 바이너리뿐이다.**
-# 바이너리에 박힌 경로는 sed로 못 고친다(길이가 달라지면 파일이 깨진다). 있으면
-# 그 패키지는 첫 import에서 죽으므로, AMI를 굽기 전에 여기서 멈춘다.
-LEFT=$(grep -rl -- "$SRC_ROOT" "$EMR_ROOT/miniconda3/envs" 2>/dev/null | wc -l)
-[ "$LEFT" = "0" ] || {
-  echo "✗ 바이너리 ${LEFT}개에 구경로가 남았습니다 — sed로 못 고칩니다:"
-  grep -rl -- "$SRC_ROOT" "$EMR_ROOT/miniconda3/envs" 2>/dev/null | head
-  exit 1; }
+# 위 sed는 텍스트 파일만 고쳤다. 남은 구경로는 두 종류이고, 성격이 전혀 다르다.
+#
+#  (1) .pyc — 컴파일 당시의 소스 경로가 co_filename 에 박힌다. 이 빌더에서 세어
+#      보니 48,858개였다. 그런데 파이썬은 import를 **파일시스템 경로**로 찾고
+#      .pyc 가 최신인지도 원본의 mtime/size 로 판단한다 — 박힌 경로는 트레이스백
+#      표시에만 쓰인다. 즉 실행에는 무해하다.
+#      그래도 그냥 두지 않는 이유: 에러 메시지가 존재하지 않는 경로를 가리키면
+#      디버깅이 괴롭다. 반대로 **지우기만 하면** 인스턴스가 뜰 때마다 약 49,000개를
+#      다시 컴파일해서 콜드스타트가 느려진다. 그래서 여기서 지우고 다시 만든다.
+#
+#  (2) ELF(.so) — 동적 로더가 읽는 RPATH/RUNPATH 에 구경로가 있으면 진짜 문제다.
+#      sed로는 못 고치고(길이가 바뀌면 파일이 깨진다) patchelf 로 헤더를 다시 쓴다.
+#      이 빌더에서는 3개였다: pytorch3d/_C.so, _nvdiffrast_c.so, libc10_stub.so —
+#      전부 editable 설치라 conda-pack 이 손대지 못한 것들이다.
+#
+# **게이트를 "문자열이 있나"로 만들면 안 된다.** ELF의 .rodata 에는 빌드 당시
+# 경로가 그대로 남는다(PyTorch의 "INTERNAL ASSERT FAILED at ..." 메시지. _C.so
+# 한 파일에만 668군데). 이건 지울 수도 없고 지울 필요도 없다. 예전 게이트가
+# `grep -rl` 로 문자열 유무만 봐서 **영원히 통과할 수 없었고**, 실제로 여기서
+# "바이너리 48861개" 라며 멈췄다. 그래서 아래는 RPATH 값을 본다.
+
+# ── 6a. .pyc 재컴파일 ────────────────────────────────────────────────────
+echo "▶ .pyc 재컴파일 (바이트코드에 박힌 구경로)"
+for e in $ENVS; do
+  d=$EMR_ROOT/miniconda3/envs/$e
+  find "$d" -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null || true
+  # compileall 은 **하나라도** 문법 오류가 나면 1을 돌려준다. 환경 안에는 py2
+  # 시절 테스트 픽스처처럼 원래부터 컴파일 안 되는 파일이 섞여 있다(세 환경 모두
+  # 그랬다). 그걸로 부트스트랩 전체를 멈추면 안 되므로 상태를 삼킨다.
+  "$d/bin/python" -m compileall -q -j 0 "$d/lib" >/dev/null 2>&1 || true
+  echo "  $e: 완료"
+done
+
+# ── 6b. ELF RPATH 치환 ───────────────────────────────────────────────────
+# patchelf 는 기반 AMI에 없다. apt 목록이 오래돼 있어서 update 부터 해야 받아진다.
+if ! command -v patchelf >/dev/null; then
+  echo "▶ patchelf 설치"
+  apt-get update -qq >/dev/null 2>&1 || true
+  apt-get install -y -qq patchelf >/dev/null 2>&1 || true
+fi
+if ! command -v patchelf >/dev/null; then
+  # apt 미러가 막혀 있어도 되게 한 번 더. pip 휠 안에 바이너리가 들어 있다.
+  FIRST_ENV=$(echo "$ENVS" | awk '{print $1}')
+  "$EMR_ROOT/miniconda3/envs/$FIRST_ENV/bin/python" -m pip install \
+    --quiet --user --root-user-action=ignore patchelf >/dev/null 2>&1 || true
+  export PATH="$PATH:/root/.local/bin"
+fi
+command -v patchelf >/dev/null || {
+  echo "✗ patchelf 를 구하지 못했습니다 — RPATH를 고칠 수 없습니다"; exit 1; }
+
+# 환경 전체를 `file` 로 훑으면 50만 개라 너무 느리다. ELF 가 될 수 있는 건
+# 공유 라이브러리와 bin/ 안의 실행파일뿐이다(4,076개 → 약 1분40초).
+scan_elf() {
+  find "$EMR_ROOT/miniconda3/envs" -type f \
+       \( -name '*.so' -o -name '*.so.*' -o -path '*/bin/*' \) -print0 2>/dev/null \
+  | while IFS= read -r -d '' f; do
+      rp=$(patchelf --print-rpath "$f" 2>/dev/null) || continue   # ELF 아니면 건너뜀
+      case "$rp" in *"$SRC_ROOT"*) printf '%s\n' "$f";; esac
+    done
+}
+
+echo "▶ ELF RPATH 치환"
+ELF_N=0
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  old=$(patchelf --print-rpath "$f")
+  patchelf --set-rpath "${old//$SRC_ROOT/$EMR_ROOT}" "$f"
+  ELF_N=$((ELF_N+1))
+done <<< "$(scan_elf || true)"
+echo "  ${ELF_N}개 치환"
+
+# ── 6c. 게이트 ───────────────────────────────────────────────────────────
+# 여기를 통과 못 하면 AMI를 굽지 않는다. 다 굽고 나서 첫 요청에 죽는 것보다
+# 지금 멈추는 쪽이 싸다.
+GATE_FAIL=0
+LEFT_TXT=$(grep -rlI --exclude-dir=__pycache__ -- "$SRC_ROOT" "$EMR_ROOT/miniconda3/envs" 2>/dev/null || true)
+if [ -n "$LEFT_TXT" ]; then
+  echo "✗ 텍스트 파일에 구경로가 남았습니다 (sed가 놓쳤다):"
+  echo "$LEFT_TXT" | head
+  GATE_FAIL=1
+fi
+LEFT_ELF=$(scan_elf || true)
+if [ -n "$LEFT_ELF" ]; then
+  echo "✗ ELF RPATH 에 구경로가 남았습니다:"
+  echo "$LEFT_ELF" | head
+  GATE_FAIL=1
+fi
+[ "$GATE_FAIL" = "0" ] || exit 1
+echo "  ✓ 구경로 없음 — 텍스트 / RPATH 둘 다 깨끗"
 
 # ── 7. 저장소 ────────────────────────────────────────────────────────────
 # bake-ami.sh 는 저장소가 $EMR_REPO_DIR 에 있기를 요구한다.
