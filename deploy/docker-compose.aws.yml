@@ -4,13 +4,28 @@
 #                  -f deploy/docker-compose.gpu.yml \
 #                  -f deploy/docker-compose.aws.yml up -d
 #
-# 로컬과 달라지는 건 딱 네 가지다. 나머지는 전부 같은 파일을 쓴다 —
+# 로컬과 달라지는 건 딱 다섯 가지다. 나머지는 전부 같은 파일을 쓴다 —
 # "로컬에선 됐는데 배포에서 안 되는" 경우를 줄이려면 차이를 최대한 줄여야 한다.
 #
 #   1. LocalStack이 없다 → AWS_ENDPOINT_URL을 비워 실제 AWS를 보게 한다.
 #   2. API 서버는 여기 없다 → 별도 t4g.small에서 돈다.
 #   3. 리퍼가 진짜로 인스턴스를 회수한다(DRY_RUN=0).
 #   4. 자격증명은 IAM 역할에서 온다 → 더미 키를 지운다.
+#   5. 버킷/테이블 이름이 다르다 → 실제 이름으로 덮어쓴다.
+#
+# 5번은 6단계 부하 테스트에서 터져서 뒤늦게 추가했다. 기본 파일이
+# `S3_BUCKET: emr-jobs` 를 **리터럴로** 박아 두는데, 실제 버킷은 계정 해시가
+# 붙은 emr-jobs-fca87aed 다. 여기서 안 덮으니 워커 14건이 전부
+# HeadObject 404 로 죽었다. 스모크 테스트는 LocalStack 에서 돌고 거기선 버킷
+# 이름이 정말 emr-jobs 라서, 이 버그를 끝까지 못 잡았다.
+#
+# 교훈은 "오버라이드를 하나 빠뜨렸다"가 아니라 **빠뜨렸는지 아무도 안 본다**는
+# 쪽이다. DDB_TABLE 은 양쪽이 우연히 emr-jobs 로 같아서 멀쩡히 돌았고, 그래서
+# 상태 갱신은 되고 S3 만 안 되는 헷갈리는 모양이 나왔다. 그 우연에 기대지
+# 않도록 테이블도 같이 명시한다.
+#
+# 기본값을 안 준다(`:?`). 값이 비면 여기서 즉시 멈추는 편이, 그럴듯한 이름으로
+# 조용히 떨어져 404 를 보는 것보다 훨씬 싸다 — 이번에 치른 값이 그 증거다.
 
 services:
   # LocalStack은 이미지 자체를 띄우지 않는다. scale: 0 으로 비활성화한다.
@@ -27,6 +42,8 @@ services:
       AWS_ACCESS_KEY_ID: ""      # IAM 역할에서 받는다 — 키를 넣으면 오히려 역할을 가린다
       AWS_SECRET_ACCESS_KEY: ""
       AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      S3_BUCKET: ${S3_BUCKET:?deploy/.env 에 S3_BUCKET 이 없다 — userdata 가 쓴다}
+      DDB_TABLE: ${DDB_TABLE:?deploy/.env 에 DDB_TABLE 이 없다 — userdata 가 쓴다}
       QUEUE_NAME: ${Q_SAM3D:-emr-sam3d}
       MOCK: "0"
       IDLE_EXIT_SEC: "0"          # 스스로 안 끝낸다 — 리퍼가 인스턴스째 회수한다

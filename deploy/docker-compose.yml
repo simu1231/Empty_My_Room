@@ -36,8 +36,14 @@ services:
       # LocalStack은 자격증명을 검사하지 않지만 boto3가 요구하므로 더미를 넣는다.
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
-      S3_BUCKET: emr-jobs
-      DDB_TABLE: emr-jobs
+      # 리터럴로 박지 않는다. 예전엔 `S3_BUCKET: emr-jobs` 였는데, AWS 오버라이드가
+      # 이걸 덮는 걸 빠뜨려서 워커가 실제 버킷(emr-jobs-fca87aed) 대신 존재하지
+      # 않는 이름을 보고 전 작업을 HeadObject 404 로 날렸다. LocalStack 에서는
+      # 이름이 정말 emr-jobs 라 스모크 테스트가 끝까지 초록불이었다.
+      # 기본값은 그대로 두되 **덮을 수 있는 모양**으로 둬서, 환경변수 하나로
+      # 모든 서비스가 같이 따라오게 한다(api 포함 — 빠뜨릴 자리를 없앤다).
+      S3_BUCKET: ${S3_BUCKET:-emr-jobs}
+      DDB_TABLE: ${DDB_TABLE:-emr-jobs}
     depends_on:
       localstack: {condition: service_healthy}
 

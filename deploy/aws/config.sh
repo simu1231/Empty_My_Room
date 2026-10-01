@@ -22,14 +22,28 @@ export Q_SCENE=emr-scene
 #
 # 로컬(LocalStack)은 전역 유일성이 필요 없어서 그냥 emr-jobs 를 쓴다. 이름이
 # 다른 건 의도된 것이고, 코드는 양쪽 다 환경변수로만 읽는다.
+# 폴백은 남기되 **조용히** 떨어지지 않게 한다. 예전에는 aws 가 PATH 에 없으면
+# 말없이 emr-jobs(이 계정에 없는 버킷)로 떨어졌다. 그러면 업로드가 한참 뒤에
+# NoSuchBucket 으로 죽는데, 원인은 버킷이 아니라 PATH 다 — 20-launch-template.sh
+# 에서 똑같은 구조로 "AMI 에 GitSha 태그가 없습니다"를 찍고 한참 헤맸다.
+# 원인과 메시지를 일치시키고, 추측값이라는 사실을 EMR_BUCKET_GUESSED 로 남긴다.
+export EMR_BUCKET_GUESSED=0
 if [ -z "${S3_BUCKET:-}" ]; then
-  _acct=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "")
-  if [ -n "$_acct" ]; then
-    export S3_BUCKET="emr-jobs-$(printf '%s' "$_acct" | sha256sum | cut -c1-8)"
+  if ! command -v aws >/dev/null 2>&1; then
+    export S3_BUCKET="emr-jobs"; export EMR_BUCKET_GUESSED=1
+    echo "⚠ aws CLI 가 PATH 에 없어 S3_BUCKET 을 추측했다: $S3_BUCKET (실제와 다를 수 있다)" >&2
+    echo "  이 PC 에서는 ~/.local/bin 에 있다: export PATH=\"\$HOME/.local/bin:\$PATH\"" >&2
   else
-    export S3_BUCKET="emr-jobs"   # 자격증명 없이 소스될 때(문법 검사 등)
+    _acct=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "")
+    if [ -n "$_acct" ]; then
+      export S3_BUCKET="emr-jobs-$(printf '%s' "$_acct" | sha256sum | cut -c1-8)"
+    else
+      export S3_BUCKET="emr-jobs"; export EMR_BUCKET_GUESSED=1
+      echo "⚠ AWS 자격증명을 읽지 못해 S3_BUCKET 을 추측했다: $S3_BUCKET (실제와 다를 수 있다)" >&2
+      echo "  aws configure 로 설정하거나, 로컬 테스트면 그대로 둬도 된다(LocalStack 은 이 이름을 쓴다)" >&2
+    fi
+    unset _acct
   fi
-  unset _acct
 fi
 export DDB_TABLE=emr-jobs
 

@@ -34,6 +34,11 @@ WARM_SKIP="__WARM_SKIP__"
 WARM_BG_DIRS="__WARM_BG_DIRS__"
 WARM_BG_TIMEOUT=__WARM_BG_TIMEOUT__
 EMR_ROOT=__EMR_ROOT__
+# 버킷/테이블은 .env 와 아래 컴포즈 덮어쓰기가 **같은 변수**를 쓰게 쉘로 올린다.
+# 두 군데에 따로 적으면 조용히 어긋난다 — 이미 가디언 유예와 워밍 상한에서
+# 한 번 당했다.
+S3_BUCKET=__S3_BUCKET__
+DDB_TABLE=__DDB_TABLE__
 RETIRE=/opt/emr/bin/self-retire.sh
 
 # ── 실패 트랩 ────────────────────────────────────────────────────────────
@@ -94,8 +99,8 @@ umask 077   # .env는 소유자만 읽는다
 cat > deploy/.env <<ENV
 AWS_ENDPOINT_URL=
 AWS_REGION=__REGION__
-S3_BUCKET=__S3_BUCKET__
-DDB_TABLE=__DDB_TABLE__
+S3_BUCKET=$S3_BUCKET
+DDB_TABLE=$DDB_TABLE
 Q_SAM3D=__Q_SAM3D__
 Q_SCENE=__Q_SCENE__
 IDLE_EXIT_SEC=__IDLE_EXIT_SEC__
@@ -127,10 +132,42 @@ systemctl daemon-reload
 # ── 기동 ─────────────────────────────────────────────────────────────────
 # --no-build 가 핵심이다. 위에서 태그를 확인했지만, 컴포즈가 만에 하나 다른
 # 서비스를 빌드하려 들면 부팅이 몇십 분짜리가 된다. 빌드는 굽는 시점의 일이다.
+#
+# 네 번째 -f 가 하는 일: AMI 안의 컴포즈 파일은 **구운 시점에 굳는다.** 6단계
+# 부하 테스트에서 기본 파일의 `S3_BUCKET: emr-jobs` 리터럴을 AWS 오버라이드가
+# 안 덮는 걸 발견했고(실제 버킷엔 계정 해시가 붙는다), 워커 14건이 전부
+# HeadObject 404 로 죽었다. 저장소는 고쳤지만 낡은 AMI 로도 떠야 한다.
+# 유저데이터는 시작 템플릿에 있어 재굽기 없이 바꿀 수 있으니 여기서 마지막으로
+# 덮는다. 값은 위 .env 와 같은 쉘 변수라 새로 적는 숫자는 없다.
+STEP="컴포즈 덮어쓰기"
+cat > /run/emr-deploy-env.yml <<YML
+services:
+  worker-sam3d: {environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE"}}
+  worker-scene: {environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE"}}
+  reaper:       {environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE"}}
+YML
+DC="docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml"
+DC="$DC -f deploy/docker-compose.aws.yml -f /run/emr-deploy-env.yml"
+
 STEP="컴포즈 기동"
-docker compose -f deploy/docker-compose.yml \
-               -f deploy/docker-compose.gpu.yml \
-               -f deploy/docker-compose.aws.yml up -d --no-build
+$DC up -d --no-build
+
+# ── 설정이 컨테이너까지 닿았는지 확인 ───────────────────────────────────
+# 위 404 사태의 진짜 교훈은 "오버라이드를 빠뜨렸다"가 아니라 **빠뜨렸는지
+# 아무도 안 본다**는 쪽이다. 컨테이너는 멀쩡히 떴고 리퍼도 떴고 가디언도
+# 조용했다. 틀린 건 첫 작업이 들어온 뒤에야 드러났고, 그때는 이미 돈이 나갔다.
+# 그래서 부팅에서 **실제 컨테이너의 환경변수**를 읽어 맞는지 본다.
+# 컴포즈 파일을 읽어 확인하면 의미가 없다 — 틀린 건 바로 그 파일이었다.
+STEP="설정 도달 확인"
+CID=$($DC ps -q worker-sam3d 2>/dev/null | head -1)
+EFF=$(docker inspect "$CID" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+        | sed -n 's/^S3_BUCKET=//p' | head -1)
+if [ "$EFF" != "$S3_BUCKET" ]; then
+  echo "[userdata] 워커가 보는 버킷이 '$EFF' 다 — 배포가 정한 값은 '$S3_BUCKET'"
+  echo "[userdata] 이대로 두면 모든 작업이 404 로 죽는다. 기동을 중단한다."
+  exit 1
+fi
+echo "[userdata] 버킷 확인 — 워커가 $EFF 를 본다"
 
 # ── 리퍼 확인 ────────────────────────────────────────────────────────────
 # 여기까지 성공해도 리퍼 컨테이너가 안 떴으면 요금을 끊을 주체가 없다.
