@@ -50,6 +50,10 @@ sed -e "s|__REGION__|${AWS_REGION}|g" \
     -e "s|__IMAGE_TAG__|${EMR_IMAGE_TAG}|g" \
     -e "s|__WARM_DIRS__|${EMR_WARM_DIRS}|g" \
     -e "s|__WARM_TIMEOUT__|${EMR_WARM_TIMEOUT}|g" \
+    -e "s|__WARM_JOBS__|${EMR_WARM_JOBS}|g" \
+    -e "s|__WARM_SKIP__|${EMR_WARM_SKIP}|g" \
+    -e "s|__GUARDIAN_GRACE_SEC__|${GUARDIAN_GRACE_SEC}|g" \
+    -e "s|__GUARDIAN_FAIL_MIN__|${GUARDIAN_FAIL_MIN}|g" \
     userdata.sh > /tmp/emr-userdata.rendered.sh
 
 # 치환이 빠지면 인스턴스가 "__IMAGE_TAG__" 라는 태그의 이미지를 찾다 죽는다.
@@ -62,14 +66,19 @@ fi
 bash -n /tmp/emr-userdata.rendered.sh || { echo "✗ 렌더된 유저데이터 문법 오류"; exit 1; }
 
 USERDATA_B64=$(base64 -w0 /tmp/emr-userdata.rendered.sh)
-# EC2 유저데이터 한도는 16KB(base64 인코딩 후 기준). 한글 주석은 글자당 3바이트라
-# 생각보다 빨리 찬다. 넘으면 시작 템플릿 생성이 실패하는 게 아니라 인스턴스가
-# 잘린 스크립트로 부팅한다.
-if [ "${#USERDATA_B64}" -gt 16384 ]; then
-  echo "✗ 유저데이터 ${#USERDATA_B64} 바이트 — 16384 한도 초과"
+USERDATA_RAW=$(wc -c < /tmp/emr-userdata.rendered.sh)
+# EC2 유저데이터 한도는 16KB이고, 기준은 **base64 인코딩 전 원본**이다.
+# (AWS 문서: "User data is limited to 16 KB, in raw form, before it is
+#  base64-encoded.")
+# 처음엔 base64 길이를 16384와 비교했는데, base64 는 3바이트를 4바이트로
+# 불리므로 실질 한도가 12KB로 좁아져 있었다 — 한도에 한참 못 미치는 스크립트를
+# 거부했다. 한글 주석은 글자당 3바이트라 그 차이가 금방 드러난다.
+if [ "$USERDATA_RAW" -gt 16384 ]; then
+  echo "✗ 유저데이터 ${USERDATA_RAW} 바이트(원본) — 16384 한도 초과"
+  echo "  긴 근거 주석은 config.sh 로 옮길 것. config.sh 는 인스턴스로 안 간다."
   exit 1
 fi
-echo "  유저데이터 ${#USERDATA_B64}/16384 바이트, 태그 ${EMR_IMAGE_TAG}"
+echo "  유저데이터 ${USERDATA_RAW}/16384 바이트(원본, base64 ${#USERDATA_B64}), 태그 ${EMR_IMAGE_TAG}"
 
 # ── 루트 볼륨 ────────────────────────────────────────────────────────────
 # 지금까지는 AMI가 들고 있는 볼륨 설정을 그대로 물려받았다. 두 가지가 통제 밖이었다:

@@ -103,7 +103,31 @@ export EMR_IMAGE_TAG=${EMR_IMAGE_TAG:-$(git -C "$(dirname "${BASH_SOURCE[0]}")/.
 # (예전에는 $EMR_REPO_DIR/sam-3d-objects 처럼 **존재하지 않는** 경로를 가리켰고,
 #  warm()은 없는 디렉터리를 조용히 건너뛰므로 워밍이 0바이트인 걸 알 수 없었다.)
 export EMR_WARM_DIRS=${EMR_WARM_DIRS:-"$EMR_ROOT/.cache/huggingface $EMR_ROOT/miniconda3/envs $EMR_ROOT/sam-3d-objects $EMR_ROOT/uLayout $EMR_ROOT/omni3d"}
-export EMR_WARM_TIMEOUT=${EMR_WARM_TIMEOUT:-600}   # 워밍에 쓸 최대 시간(초)
+# 워밍에 쓸 최대 시간(초). 올리면 GUARDIAN_GRACE_SEC 도 같이 올라간다(아래).
+export EMR_WARM_TIMEOUT=${EMR_WARM_TIMEOUT:-420}
+
+# 동시에 읽을 파일 수. 지연 로딩은 대역폭이 아니라 왕복 지연에 묶여 있어서,
+# 한 줄로 읽으면 볼륨 처리량의 몇 %밖에 못 쓴다 — 첫 실부팅에서 250 MB/s
+# 짜리 볼륨에서 10.5 MB/s 가 나왔다. vCPU 4개짜리에 32는 과해 보이지만 CPU를
+# 쓰는 일이 아니라 IO를 기다리는 일이라 상관없다. 메모리도 32 x 4MB = 128MB다.
+export EMR_WARM_JOBS=${EMR_WARM_JOBS:-32}
+
+# 워밍에서 뺄 경로 조각(공백 구분, grep -E 로 묶어서 제외한다).
+# AMI의 HF 캐시 28GB에는 **배포하는 세 서비스가 안 쓰는** 모델이 섞여 있다.
+# 빌더에서 홈 디렉터리째 tar로 떠왔기 때문이다. 근거:
+#   control_v11p_sd15_canny / stable-diffusion-inpainting (5.4G)
+#     → sam3d/backend/services/sd_service.py 만 쓰는데, 그 모듈은 워커·API
+#       어느 쪽에서도 import 되지 않는다(사용자가 SD/인페인팅을 보류했다).
+#   zero123plus-v1.2 (5.2G) / TripoSR (1.6G)
+#     → 저장소 코드와 벤더 코드(sam-3d-objects, uLayout, omni3d) 어디에서도
+#       참조가 없다. SAM3D로 정착하기 전에 실험하던 대안 모델들이다.
+# 합쳐 12.2GB. 이걸 빼면 워밍 대상이 60GB에서 43GB가 된다.
+#
+# 틀렸을 때의 대가는 작다. 필요한 걸 실수로 빼도 기동은 멀쩡하고 그 모델만
+# 첫 요청 때 느리게 읽힌다. 반대로 안 쓰는 걸 데우면 **매 콜드스타트마다**
+# 그만큼 시간을 버린다. 그래서 확신이 서는 것만 뺐다 — moge-2-vitl(1.3G)과
+# depth_anything_vitl14(1.3G)도 참조를 못 찾았지만 금액이 작아서 남겨뒀다.
+export EMR_WARM_SKIP=${EMR_WARM_SKIP:-"models--lllyasviel--control_v11p_sd15_canny models--runwayml--stable-diffusion-inpainting models--sudo-ai--zero123plus models--stabilityai--TripoSR"}
 
 # ── 루트 볼륨 ───────────────────────────────────────────────────────────
 # AMI에 들어가는 실제 내용물은 **약 123GB다**. 우리가 넣는 것만 세면 85GB지만
@@ -139,5 +163,18 @@ export EMR_VOLUME_THROUGHPUT=${EMR_VOLUME_THROUGHPUT:-250}
 # 리퍼는 컴포즈 스택 안의 컨테이너다. 그래서 컴포즈가 안 뜨면 리퍼도 없고,
 # ASG 헬스체크는 EC2(켜져 있는지)만 보므로 인스턴스가 일 없이 계속 과금된다.
 # 가디언은 호스트에서 systemd 타이머로 돌며 "리퍼가 살아있나"만 본다.
-export GUARDIAN_GRACE_SEC=${GUARDIAN_GRACE_SEC:-900}   # 부팅 후 이 시간은 봐준다
+#
+# 유예는 **부팅이 끝날 수 있는 시간보다 길어야 한다.** 짧으면 멀쩡히 부팅
+# 중인 워커를 죽인다. 실제로 그랬다: 2026-10-01, 유예 900 + FAIL_MIN 5분이
+# 끝나는 20.2분에 아직 워밍 중이던 워커가 회수됐다. 두 숫자(워밍 상한과
+# 가디언 유예)가 같은 파일에 따로 적혀 있어서 조용히 어긋난 것이다.
+# 그래서 손으로 맞추지 않고 **유도한다**.
+#   부트+cloud-init(~120) + 워밍 상한 + 컴포즈·헬스체크(~600) + 여유(300)
+# EMR_WARM_TIMEOUT 을 올리면 유예도 같이 올라간다.
+#
+# 주의: 이 값은 bake-ami.sh 가 emr-guardian.service 의 Environment= 에
+# **구워 넣는다.** 이미 구운 AMI에는 옛 값이 들어 있으므로, userdata.sh 가
+# 부팅할 때 systemd 드롭인으로 덮어쓴다(EMR_IMAGE_TAG 와 같은 함정이다 —
+# 배포 시점 설정이 AMI에 굳은 값에 지면 안 된다).
+export GUARDIAN_GRACE_SEC=${GUARDIAN_GRACE_SEC:-$(( 120 + EMR_WARM_TIMEOUT + 600 + 300 ))}
 export GUARDIAN_FAIL_MIN=${GUARDIAN_FAIL_MIN:-5}       # 리퍼 부재가 이만큼(분) 이어지면 회수

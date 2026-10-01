@@ -30,6 +30,8 @@ exec > >(tee /var/log/emr-userdata.log "$CONSOLE" | logger -t emr-userdata) 2>&1
 REPO=__REPO_DIR__
 IMAGE_TAG=__IMAGE_TAG__
 WARM_TIMEOUT=__WARM_TIMEOUT__
+WARM_JOBS=__WARM_JOBS__
+WARM_SKIP="__WARM_SKIP__"
 EMR_ROOT=__EMR_ROOT__
 RETIRE=/opt/emr/bin/self-retire.sh
 
@@ -102,30 +104,110 @@ DRY_RUN=0
 ENV
 umask 022
 
+# ── 가디언 유예 조정 ────────────────────────────────────────────────────
+# GUARDIAN_GRACE_SEC 은 bake-ami.sh 가 emr-guardian.service 에 **구워 넣는다.**
+# 그래서 config.sh 만 고치면 이미 구운 AMI에는 안 먹는다(EMR_IMAGE_TAG 와 같은
+# 함정이다). 유예가 부팅 시간보다 짧으면 가디언이 멀쩡히 부팅 중인 워커를
+# 죽인다 — 2026-10-01 에 20.2분째 워밍 중이던 워커가 그렇게 회수됐다.
+# 드롭인은 본체 뒤에 처리되므로 같은 변수는 이쪽 값이 이긴다.
+STEP="가디언 유예 조정"
+mkdir -p /etc/systemd/system/emr-guardian.service.d
+cat > /etc/systemd/system/emr-guardian.service.d/10-grace.conf <<CONF
+[Service]
+Environment=GUARDIAN_GRACE_SEC=__GUARDIAN_GRACE_SEC__
+Environment=GUARDIAN_FAIL_MIN=__GUARDIAN_FAIL_MIN__
+CONF
+systemctl daemon-reload
+
 # ── 스냅샷 워밍 ──────────────────────────────────────────────────────────
-# EBS 스냅샷에서 복원한 볼륨은 블록을 처음 읽을 때 S3에서 끌어온다(지연 로딩).
-# 가중치 31GB를 추론 중에 처음 읽으면 첫 작업이 몇 분 걸린다. 미리 훑어서 그
-# 비용을 부팅 시간으로 옮긴다 — 어차피 기다릴 거면 사용자 요청 앞이 낫다.
+# 스냅샷에서 복원한 볼륨은 블록을 처음 읽을 때 S3에서 끌어온다(지연 로딩).
+# 추론 중에 처음 읽으면 첫 작업이 몇 분 걸리므로 미리 훑어 부팅 시간으로 옮긴다.
+# 장치명(/dev/nvme1n1)이 아니라 파일 경로로 읽는다 — 장치 번호는 구성 따라
+# 바뀌고, 틀리면 조용히 건너뛰어 워밍이 0바이트인 걸 모른다.
 #
-# 장치명(/dev/nvme1n1)을 찍지 않는다. 장치 번호는 볼륨 구성에 따라 바뀌고,
-# 틀리면 `|| true` 때문에 조용히 넘어가서 워밍이 아예 안 된 걸 모른다. 게다가
-# fio의 --runtime 은 상한이라(둘 중 먼저 오는 쪽) 125MB/s gp3에서 180초면
-# 80GB 중 22GB만 데운다. 파일 경로로 읽으면 장치와 무관하고, 필요한 가중치만
-# 읽어서 볼륨 전체보다 빠르다.
+# 반드시 병렬이어야 한다. 순차 dd 는 250 MB/s 볼륨에서 10.5 MB/s 밖에 못 냈고
+# (2026-10-01 첫 실부팅) 그게 콜드스타트 21분의 원인이었다. 지연 로딩은
+# 대역폭이 아니라 왕복 지연에 묶이기 때문이다. 자세한 근거와 EMR_WARM_SKIP
+# 목록의 출처는 config.sh 의 EMR_WARM_JOBS / EMR_WARM_SKIP 주석에 있다.
+#
+# 상한은 xargs 전체가 아니라 dd 하나하나에 건다(근거는 아래). xargs 를 통째로
+# 감싸면 자식 dd 가 고아로 남아 컴포즈 기동 중에도 디스크를 계속 두드린다.
+# set +x: 파일이 수백 개라 추적을 켜 두면 콘솔 버퍼(64KB)가 앞부분을 밀어낸다.
 warm() {
-  local t0 n=0
+  local t0 raw=/run/emr-warmlist.raw list=/run/emr-warmlist done=/run/emr-warmdone
+  local flag=/run/emr-warming deadline bytes files el mbps pat read_bytes mon
+  set +x
   t0=$(date +%s)
+  deadline=$(( t0 + WARM_TIMEOUT ))
+
+  # +8M 만. '*.a' 제외 — 정적 라이브러리 5GB는 링크용이라 런타임에 안 읽힌다.
+  : > "$raw"
   for d in __WARM_DIRS__; do
-    [ -d "$d" ] || { echo "[warm] $d 없음 — 건너뜀"; continue; }
-    # -size +8M: 작은 설정 파일은 어차피 금방 읽힌다. 큰 가중치만 데운다.
-    while IFS= read -r -d '' f; do
-      [ $(( $(date +%s) - t0 )) -lt "$WARM_TIMEOUT" ] || {
-        echo "[warm] ${WARM_TIMEOUT}초 상한 도달 — 남은 파일은 첫 요청 때 읽힌다"; return 0; }
-      dd if="$f" of=/dev/null bs=1M status=none 2>/dev/null || true
-      n=$((n+1))
-    done < <(find "$d" -type f -size +8M -print0 2>/dev/null)
+    if [ -d "$d" ]; then
+      find "$d" -type f -size +8M ! -name '*.a' -printf '%s\t%p\n' 2>/dev/null >> "$raw"
+    else
+      echo "[warm] $d 없음 — 건너뜀"
+    fi
   done
-  echo "[warm] ${n}개 파일, $(( $(date +%s) - t0 ))초"
+
+  # WARM_SKIP: 세 서비스가 안 읽는 가중치를 뺀다(config.sh 참고).
+  if [ -n "$WARM_SKIP" ]; then
+    pat=$(printf '%s\n' $WARM_SKIP | paste -sd'|' -)
+    grep -Ev "$pat" "$raw" > "$list" || true
+  else
+    cp "$raw" "$list"
+  fi
+
+  files=$(wc -l < "$list")
+  if [ "$files" -eq 0 ]; then
+    echo "[warm] 대상이 없다 — 건너뜀 (EMR_WARM_DIRS 가 맞는지 확인할 것)"
+    set -x
+    return 0
+  fi
+  bytes=$(awk -F'\t' '{t+=$1} END{print t+0}' "$list")
+  echo "[warm] 대상 ${files}개 $(( bytes / 1048576 ))MB (제외 뒤), 동시 ${WARM_JOBS}개, 상한 ${WARM_TIMEOUT}초"
+
+  # 큰 것부터. 상한에 걸려도 무거운 가중치는 먼저 들어와 있게 된다.
+  # 다 읽은 것만 $done 에 남긴다. 상한에 걸렸을 때 대상 크기로 속도를 계산하면
+  # 안 읽은 양을 읽은 척하게 되는데, 이 숫자가 다음 조정의 유일한 근거다.
+  #
+  # dd 를 timeout 으로 감싼다. "시작 전에 마감을 본다"만으로는 상한이 안 된다 —
+  # 큰 것부터 읽으므로 마감 직전에 4.6GB 짜리가 32개 떠 있을 수 있고, 그것들이
+  # 끝날 때까지 몇 분이 더 간다. 실제로 상한 600초를 17분까지 넘겼고 그 사이
+  # 가디언이 부팅 중인 워커를 죽였다.
+  #
+  # 진행 표시는 1초마다 깨어나 플래그를 보고 60초마다 한 줄 찍는다. sleep 60
+  # 한 번으로 재우고 나중에 kill 하면 안 된다 — 서브셸만 죽고 자식 sleep 은
+  # init 에 입양돼 cloud-init 이 끝난 뒤까지 상속받은 fd 를 붙들고 남는다.
+  : > "$done"; : > "$flag"
+  ( n=0
+    while [ -e "$flag" ]; do
+      sleep 1; n=$(( n + 1 ))
+      if [ $(( n % 60 )) -eq 0 ]; then
+        echo "[warm] 진행 $(wc -l < "$done")/${files}개, ${n}초"
+      fi
+    done ) &
+  mon=$!
+  sort -rn "$list" | cut -f2- \
+    | WARM_DEADLINE=$deadline WARM_DONE=$done xargs -d '\n' -P "$WARM_JOBS" -n 1 sh -c '
+        rem=$(( WARM_DEADLINE - $(date +%s) ))
+        [ "$rem" -gt 0 ] || exit 0
+        timeout "$rem" dd if="$1" of=/dev/null bs=4M status=none 2>/dev/null || exit 0
+        printf "%s\n" "$1" >> "$WARM_DONE"
+      ' _ || true
+  rm -f "$flag"
+  wait "$mon" 2>/dev/null || true
+
+  el=$(( $(date +%s) - t0 ))
+  if [ "$el" -lt 1 ]; then el=1; fi
+  read_bytes=$(awk -F'\t' 'NR==FNR{sz[$2]=$1; next} ($0 in sz){t+=sz[$0]} END{print t+0}' "$list" "$done")
+  mbps=$(( read_bytes / 1048576 / el ))
+  echo "[warm] $(wc -l < "$done")/${files}개 $(( read_bytes / 1048576 ))MB, ${el}초, 약 ${mbps} MB/s"
+  if [ "$el" -ge "$WARM_TIMEOUT" ]; then
+    echo "[warm] 상한에 걸렸다 — 나머지 $(( (bytes - read_bytes) / 1048576 ))MB 는 첫 요청 때 읽힌다"
+  fi
+  set -x
+  return 0
 }
 STEP="스냅샷 워밍"
 warm   # 실패해도 기동은 계속한다(느려질 뿐이지 틀리지는 않는다)
