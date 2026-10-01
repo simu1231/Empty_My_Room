@@ -4,8 +4,9 @@ import numpy as np
 import torch
 from PIL import Image
 
-LAMA_DIR  = '/home/tmvlem5671/lama_repo'
-MODEL_DIR = '/home/tmvlem5671/lama_model'
+EMR_ROOT  = os.environ.get('EMR_ROOT') or os.path.expanduser('~')
+LAMA_DIR  = os.environ.get('LAMA_DIR',       os.path.join(EMR_ROOT, 'lama_repo'))
+MODEL_DIR = os.environ.get('LAMA_MODEL_DIR', os.path.join(EMR_ROOT, 'lama_model'))
 
 class LamaService:
     def __init__(self):

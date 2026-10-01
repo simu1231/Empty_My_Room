@@ -29,11 +29,19 @@ import torch
 import numpy as np
 from PIL import Image
 
-# 체크포인트 위치. 기본값은 기존 로컬 경로 그대로, 컨테이너에서는
-# SAM3D_CKPT_DIR로 덮어쓴다(볼륨 마운트 지점).
+# 체크포인트 위치. 기본값에 특정 사람의 홈 경로를 박아두지 않는다
+# (deploy/worker/worker.py와 같은 규칙). EMR_ROOT는 이미지에 구워져 있고
+# (gpu/Dockerfile의 ENV), 로컬에는 없어서 홈으로 떨어진다 — 기존 경로와 같다.
+#
+# 전에는 기본값이 '/home/tmvlem5671/...' 였다. SAM3D_CKPT_DIR을 설정하는 곳이
+# **어디에도 없었으므로** EC2에서는 항상 이 폴백이 쓰였고, 그 경로가 없으니
+# load_pipeline()이 죽는다. 그런데 워커는 작업을 받을 때까지 파이프라인을
+# 로드하지 않으므로, 스택은 멀쩡히 뜨고 리퍼도 뜨고 ASG도 정상으로 보이다가
+# **첫 추론에서** 터진다 — verify-ami.sh 머리말이 경고하는 그 실패다.
+EMR_ROOT = os.environ.get('EMR_ROOT') or os.path.expanduser('~')
 CKPT_DIR = os.environ.get(
     'SAM3D_CKPT_DIR',
-    '/home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints',
+    os.path.join(EMR_ROOT, 'sam-3d-objects/checkpoints/hf/checkpoints'),
 )
 PIPELINE_CONFIG = os.path.join(CKPT_DIR, 'pipeline.yaml')
 WORKSPACE_DIR   = CKPT_DIR

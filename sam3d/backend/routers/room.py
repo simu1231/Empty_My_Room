@@ -1,5 +1,6 @@
 import io
 import gc
+import os
 import json
 import base64
 import numpy as np
@@ -12,8 +13,13 @@ from fastapi.responses import JSONResponse, Response
 
 router = APIRouter()
 
-PIPELINE_CONFIG = '/home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints/pipeline.yaml'
-WORKSPACE_DIR   = '/home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints'
+# 특정 사람의 홈 경로를 박아두지 않는다(services/sam3d_runner.py와 같은 규칙).
+# 로컬에서는 EMR_ROOT가 없어 홈으로 떨어지므로 기존 경로와 같다.
+EMR_ROOT        = os.environ.get('EMR_ROOT') or os.path.expanduser('~')
+CKPT_DIR        = os.environ.get(
+    'SAM3D_CKPT_DIR', os.path.join(EMR_ROOT, 'sam-3d-objects/checkpoints/hf/checkpoints'))
+PIPELINE_CONFIG = os.path.join(CKPT_DIR, 'pipeline.yaml')
+WORKSPACE_DIR   = CKPT_DIR
 MIN_INPUT_SIZE  = 512
 MAX_INPUT_SIZE  = 1024
 ULAYOUT_SIDECAR_URL = 'http://localhost:8002/infer'

@@ -4,7 +4,8 @@ import numpy as np
 import cv2
 import torch
 
-SAM2_DIR = '/home/tmvlem5671/sam2_repo'
+EMR_ROOT = os.environ.get('EMR_ROOT') or os.path.expanduser('~')
+SAM2_DIR = os.environ.get('SAM2_DIR', os.path.join(EMR_ROOT, 'sam2_repo'))
 
 class SAM2Service:
     def __init__(self):
@@ -12,17 +13,20 @@ class SAM2Service:
         self._load()
 
     def _load(self):
+        prev_cwd = os.getcwd()
         sys.path.insert(0, SAM2_DIR)
         os.chdir(SAM2_DIR)
-        from sam2.build_sam import build_sam2
-        from sam2.sam2_image_predictor import SAM2ImagePredictor
-        sam2_model = build_sam2(
-            'configs/sam2.1/sam2.1_hiera_l.yaml',
-            f'{SAM2_DIR}/checkpoints/sam2.1_hiera_large.pt',
-            device='cuda'
-        )
-        self.predictor = SAM2ImagePredictor(sam2_model)
-        os.chdir('/home/tmvlem5671')
+        try:
+            from sam2.build_sam import build_sam2
+            from sam2.sam2_image_predictor import SAM2ImagePredictor
+            sam2_model = build_sam2(
+                'configs/sam2.1/sam2.1_hiera_l.yaml',
+                f'{SAM2_DIR}/checkpoints/sam2.1_hiera_large.pt',
+                device='cuda'
+            )
+            self.predictor = SAM2ImagePredictor(sam2_model)
+        finally:
+            os.chdir(prev_cwd)
         print('SAM2 로드 완료!')
 
     def predict(self, image_np, points, dilation_px=15):
