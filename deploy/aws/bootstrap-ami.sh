@@ -49,10 +49,24 @@ docker info 2>/dev/null | grep -q nvidia || {
   echo "✗ 도커에 nvidia 런타임이 없습니다 — nvidia-container-toolkit을 설치하세요"; exit 1; }
 
 # 내용물 약 85GB. 여유 90GB를 요구한다(스트리밍이라 tarball 공간은 안 센다).
+#
+# 재개 실행에서는 이미 받아둔 조각을 다시 받지 않는다. 그런데 그건 **이미 디스크를
+# 쓰고 있으므로** df 여유에서는 빠져 있다. 여유만 보고 막으면 재개가 영원히
+# 불가능해진다 — 실제로 73GB를 복원해 둔 빌더가 "여유 23GB"로 거부당했다.
+# 그래서 복원해 둔 양을 더해서 "이 볼륨이 전부 담을 수 있나"를 본다.
 FREE_GB=$(df -BG --output=avail / | tail -1 | tr -dc 0-9)
-echo "  루트 여유 ${FREE_GB}GB"
-[ "$FREE_GB" -ge 90 ] || {
-  echo "✗ 여유 ${FREE_GB}GB — 90GB 이상 필요합니다. 루트 볼륨을 150GB로 띄우세요."; exit 1; }
+# `[ -d ... ] && HAVE_GB=...` 로 쓰면 안 된다. 최초 실행에는 $EMR_ROOT 가 없어서
+# 이 AND-OR 목록이 1을 돌려주고 set -e 가 거기서 스크립트를 끝낸다 (05-preflight.sh
+# 에서 겪은 것과 같은 함정이다).
+HAVE_GB=0
+if [ -d "$EMR_ROOT" ]; then
+  HAVE_GB=$(du -sxBG "$EMR_ROOT" 2>/dev/null | cut -f1 | tr -dc 0-9 || true)
+  HAVE_GB=${HAVE_GB:-0}
+fi
+echo "  루트 여유 ${FREE_GB}GB + 복원분 ${HAVE_GB}GB = $((FREE_GB + HAVE_GB))GB"
+[ "$((FREE_GB + HAVE_GB))" -ge 90 ] || {
+  echo "✗ 여유 ${FREE_GB}GB — 복원분을 합쳐도 90GB가 안 됩니다. 루트 볼륨을 150GB로 띄우세요."
+  exit 1; }
 
 # ── 1. 매니페스트 ────────────────────────────────────────────────────────
 # pack-envs.sh가 **마지막에** 올리는 파일이다. 있다는 건 앞 조각이 다 올라갔다는 뜻.
