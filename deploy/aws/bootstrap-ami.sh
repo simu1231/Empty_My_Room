@@ -77,10 +77,30 @@ echo "  원본 $SRC_ROOT → 복원 $EMR_ROOT / 환경: $ENVS"
 
 install -d -o 1000 -g 1000 "$EMR_ROOT" "$EMR_ROOT/.cache"
 
-# S3에서 바로 tar로 흘린다. 조각이 이미 복원돼 있으면 건너뛰므로 재실행이 싸다.
-stream() {   # stream <s3키> <tar옵션> <풀 위치>
-  echo "  내려받아 푸는 중: $1"
-  aws s3 cp "$S3/$1" - | tar -x"$2"f - -C "$3"
+# 완료 표식. 조각이 **끝까지** 복원된 것만 여기에 파일로 남는다.
+DONE=$EMR_ROOT/.bootstrap-done
+install -d "$DONE"
+
+# S3에서 바로 tar로 흘린다. 이미 끝난 조각은 건너뛰므로 재실행이 싸다.
+#
+# "이미 있나"를 디렉터리 존재로 판단하면 안 된다. tar는 **첫 파일을 풀 때 이미**
+# 디렉터리를 만들어 둔다. 그래서 스트림이 중간에 끊긴 뒤 다시 돌리면 반쯤 풀린
+# 조각을 완성된 것으로 보고 건너뛰고, 그렇게 구운 AMI는 멀쩡히 부팅한 뒤 첫
+# 추론에서 죽는다 — 제일 찾기 어려운 실패다. 스팟 빌더에서는 더 중요하다:
+# SSH가 끊기거나(노트북 절전) 네트워크가 한 번 튀면 바로 이 상황이 된다.
+#
+# 그래서 tar가 종료코드 0으로 끝난 뒤에만 표식을 남기고, 판단은 표식으로만 한다.
+# 다시 풀어도 tar가 같은 파일을 전부 덮어쓰므로 중간에 끊긴 조각 위에 그대로
+# 덮어쓰면 된다(환경만 예외적으로 먼저 지운다 — 아래).
+#
+# set -o pipefail 이 켜져 있어야 `aws s3 cp` 실패가 파이프 밖으로 나온다.
+# 안 그러면 tar가 "빈 입력"을 받고 0으로 끝나서 표식까지 남는다. 머리말의
+# `set -euo pipefail` 을 지우지 말 것.
+stream() {   # stream <표식이름> <s3키> <tar옵션> <풀 위치>
+  if [ -f "$DONE/$1" ]; then echo "▶ $1 — 이미 복원됨, 건너뜀"; return 0; fi
+  echo "▶ $1 복원 — 내려받아 푸는 중: $2"
+  aws s3 cp "$S3/$2" - | tar -x"$3"f - -C "$4"
+  : > "$DONE/$1"
 }
 
 # ── 2. conda 환경 ────────────────────────────────────────────────────────
@@ -88,20 +108,18 @@ stream() {   # stream <s3키> <tar옵션> <풀 위치>
 # 그래서 환경 디렉터리를 먼저 만들고 그 안으로 푼다.
 for e in $ENVS; do
   d=$EMR_ROOT/miniconda3/envs/$e
-  if [ -x "$d/bin/python" ]; then echo "▶ 환경 $e — 이미 있음, 건너뜀"; continue; fi
-  echo "▶ 환경 $e 복원"
+  if [ -f "$DONE/env-$e" ]; then echo "▶ 환경 $e — 이미 복원됨, 건너뜀"; continue; fi
+  # 환경만 먼저 지운다. 앞서 끊긴 시도가 남긴 파일이 섞이면 conda 환경은
+  # import 단계에서 어긋나고, 그 원인을 뒤에서 찾기가 매우 어렵다.
   rm -rf "$d"; install -d "$d"
-  stream "envs/$e.tar.gz" z "$d"
+  stream "env-$e" "envs/$e.tar.gz" z "$d"
   # --dest-prefix 로 포장했으면 경로가 이미 최종값이라 할 일이 없지만, 버전에
   # 따라 conda-unpack 이 같이 들어오기도 한다. 있으면 돌려서 손해 볼 게 없다.
   [ -x "$d/bin/conda-unpack" ] && "$d/bin/conda-unpack" || true
 done
 
 # ── 3. 소스 트리 ─────────────────────────────────────────────────────────
-if [ -d "$EMR_ROOT/sam-3d-objects" ]; then echo "▶ 소스 — 이미 있음, 건너뜀"; else
-  echo "▶ 소스 트리 5개 복원"
-  stream "sources.tar.gz" z "$EMR_ROOT"
-fi
+stream "sources" "sources.tar.gz" z "$EMR_ROOT"
 
 # ── 4. 체크포인트 ────────────────────────────────────────────────────────
 # 소스 tar에서 이름으로 빼둔 대용량 3개를 제자리에 돌려놓는다.
@@ -109,9 +127,13 @@ echo "▶ 체크포인트 3개"
 python3 -c "import json,sys;[print(k,v) for k,v in json.load(sys.stdin)['ckpt_dest'].items()]" < "$MAN" |
 while read -r name dest; do
   full=$EMR_ROOT/$dest
-  if [ -s "$full" ]; then echo "  $name — 이미 있음"; continue; fi
+  if [ -f "$DONE/ckpt-$name" ]; then echo "  $name — 이미 있음"; continue; fi
   install -d "$(dirname "$full")"
-  aws s3 cp "$S3/ckpt/$name" "$full" --only-show-errors
+  # .part 로 받고 끝난 뒤에 옮긴다. 바로 받으면 중간에 끊긴 파일도 비어 있지는
+  # 않아서 "이미 있음"으로 통과하고, 가중치가 잘린 채 AMI에 들어간다.
+  aws s3 cp "$S3/ckpt/$name" "$full.part" --only-show-errors
+  mv -f "$full.part" "$full"
+  : > "$DONE/ckpt-$name"
   echo "  $name → $dest"
 done
 
@@ -121,14 +143,8 @@ done
 # 걸린 **상대** 심링크이기 때문이다(`../../../../.cache/...`). 상대 경로라서
 # 루트가 바뀌어도 따라오지만, blobs 안의 파일명이 하나라도 달라지면 끊긴다.
 # 그래서 다시 받지 않고 캐시를 통째로 옮긴다.
-if [ -d "$EMR_ROOT/.cache/huggingface/hub" ]; then echo "▶ HF 캐시 — 이미 있음, 건너뜀"; else
-  echo "▶ HF 캐시 복원 (28GB, 몇 분 걸립니다)"
-  stream "hfcache.tar" "" "$EMR_ROOT/.cache"
-fi
-if [ -d "$EMR_ROOT/.cache/torch" ]; then echo "▶ torch 캐시 — 이미 있음, 건너뜀"; else
-  echo "▶ torch 캐시 복원"
-  stream "torchhub.tar" "" "$EMR_ROOT/.cache"
-fi
+stream "hfcache" "hfcache.tar" "" "$EMR_ROOT/.cache"   # 28GB, 몇 분 걸린다
+stream "torchcache" "torchhub.tar" "" "$EMR_ROOT/.cache"
 
 # ── 6. 남은 구경로 정리 ──────────────────────────────────────────────────
 # conda-pack --dest-prefix 는 **환경 안의** 경로만 바꾼다. detectron2와 pytorch3d는
