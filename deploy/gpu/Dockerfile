@@ -42,19 +42,31 @@ RUN pip install --no-cache-dir --break-system-packages \
         --no-deps --target /opt/worker-deps \
         boto3 botocore jmespath s3transfer
 
+# ── 모델 루트 ────────────────────────────────────────────────────────────
+# conda 환경 · 소스 · 가중치가 호스트에 놓인 위치. 컨테이너 안에서도 같은
+# 경로로 마운트한다(위 "왜 경로가 같은가" 참고).
+#
+# 예전에는 여기가 /home/tmvlem5671 로 **박혀** 있었다. 두 가지가 깨졌다:
+#   - EC2 기본 사용자는 ubuntu라 그 경로가 없다 → 배포 불가
+#   - 이 PC를 같이 쓰는 다른 두 사람은 이미지를 빌드해도 못 쓴다
+# 그래서 빌드 인자로 뺐다. 로컬은 compose가 ${HOME}을 넣어 주므로 전과 같고,
+# AWS는 config.sh의 EMR_ROOT(/opt/emr)가 들어간다.
+ARG EMR_ROOT=/opt/emr
+
 # 호스트와 같은 UID로 돌려야 마운트된 파일을 읽고, __pycache__를 root 소유로
 # 만들어 호스트를 더럽히지 않는다. ubuntu:24.04는 uid 1000을 이미 쓰고 있어 비운다.
-ARG APP_USER=tmvlem5671
+# 계정 **이름**은 아무 의미가 없다(호스트 파일은 uid로 매칭된다). 그래서
+# 사람 이름 대신 emr로 두고, 홈만 EMR_ROOT로 맞춘다.
 ARG APP_UID=1000
 RUN userdel -r ubuntu 2>/dev/null || true; \
-    useradd -m -u ${APP_UID} -s /bin/bash ${APP_USER}
+    useradd -M -d ${EMR_ROOT} -u ${APP_UID} -s /bin/bash emr
 
-# ~/.cache 를 이미지 안에 미리, 앱 사용자 소유로 만들어 둔다.
+# EMR_ROOT 와 그 아래 .cache 를 이미지 안에 미리, 앱 사용자 소유로 만들어 둔다.
 # 안 만들면 docker가 .cache/huggingface 같은 마운트 지점의 없는 부모를
 # **root 소유로** 자동 생성하고, 그러면 uid 1000이 그 안에 새 캐시 디렉터리를
 # 못 만든다. 실제로 NVIDIA Warp가 ~/.cache/warp 생성에 실패해 첫 작업만
 # 죽는 현상이 있었다(두 번째부터는 우회 경로를 타서 성공 — 그래서 더 위험하다).
-RUN install -d -o ${APP_UID} -g ${APP_UID} /home/${APP_USER}/.cache
+RUN install -d -o ${APP_UID} -g ${APP_UID} ${EMR_ROOT} ${EMR_ROOT}/.cache
 
 COPY --chown=${APP_UID} worker.py /app/worker.py
 
@@ -65,12 +77,18 @@ COPY --chown=${APP_UID} worker.py /app/worker.py
 RUN install -d -m 0777 /state
 
 # 마운트된 소스 디렉터리에 .pyc를 흘리지 않는다.
+# EMR_ROOT를 ENV로도 남긴다 — CMD와 worker.py가 런타임에 이 값을 읽는다.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/opt/worker-deps
+    PYTHONPATH=/opt/worker-deps \
+    EMR_ROOT=${EMR_ROOT} \
+    HOME=${EMR_ROOT}
 
-USER ${APP_USER}
+USER emr
 WORKDIR /app
 
 # 기본값은 SAM3D 워커. 사이드카는 compose에서 command로 덮어쓴다.
-CMD ["/home/tmvlem5671/miniconda3/envs/sam3d/bin/python", "-u", "/app/worker.py"]
+# exec 형식(JSON 배열)은 변수를 치환하지 않으므로 sh -c 를 거친다. exec 를 붙여
+# python이 PID 1을 이어받게 한다 — 안 그러면 SIGTERM이 전달되지 않아 컨테이너
+# 종료가 10초 타임아웃 뒤 SIGKILL이 되고, 작업 중이던 워커가 정리할 틈이 없다.
+CMD ["sh", "-c", "exec \"$EMR_ROOT/miniconda3/envs/sam3d/bin/python\" -u /app/worker.py"]

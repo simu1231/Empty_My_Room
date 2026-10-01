@@ -2,7 +2,7 @@
 # 인스턴스가 뜰 때마다 실행된다. 하는 일은 하나 — 이미 구워진 스택을 올린다.
 #
 # 여기서 모델을 내려받거나 conda 환경을 설치하거나 도커 이미지를 빌드하지 않는다.
-# 전부 AMI에 들어 있어야 한다(47GB). 부팅할 때마다 하면 콜드스타트가 수십 분이
+# 전부 AMI에 들어 있어야 한다(약 80GB). 부팅할 때마다 하면 콜드스타트가 수십 분이
 # 되고, 그러면 스케일투제로로 아낀 돈을 대기 시간으로 도로 토해낸다.
 #
 # 이 스크립트가 실패하면 **인스턴스를 스스로 회수한다**(아래 트랩). 실패한 채
@@ -15,6 +15,7 @@ exec > >(tee /var/log/emr-userdata.log | logger -t emr-userdata) 2>&1
 REPO=__REPO_DIR__
 IMAGE_TAG=__IMAGE_TAG__
 WARM_TIMEOUT=__WARM_TIMEOUT__
+EMR_ROOT=__EMR_ROOT__
 RETIRE=/opt/emr/bin/self-retire.sh
 
 # ── 실패 트랩 ────────────────────────────────────────────────────────────
@@ -43,6 +44,17 @@ STEP="저장소 확인"
 [ -d "$REPO" ] || { echo "[userdata] $REPO 가 없다 — AMI가 잘못됐다"; exit 1; }
 cd "$REPO"
 
+# ── 모델 루트 확인 ───────────────────────────────────────────────────────
+# compose가 이 경로들을 바인드 마운트한다. **없으면 도커가 조용히 빈 디렉터리를
+# root 소유로 만들어 준다.** 컨테이너는 정상적으로 뜨고, 리퍼도 뜨고, 겉보기엔
+# 다 성공한 뒤 첫 요청에서 ModuleNotFoundError로 죽는다. 여기서 먼저 깨뜨린다.
+STEP="모델 루트 확인"
+for d in "$EMR_ROOT/miniconda3" "$EMR_ROOT/sam-3d-objects" "$EMR_ROOT/uLayout" \
+         "$EMR_ROOT/omni3d" "$EMR_ROOT/detectron2" "$EMR_ROOT/pytorch3d_omni3d_build" \
+         "$EMR_ROOT/.cache/huggingface"; do
+  [ -d "$d" ] || { echo "[userdata] $d 가 없다 — AMI에 모델이 안 들어갔다"; exit 1; }
+done
+
 # ── 이미지 확인 ──────────────────────────────────────────────────────────
 # `docker compose up -d`는 이미지가 없으면 **그 자리에서 빌드한다**. 부팅 중
 # 빌드는 수십 분이고, 그동안 요금은 계속 나간다. 그래서 먼저 태그가 실제로
@@ -70,6 +82,7 @@ Q_SAM3D=__Q_SAM3D__
 Q_SCENE=__Q_SCENE__
 IDLE_EXIT_SEC=__IDLE_EXIT_SEC__
 EMR_IMAGE_TAG=$IMAGE_TAG
+EMR_ROOT=$EMR_ROOT
 DRY_RUN=0
 ENV
 umask 022
@@ -82,7 +95,7 @@ umask 022
 # 장치명(/dev/nvme1n1)을 찍지 않는다. 장치 번호는 볼륨 구성에 따라 바뀌고,
 # 틀리면 `|| true` 때문에 조용히 넘어가서 워밍이 아예 안 된 걸 모른다. 게다가
 # fio의 --runtime 은 상한이라(둘 중 먼저 오는 쪽) 125MB/s gp3에서 180초면
-# 47GB 중 22GB만 데운다. 파일 경로로 읽으면 장치와 무관하고, 필요한 가중치만
+# 80GB 중 22GB만 데운다. 파일 경로로 읽으면 장치와 무관하고, 필요한 가중치만
 # 읽어서 볼륨 전체보다 빠르다.
 warm() {
   local t0 n=0

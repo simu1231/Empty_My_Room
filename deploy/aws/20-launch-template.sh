@@ -17,6 +17,7 @@ sed -e "s|__REGION__|${AWS_REGION}|g" \
     -e "s|__Q_SCENE__|${Q_SCENE}|g" \
     -e "s|__IDLE_EXIT_SEC__|${IDLE_EXIT_SEC:-120}|g" \
     -e "s|__REPO_DIR__|${EMR_REPO_DIR}|g" \
+    -e "s|__EMR_ROOT__|${EMR_ROOT}|g" \
     -e "s|__IMAGE_TAG__|${EMR_IMAGE_TAG}|g" \
     -e "s|__WARM_DIRS__|${EMR_WARM_DIRS}|g" \
     -e "s|__WARM_TIMEOUT__|${EMR_WARM_TIMEOUT}|g" \
@@ -41,9 +42,42 @@ if [ "${#USERDATA_B64}" -gt 16384 ]; then
 fi
 echo "  유저데이터 ${#USERDATA_B64}/16384 바이트, 태그 ${EMR_IMAGE_TAG}"
 
+# ── 루트 볼륨 ────────────────────────────────────────────────────────────
+# 지금까지는 AMI가 들고 있는 볼륨 설정을 그대로 물려받았다. 두 가지가 통제 밖이었다:
+# 크기(굽던 인스턴스가 어쩌다 가진 값)와 DeleteOnTermination(false면 인스턴스가
+# 사라져도 볼륨만 남아 영원히 과금된다 — 스케일투제로에서 제일 조용한 누수다).
+#
+# 루트 장치 이름을 추측하지 않고 AMI에서 읽는다. 틀리면 EC2는 에러를 내지 않고
+# **루트와 별개인 추가 볼륨**을 하나 더 붙인다. 모델은 여전히 느린 루트에서 읽히고
+# 요금만 두 배가 된다.
+ROOT_DEV=$(aws ec2 describe-images --image-ids "$EMR_AMI_ID" \
+             --query 'Images[0].RootDeviceName' --output text)
+[ -n "$ROOT_DEV" ] && [ "$ROOT_DEV" != "None" ] || {
+  echo "✗ AMI $EMR_AMI_ID 의 루트 장치 이름을 읽지 못했습니다"; exit 1; }
+
+# 스냅샷보다 작은 볼륨은 만들 수 없다. 여기서 안 막으면 ASG 활동 기록에만 남는다.
+SNAP_GB=$(aws ec2 describe-images --image-ids "$EMR_AMI_ID" \
+            --query "Images[0].BlockDeviceMappings[?DeviceName=='$ROOT_DEV'].Ebs.VolumeSize | [0]" \
+            --output text)
+if [ "$SNAP_GB" != "None" ] && [ "${EMR_VOLUME_GB}" -lt "$SNAP_GB" ]; then
+  echo "✗ EMR_VOLUME_GB=${EMR_VOLUME_GB} 가 AMI 스냅샷 ${SNAP_GB}GB 보다 작습니다"; exit 1
+fi
+echo "  루트 장치 $ROOT_DEV / ${EMR_VOLUME_GB}GB gp3 ${EMR_VOLUME_THROUGHPUT}MB/s"
+
 cat > /tmp/emr-lt-data.json <<JSON
 {
   "ImageId": "${EMR_AMI_ID}",
+  "BlockDeviceMappings": [
+    {
+      "DeviceName": "${ROOT_DEV}",
+      "Ebs": {
+        "VolumeSize": ${EMR_VOLUME_GB},
+        "VolumeType": "gp3",
+        "Throughput": ${EMR_VOLUME_THROUGHPUT},
+        "DeleteOnTermination": true
+      }
+    }
+  ],
   "SecurityGroupIds": ["${EMR_SG_ID}"],
   "IamInstanceProfile": {"Name": "${PROFILE_NAME}"},
   "UserData": "${USERDATA_B64}",

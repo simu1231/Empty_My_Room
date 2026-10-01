@@ -73,11 +73,19 @@ export OD_FALLBACK_MIN=5
 export INSTANCE_TYPES="g6.xlarge g5.xlarge g6e.xlarge"
 
 # ── AMI / 이미지 ────────────────────────────────────────────────────────
+# conda 환경 · 모델 소스 · 가중치 · 저장소가 인스턴스에서 모두 이 아래 모인다.
+# 컨테이너도 **같은 절대경로**로 마운트한다(conda prefix와 editable 설치가
+# 경로를 박아두기 때문 — deploy/gpu/Dockerfile 머리말 참고).
+#
+# 이전에는 개발 PC의 홈 경로(/home/tmvlem5671/...)가 이미지와 compose에 박혀
+# 있었다. EC2 기본 사용자는 ubuntu라 그 경로가 없으니 컨테이너가 아예 못 떴고,
+# 그러면 리퍼도 없어서 인스턴스가 일 없이 영원히 과금되는 경로로 직행했다.
+# 로컬에서는 EMR_ROOT를 비워두면 compose가 ${HOME}을 쓴다(= 전과 동일).
+export EMR_ROOT=${EMR_ROOT:-/opt/emr}
+
 # 인스턴스 안에서 저장소가 어디에 있는지. userdata가 여기로 cd 한다.
-# 이전에는 개발 PC의 홈 경로(/home/tmvlem5671/...)가 박혀 있었다 — EC2 기본
-# 사용자는 ubuntu라서 그 경로가 없고, cd 실패 → userdata 죽음 → 리퍼도 안 뜸
-# → 인스턴스가 일 없이 영원히 과금되는 경로로 직행했다.
-export EMR_REPO_DIR=${EMR_REPO_DIR:-/opt/emr/Empty_My_Room}
+# compose의 sam3d/backend 마운트와 반드시 같아야 한다($EMR_ROOT/Empty_My_Room).
+export EMR_REPO_DIR=${EMR_REPO_DIR:-$EMR_ROOT/Empty_My_Room}
 
 # AMI에 구워 넣은 도커 이미지의 태그. bake-images.sh가 git SHA로 붙인다.
 # userdata는 부팅 때 이 태그가 실제로 있는지 확인하고, 없으면 빌드를 시도하지
@@ -87,9 +95,34 @@ export EMR_IMAGE_TAG=${EMR_IMAGE_TAG:-$(git -C "$(dirname "${BASH_SOURCE[0]}")/.
 # 부팅 때 미리 읽어둘 디렉터리(스냅샷 지연 로딩 해소용). 공백으로 구분.
 # 장치명(/dev/nvme1n1)을 찍지 않는다 — 장치 번호는 볼륨 구성에 따라 바뀌고,
 # 틀려도 조용히 넘어가서 워밍이 아예 안 된 걸 모른다. 파일 단위로 읽으면
-# 장치와 무관하고, 필요한 가중치만 읽어서 47GB 전체보다 빠르다.
-export EMR_WARM_DIRS=${EMR_WARM_DIRS:-"$EMR_REPO_DIR/sam-3d-objects $EMR_REPO_DIR/uLayout $EMR_REPO_DIR/omni3d"}
+# 장치와 무관하고, 필요한 것만 읽어서 볼륨 전체보다 빠르다.
+#
+# 순서가 곧 우선순위다(상한에 걸리면 뒤쪽은 첫 요청 때 읽힌다). 실제로 콜드스타트를
+# 지배하는 건 모델 가중치(HF 캐시 28G)와 conda 환경의 큰 .so(torch/cuda, 32G)다.
+# 소스 디렉터리(3.9G)는 대부분 작은 파일이라 >8M 필터에 거의 안 걸린다 — 뒤에 둔다.
+# (예전에는 $EMR_REPO_DIR/sam-3d-objects 처럼 **존재하지 않는** 경로를 가리켰고,
+#  warm()은 없는 디렉터리를 조용히 건너뛰므로 워밍이 0바이트인 걸 알 수 없었다.)
+export EMR_WARM_DIRS=${EMR_WARM_DIRS:-"$EMR_ROOT/.cache/huggingface $EMR_ROOT/miniconda3/envs $EMR_ROOT/sam-3d-objects $EMR_ROOT/uLayout $EMR_ROOT/omni3d"}
 export EMR_WARM_TIMEOUT=${EMR_WARM_TIMEOUT:-600}   # 워밍에 쓸 최대 시간(초)
+
+# ── 루트 볼륨 ───────────────────────────────────────────────────────────
+# AMI에 들어가는 실제 내용물이 약 80GB다(conda 32 + HF 캐시 28 + torch 캐시 3.4
+# + 소스 4 + 이미지 3 + OS/드라이버 8). 굽는 **도중에는** conda 패키지 캐시
+# (~/miniconda3/pkgs)가 35GB까지 부풀었다가 conda clean 으로 사라지므로,
+# 피크는 115GB다. 그래서 150GB로 잡는다 — 중간에 디스크가 차면 환경 설치가
+# 몇 시간 날아간다.
+#
+# 스냅샷 요금은 **쓴 블록만** 센다(약 80GB x $0.05 = 월 $4). 볼륨을 150으로
+# 잡아도 안 쓴 70GB는 돈을 안 낸다. 인스턴스가 떠 있는 동안의 볼륨 요금만
+# 150GB 기준이고, 스케일투제로라 그 시간이 짧다.
+export EMR_VOLUME_GB=${EMR_VOLUME_GB:-150}
+
+# gp3 기본값은 125 MB/s 다. 스냅샷에서 복원한 볼륨은 블록을 처음 읽을 때
+# S3에서 끌어오므로(지연 로딩), 이 숫자가 부팅 워밍 속도의 상한이 된다.
+# 125 MB/s면 80GB를 다 데우는 데 10분 이상이라 EMR_WARM_TIMEOUT(600초)에 걸린다.
+# 올리면 빨라지지만 125 초과분은 MB/s당 월 $0.04다(250이면 월 $5, 떠 있는
+# 시간만큼 비례 과금). 첫 실부팅 로그의 [warm] 줄을 보고 조정한다.
+export EMR_VOLUME_THROUGHPUT=${EMR_VOLUME_THROUGHPUT:-250}
 
 # ── 가디언(요금 폭주 차단) ──────────────────────────────────────────────
 # 리퍼는 컴포즈 스택 안의 컨테이너다. 그래서 컴포즈가 안 뜨면 리퍼도 없고,

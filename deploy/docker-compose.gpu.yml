@@ -9,22 +9,30 @@
 #
 # 전제: nvidia-container-toolkit 설치 (컨테이너에 호스트 GPU 드라이버를 주입한다)
 
+x-gpu-build: &gpu_build
+  context: ./worker
+  dockerfile: ../gpu/Dockerfile
+  args:
+    # 이미지 안 경로를 호스트와 맞추기 위해 빌드 시점에 넣는다.
+    # 로컬은 ${HOME}, AWS는 config.sh의 EMR_ROOT(/opt/emr).
+    EMR_ROOT: ${EMR_ROOT:-${HOME}}
+
 x-mounts: &model_mounts
   # 컨테이너 안 경로를 호스트와 똑같이 맞춘다. conda prefix와 editable 설치 경로가
   # 절대경로로 박혀 있어서, 다른 위치에 붙이면 import 자체가 깨진다.
-  - ${HOME}/miniconda3:${HOME}/miniconda3:ro
-  - ${HOME}/sam-3d-objects:${HOME}/sam-3d-objects:ro
-  - ${HOME}/uLayout:${HOME}/uLayout:ro
-  - ${HOME}/omni3d:${HOME}/omni3d:ro
+  - ${EMR_ROOT:-${HOME}}/miniconda3:${EMR_ROOT:-${HOME}}/miniconda3:ro
+  - ${EMR_ROOT:-${HOME}}/sam-3d-objects:${EMR_ROOT:-${HOME}}/sam-3d-objects:ro
+  - ${EMR_ROOT:-${HOME}}/uLayout:${EMR_ROOT:-${HOME}}/uLayout:ro
+  - ${EMR_ROOT:-${HOME}}/omni3d:${EMR_ROOT:-${HOME}}/omni3d:ro
   # omni3d 환경의 detectron2/pytorch3d는 editable 설치라 site-packages에
   # 코드가 없고 아래 소스 디렉터리를 가리킨다. 안 붙이면 ModuleNotFoundError다.
   # (pytorch3d는 ~/pytorch3d 가 아니라 omni3d 전용 빌드 쪽을 가리킨다)
-  - ${HOME}/detectron2:${HOME}/detectron2:ro
-  - ${HOME}/pytorch3d_omni3d_build:${HOME}/pytorch3d_omni3d_build:ro
-  - ${HOME}/Empty_My_Room/sam3d/backend:${HOME}/Empty_My_Room/sam3d/backend:ro
+  - ${EMR_ROOT:-${HOME}}/detectron2:${EMR_ROOT:-${HOME}}/detectron2:ro
+  - ${EMR_ROOT:-${HOME}}/pytorch3d_omni3d_build:${EMR_ROOT:-${HOME}}/pytorch3d_omni3d_build:ro
+  - ${EMR_ROOT:-${HOME}}/Empty_My_Room/sam3d/backend:${EMR_ROOT:-${HOME}}/Empty_My_Room/sam3d/backend:ro
   # HuggingFace 캐시(28GB)가 실질적인 가중치 저장소다. 락 파일을 쓰므로 rw로 붙인다.
-  - ${HOME}/.cache/huggingface:${HOME}/.cache/huggingface
-  - ${HOME}/.cache/torch:${HOME}/.cache/torch
+  - ${EMR_ROOT:-${HOME}}/.cache/huggingface:${EMR_ROOT:-${HOME}}/.cache/huggingface
+  - ${EMR_ROOT:-${HOME}}/.cache/torch:${EMR_ROOT:-${HOME}}/.cache/torch
 
 # WSL2의 dxg 드라이버는 공유 GPU 리소스마다 fd를 하나씩 쓴다. Docker 기본
 # 소프트 한도가 1024라서, 파이프라인을 캐시해 둔 채 두 번째 작업을 돌리면
@@ -47,14 +55,12 @@ x-gpu: &gpu_reservation
 services:
   # ── SAM3D 워커 (GPU, 무거움) ──────────────────────────────────────────
   worker-sam3d:
-    build:
-      context: ./worker
-      dockerfile: ../gpu/Dockerfile
+    build: *gpu_build
     image: emr/gpu:${EMR_IMAGE_TAG:-dev}
     environment:
       MOCK: "0"
-      HOME: ${HOME}
-      SAM3D_BACKEND_DIR: ${HOME}/Empty_My_Room/sam3d/backend
+      HOME: ${EMR_ROOT:-${HOME}}
+      SAM3D_BACKEND_DIR: ${EMR_ROOT:-${HOME}}/Empty_My_Room/sam3d/backend
       # 캐싱 할당자가 세그먼트를 넓혀 쓰게 해 단편화를 줄인다(services.sh와 동일).
       PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
     volumes: *model_mounts
@@ -83,18 +89,16 @@ services:
 
   # ── uLayout 사이드카 (GPU) ────────────────────────────────────────────
   ulayout:
-    build:
-      context: ./worker
-      dockerfile: ../gpu/Dockerfile
+    build: *gpu_build
     image: emr/gpu:${EMR_IMAGE_TAG:-dev}
-    working_dir: ${HOME}/uLayout
-    command: ["${HOME}/miniconda3/envs/uLayout/bin/python", "-u", "server.py"]
+    working_dir: ${EMR_ROOT:-${HOME}}/uLayout
+    command: ["${EMR_ROOT:-${HOME}}/miniconda3/envs/uLayout/bin/python", "-u", "server.py"]
     environment:
-      HOME: ${HOME}
+      HOME: ${EMR_ROOT:-${HOME}}
     # /health는 모델이 안 올라가도 status:ok 를 반환한다. 그래서 status가 아니라
     # ulayout_loaded 플래그를 봐야 한다. 이미지에 curl이 없어 python으로 짠다.
     healthcheck:
-      test: ["CMD", "${HOME}/miniconda3/envs/uLayout/bin/python", "-c",
+      test: ["CMD", "${EMR_ROOT:-${HOME}}/miniconda3/envs/uLayout/bin/python", "-c",
              "import urllib.request,json,sys; d=json.load(urllib.request.urlopen('http://localhost:8002/health',timeout=5)); sys.exit(0 if d.get('ulayout_loaded') else 1)"]
       interval: 10s
       timeout: 10s
@@ -106,20 +110,18 @@ services:
 
   # ── Omni3D 사이드카 (GPU) ─────────────────────────────────────────────
   omni3d:
-    build:
-      context: ./worker
-      dockerfile: ../gpu/Dockerfile
+    build: *gpu_build
     image: emr/gpu:${EMR_IMAGE_TAG:-dev}
-    working_dir: ${HOME}/omni3d
-    command: ["${HOME}/miniconda3/envs/omni3d/bin/python", "-u", "server.py"]
+    working_dir: ${EMR_ROOT:-${HOME}}/omni3d
+    command: ["${EMR_ROOT:-${HOME}}/miniconda3/envs/omni3d/bin/python", "-u", "server.py"]
     environment:
-      HOME: ${HOME}
+      HOME: ${EMR_ROOT:-${HOME}}
       # pytorch3d._C 로드에 이 env의 torch/lib이 필요하다(services.sh와 동일한 이유).
-      LD_LIBRARY_PATH: ${HOME}/miniconda3/envs/omni3d/lib/python3.10/site-packages/torch/lib
+      LD_LIBRARY_PATH: ${EMR_ROOT:-${HOME}}/miniconda3/envs/omni3d/lib/python3.10/site-packages/torch/lib
     # /health는 모델이 안 올라가도 status:ok 를 반환한다. 그래서 status가 아니라
     # omni3d_loaded 플래그를 봐야 한다. 이미지에 curl이 없어 python으로 짠다.
     healthcheck:
-      test: ["CMD", "${HOME}/miniconda3/envs/omni3d/bin/python", "-c",
+      test: ["CMD", "${EMR_ROOT:-${HOME}}/miniconda3/envs/omni3d/bin/python", "-c",
              "import urllib.request,json,sys; d=json.load(urllib.request.urlopen('http://localhost:8003/health',timeout=5)); sys.exit(0 if d.get('omni3d_loaded') else 1)"]
       interval: 10s
       timeout: 10s

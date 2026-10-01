@@ -30,8 +30,11 @@ MOCK       = os.getenv("MOCK", "0") == "1"
 
 # SAM3D 추론 모듈이 있는 디렉터리. 컨테이너 안에서도 호스트와 같은 절대경로로
 # 마운트한다(conda prefix와 editable 설치가 경로에 박혀 있어서 옮길 수 없다).
+# 기본값에 특정 사람의 홈 경로를 박아두지 않는다 — 그 PC 밖에서는 전부 틀린다.
+# EMR_ROOT는 이미지에 구워져 있고(gpu/Dockerfile), compose가 다시 덮어쓴다.
+EMR_ROOT    = os.getenv("EMR_ROOT", os.path.expanduser("~"))
 BACKEND_DIR = os.getenv(
-    "SAM3D_BACKEND_DIR", "/home/tmvlem5671/Empty_My_Room/sam3d/backend"
+    "SAM3D_BACKEND_DIR", os.path.join(EMR_ROOT, "Empty_My_Room/sam3d/backend")
 )
 
 # 사이드카 주소. 로컬에서는 localhost, 컴포즈/운영에서는 서비스 이름이 들어온다.

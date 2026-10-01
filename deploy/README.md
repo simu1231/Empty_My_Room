@@ -361,16 +361,33 @@ GPU 컨테이너는 conda 환경과 소스를 **호스트에서 bind-mount로 �
 
 | 항목 | 크기 |
 |---|---|
-| conda 환경 (sam3d 12G + uLayout 6.9G + omni3d 13G) | 31.9 GB |
-| 소스 (sam-3d-objects 2.3G + uLayout 1.2G + 나머지 0.5G) | 4.0 GB |
+| conda 환경 3개 (sam3d 19G + uLayout 7.0G + omni3d 5.9G) | 32 GB |
+| HuggingFace 캐시 — 실질적인 **모델 가중치 저장소** | 28 GB |
+| torch 캐시 | 3.4 GB |
+| 소스 5개 (sam-3d-objects 2.3G + uLayout 1.2G + 나머지 0.5G) | 4.0 GB |
+| miniconda3 본체(base 환경) | 약 1 GB |
+| 저장소(web 빌드 산출물 제외) | 0.3 GB |
 | 도커 이미지 | 3.0 GB |
-| OS + 드라이버 | 약 8 GB |
-| **AMI 합계** | **약 47 GB** |
+| OS + NVIDIA 드라이버 | 약 8 GB |
+| **AMI 합계** | **약 80 GB** |
+
+> 앞서 이 표에 **47GB**라고 적어뒀었는데 틀렸다. HuggingFace 캐시 28GB가 빠져
+> 있었다. 가중치가 conda 환경 안이 아니라 `~/.cache/huggingface` 에 있어서
+> "환경 + 소스"만 세면 제일 큰 덩어리를 통째로 놓친다. 볼륨을 80GB로 잡았으면
+> 환경 설치 중에 디스크가 찼을 것이다.
+
+**굽는 도중 피크는 115GB다.** `conda create` 가 받은 패키지가
+`~/miniconda3/pkgs` 에 35GB까지 쌓였다가 `conda clean -a` 로 사라진다. 그래서
+루트 볼륨은 150GB로 잡는다(`EMR_VOLUME_GB`). 스냅샷 요금은 **쓴 블록만** 세므로
+안 쓴 70GB는 돈을 안 낸다 — 넉넉히 잡는 쪽이 싸다. 정리를 깜빡하면
+`verify-ami.sh` 가 경고한다.
 
 스냅샷에서 복원한 EBS 볼륨은 블록을 **처음 읽을 때** S3에서 지연 로딩된다. 이 중 실제로
 읽는 10GB 남짓을 실효 50~100MB/s로 당겨오면 첫 부팅에만 2분 이상이 더 붙는다. EBS Fast
 Snapshot Restore가 이 문제를 없애주지만 스냅샷·AZ당 시간 $0.75(월 $540)라 스케일투제로
-취지에 정면으로 어긋난다 — 쓰지 않는다.
+취지에 정면으로 어긋난다 — 쓰지 않는다. 대신 루트 볼륨 처리량을 gp3 기본 125에서
+250 MB/s로 올려뒀다(`EMR_VOLUME_THROUGHPUT`). 125 초과분은 MB/s당 월 $0.04이고
+인스턴스가 떠 있는 시간만큼만 비례 과금된다.
 
 ## 4단계: 오토스케일링 + 스케일투제로
 
@@ -585,7 +602,9 @@ aws ec2 create-image --instance-id i-xxxx --name emr-gpu-<sha> --no-reboot
 `verify-ami.sh`가 보는 것: aws CLI, `/opt/emr/bin/self-retire.sh`,
 `emr-guardian.timer` enabled, docker 자동 시작, nvidia 런타임, 세 이미지 태그
 존재, `emr/worker`와 `emr/gpu`가 서로 다른 이미지인지(태그 덮어쓰기 사고),
-가중치 디렉터리, `.env`와 `~/.aws`가 남아있지 않은지.
+가중치 디렉터리, 마운트 경로와 이미지에 구워진 `EMR_ROOT` 가 일치하는지,
+HF 캐시 소유자가 uid 1000인지, conda 패키지 캐시가 정리됐는지,
+`.env`와 `~/.aws`가 남아있지 않은지.
 
 마지막 항목을 확인할 때 `sudo -n`을 쓴다. sudo가 비밀번호를 물어보며 실패하면
 `test -e`도 실패하는데, 그걸 "파일 없음"으로 읽으면 **확인하지 못한 것을
@@ -596,6 +615,7 @@ aws ec2 create-image --instance-id i-xxxx --name emr-gpu-<sha> --no-reboot
 | 단계 | 하는 일 | 실패하면 |
 |---|---|---|
 | 저장소 확인 | `$EMR_REPO_DIR` 존재 확인 | 회수 |
+| 모델 루트 확인 | `$EMR_ROOT` 아래 마운트 대상 7개 | 회수 |
 | 이미지 태그 확인 | 세 이미지가 AMI에 있는지 | 회수(빌드 안 함) |
 | 환경변수 주입 | `deploy/.env` 생성(umask 077) | 회수 |
 | 스냅샷 워밍 | 가중치 파일 미리 읽기 | 계속(느려질 뿐) |
@@ -611,11 +631,57 @@ aws ec2 create-image --instance-id i-xxxx --name emr-gpu-<sha> --no-reboot
 - 장치 번호는 볼륨 구성에 따라 바뀐다. 가중치가 루트 볼륨(`nvme0n1`)에 있으면
   엉뚱한 장치를 읽는데, `|| true` 때문에 **조용히** 넘어간다.
 - `fio`의 `--runtime`은 상한이다("둘 중 먼저 오는 쪽"). 125MB/s gp3에서 180초면
-  47GB 중 22GB만 데운다. 나머지는 첫 요청 때 지연 로딩된다.
+  80GB 중 22GB만 데운다. 나머지는 첫 요청 때 지연 로딩된다.
 - 볼륨 전체를 읽을 필요도 없다. 필요한 건 가중치뿐이다.
 
 지금은 `EMR_WARM_DIRS`의 8MB 이상 파일만 `EMR_WARM_TIMEOUT`(600초) 안에서 읽는다.
-장치와 무관하고, 없는 디렉터리는 건너뛰되 로그에 남긴다.
+장치와 무관하고, 없는 디렉터리는 건너뛰되 로그에 남긴다. 순서가 곧 우선순위라
+HF 캐시 → conda 환경 → 소스 순으로 둔다(상한에 걸리면 뒤쪽은 첫 요청 때 읽힌다).
+
+> `EMR_WARM_DIRS` 는 한동안 `$EMR_REPO_DIR/sam-3d-objects` 처럼 **존재하지 않는**
+> 경로를 가리키고 있었다(실제 위치는 `$EMR_ROOT/` 아래다). `warm()` 은 없는
+> 디렉터리를 건너뛰므로 에러도 안 나고, 워밍이 0바이트인 걸 알 방법이 없었다.
+> 지금은 `verify-ami.sh` 가 `EMR_WARM_DIRS` 의 모든 경로를 실제로 확인한다.
+
+#### 왜 경로를 `/opt/emr` 로 통일했나
+
+GPU 컨테이너는 conda 환경과 소스를 **호스트와 똑같은 절대경로**로 마운트한다.
+conda prefix와 editable 설치가 경로를 파일 안에 박아두기 때문에, 다른 위치에
+붙이면 `import` 부터 깨진다(`deploy/gpu/Dockerfile` 머리말 참고).
+
+문제는 그 경로가 개발 PC의 홈(`/home/<개인계정>`)으로 **박혀** 있었다는 것이다.
+
+- `gpu/Dockerfile` 의 `CMD` 가 그 경로의 python을 직접 가리켰다
+- `docker-compose.gpu.yml` 의 마운트·`command`·`healthcheck` 가 전부 `${HOME}` 기준
+- 게다가 userdata는 root로 도니까 거기서는 `${HOME}` 이 `/root` 가 된다
+
+EC2 기본 사용자는 `ubuntu` 라 그 경로가 아예 없다. 그런데 **도커는 마운트 원본이
+없어도 에러를 내지 않는다** — 빈 디렉터리를 root 소유로 만들어 준다. 컨테이너는
+정상적으로 뜨고, 리퍼도 뜨고, ASG도 정상으로 보다가, 첫 요청에서
+`ModuleNotFoundError` 로 죽는다. 그동안 요금은 계속 나간다.
+
+그래서 루트를 `EMR_ROOT` 로 뺐다.
+
+| | 값 | 어디서 |
+|---|---|---|
+| 로컬 | `${HOME}` (= 전과 동일) | `EMR_ROOT` 미설정 → compose 기본값 |
+| AWS | `/opt/emr` | `config.sh` → `deploy/.env` → compose |
+| 이미지 | 빌드 인자 `EMR_ROOT` 로 구움 | `docker-compose.gpu.yml` 의 `args` |
+
+덤으로 Dockerfile에서 개인 계정명이 사라졌다. 이 PC를 같이 쓰는 다른 두 사람도
+이제 이미지를 빌드해서 쓸 수 있다(전에는 빌드는 되는데 실행이 안 됐다).
+
+경로가 어긋났을 때 **첫 요청까지 가지 않고** 깨지도록 세 군데서 막는다.
+
+| 언제 | 무엇을 | 어디 |
+|---|---|---|
+| 굽기 전 | 저장소 위치 = `EMR_REPO_DIR`, 마운트 원본 7개, HF 캐시 소유자 uid 1000 | `bake-ami.sh` |
+| 스냅샷 전 | 위 전부 + **이미지에 구워진 `EMR_ROOT` 가 설정과 같은지** | `verify-ami.sh` |
+| 부팅 때 | 마운트 원본 7개 | `userdata.sh` (실패 시 회수) |
+
+컨테이너가 uid 1000으로 도는 것도 같이 본다. HuggingFace 캐시는 락 파일을 쓰므로
+읽기만으로는 부족한데, `/opt/emr` 을 root로 깔아두기 쉽다. 그러면 첫 추론에서
+`PermissionError` 다 — `sudo chown -R 1000:1000 /opt/emr`.
 
 ### 실행 순서
 

@@ -10,6 +10,7 @@ sam3d를 3번 돌리는 이유는 파이프라인 캐시(콜드/웜)를 보기 �
 """
 import os
 import sys
+import pathlib
 import json
 import time
 import tempfile
@@ -18,6 +19,9 @@ import requests
 
 API = "http://localhost:8000"
 IMG = os.path.join(tempfile.gettempdir(), "emr_test_input.png")
+
+# 이 파일 기준으로 저장소 루트를 찾는다(개인 홈 경로를 박지 않는다).
+REPO_ROOT = str(pathlib.Path(__file__).resolve().parent.parent)
 
 
 def ensure_image():
@@ -53,7 +57,7 @@ def worker_fds():
             ["sg","docker","-c",
              "docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml "
              "exec -T worker-sam3d sh -c 'ls /proc/1/fd | wc -l'"],
-            capture_output=True, text=True, timeout=30, cwd="/home/tmvlem5671/Empty_My_Room")
+            capture_output=True, text=True, timeout=30, cwd=REPO_ROOT)
         return int(out.stdout.strip().splitlines()[-1])
     except Exception:
         return -1

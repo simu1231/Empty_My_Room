@@ -14,7 +14,28 @@ cd "$(dirname "$0")"
 . ./config.sh
 
 REPO_ROOT=$(cd ../.. && pwd)
-echo "▶ 저장소 $REPO_ROOT / 태그 $EMR_IMAGE_TAG"
+echo "▶ 저장소 $REPO_ROOT / 루트 $EMR_ROOT / 태그 $EMR_IMAGE_TAG"
+
+# ── 0. 경로 점검 ─────────────────────────────────────────────────────────
+# 컨테이너는 호스트와 **같은 절대경로**로 모델을 마운트한다. 이 인스턴스의 실제
+# 배치가 config.sh의 EMR_ROOT와 어긋나면 컨테이너는 멀쩡히 뜬 뒤 첫 요청에서
+# import 에러로 죽는다 — 그때는 이미 AMI를 구운 뒤다. 굽기 전에 깨뜨린다.
+[ "$REPO_ROOT" = "$EMR_REPO_DIR" ] || {
+  echo "✗ 저장소는 $REPO_ROOT 에 있는데 config.sh는 $EMR_REPO_DIR 를 가리킨다"
+  echo "  저장소를 옮기거나 EMR_ROOT 를 맞추세요."; exit 1; }
+
+for d in miniconda3 sam-3d-objects uLayout omni3d detectron2 \
+         pytorch3d_omni3d_build .cache/huggingface; do
+  [ -d "$EMR_ROOT/$d" ] || { echo "✗ $EMR_ROOT/$d 가 없다 — 설치가 덜 끝났다"; exit 1; }
+done
+
+# 컨테이너는 uid 1000으로 돈다(호스트 파일을 uid로 매칭한다). HF 캐시는 락 파일을
+# 쓰므로 읽기만으로는 부족하다. root 소유로 깔아두면 첫 추론에서 PermissionError다.
+_owner=$(stat -c %u "$EMR_ROOT/.cache/huggingface")
+[ "$_owner" = "1000" ] || {
+  echo "✗ $EMR_ROOT/.cache/huggingface 소유자가 uid $_owner (uid 1000이어야 한다)"
+  echo "  sudo chown -R 1000:1000 $EMR_ROOT"; exit 1; }
+unset _owner
 
 # ── 1. 이미지 빌드 ───────────────────────────────────────────────────────
 # 컴포즈 파일에 image: 태그를 박아뒀으므로 build 만으로 태그가 붙는다.

@@ -68,6 +68,37 @@ for d in $EMR_WARM_DIRS; do
   else bad "$d 없음 — 모델 가중치가 AMI에 안 들어갔다"; fi
 done
 
+echo "▶ 경로 일치 (루트 $EMR_ROOT)"
+# 이게 이 스크립트에서 제일 중요한 검사다. 컨테이너는 호스트와 **같은 절대경로**로
+# 모델을 마운트하는데, 경로가 하나라도 없으면 도커는 에러를 내지 않고 빈 디렉터리를
+# root 소유로 만들어 준다. 그러면 스택은 멀쩡히 뜨고 리퍼도 뜨고 ASG도 정상으로
+# 보다가, 첫 요청에서 ModuleNotFoundError로 죽는다 — 그때까지 요금은 계속 나간다.
+for d in miniconda3 sam-3d-objects uLayout omni3d detectron2 \
+         pytorch3d_omni3d_build .cache/huggingface .cache/torch; do
+  [ -d "$EMR_ROOT/$d" ] && ok "$EMR_ROOT/$d" \
+    || bad "$EMR_ROOT/$d 없음 — 도커가 빈 디렉터리로 때워서 첫 요청에서 죽는다"
+done
+[ -d "$EMR_REPO_DIR/sam3d/backend" ] && ok "$EMR_REPO_DIR/sam3d/backend" \
+  || bad "$EMR_REPO_DIR/sam3d/backend 없음 (compose 마운트 대상)"
+
+# 이미지에 구워진 EMR_ROOT 가 지금 설정과 같은지. 다르면 컨테이너 안의 python
+# 경로가 호스트 마운트와 어긋나 역시 첫 요청에서 죽는다.
+BAKED=$(docker image inspect "emr/gpu:$EMR_IMAGE_TAG" \
+          --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+        | sed -n 's/^EMR_ROOT=//p')
+if [ -z "$BAKED" ]; then
+  bad "emr/gpu 이미지에 EMR_ROOT 가 없다 — 옛 Dockerfile로 구운 이미지다"
+elif [ "$BAKED" != "$EMR_ROOT" ]; then
+  bad "이미지에 구워진 EMR_ROOT=$BAKED 인데 설정은 $EMR_ROOT 다 — 다시 빌드해야 한다"
+else
+  ok "이미지에 구워진 EMR_ROOT 가 설정과 같다"
+fi
+
+# 컨테이너는 uid 1000으로 돈다. HF 캐시는 락 파일을 쓰므로 쓰기 권한이 필요하다.
+HF_UID=$(stat -c %u "$EMR_ROOT/.cache/huggingface" 2>/dev/null || echo "?")
+[ "$HF_UID" = "1000" ] && ok "HF 캐시 소유자 uid 1000" \
+  || bad "HF 캐시 소유자가 uid $HF_UID — 첫 추론에서 PermissionError (sudo chown -R 1000:1000 $EMR_ROOT)"
+
 echo "▶ 위생"
 [ -f "$EMR_REPO_DIR/deploy/.env" ] \
   && warn ".env 가 남아있다 — userdata가 덮어쓰지만 AMI 공유 시 새어나간다" \
@@ -83,6 +114,14 @@ for p in /root/.aws /home/ubuntu/.aws; do
     ok "$p 없음"
   fi
 done
+# conda 패키지 캐시는 환경을 만들고 나면 쓸모가 없는데 35GB까지 부푼다.
+# 스냅샷은 쓴 블록만 세므로, 이걸 안 지우면 매달 그 35GB만큼 돈을 더 낸다.
+PKGS=$(du -sm "$EMR_ROOT/miniconda3/pkgs" 2>/dev/null | cut -f1 || echo 0)
+if [ "${PKGS:-0}" -gt 2048 ]; then
+  warn "conda 패키지 캐시가 $(( PKGS / 1024 ))GB 남아있다 — 'conda clean -a -y' 로 지우면 스냅샷이 그만큼 작아진다"
+else
+  ok "conda 패키지 캐시 정리됨 (${PKGS}MB)"
+fi
 df -h / | awk 'NR==2 {printf "  ✔ 루트 %s 중 %s 사용 (여유 %s)\n", $2, $3, $4}'
 
 echo
