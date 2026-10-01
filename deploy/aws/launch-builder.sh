@@ -248,8 +248,11 @@ cat <<NEXT
      (떨어졌으면 재접속 후 \`tmux attach -t build\`. 끊긴 조각은 다시 받고
       끝난 조각은 건너뜁니다.)
 
-  3) 이미지 빌드 → 검증
-       cd $EMR_REPO_DIR/deploy/aws && bash bake-ami.sh && bash verify-ami.sh
+  3) 이미지 빌드 → 실동작 → 검증. **한 줄씩** 따로 돌리고 출력을 봅니다
+       cd $EMR_REPO_DIR/deploy/aws
+       bash bake-ami.sh     # 세 이미지를 git SHA 태그로 빌드
+       bash smoke-test.sh   # 스택을 띄워 세 모델에 진짜 작업을 통과시킨다
+       bash verify-ami.sh   # AMI가 되기 위한 조건 점검
 
   4) 통과하면 **개발 PC에서** 스냅샷을 찍습니다
        aws ec2 create-image --instance-id $IID \\
