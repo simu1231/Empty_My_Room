@@ -114,6 +114,38 @@ else
   unset _n _broken
 fi
 
+# 위까지는 체크포인트 **파일**이 제자리에 있는지만 봤다. 파일이 있어도 코드가
+# 다른 곳을 보고 있으면 똑같이 첫 추론에서 죽는다. 실제로 그랬다 —
+# sam3d_runner.CKPT_DIR 의 기본값에 개발 PC의 홈 경로가 박혀 있었고,
+# SAM3D_CKPT_DIR 을 설정하는 곳은 저장소 어디에도 없었다. 즉 EC2에서는 **항상**
+# 그 폴백이 쓰였다. 게다가 워커는 작업을 받을 때까지 load_pipeline() 을 부르지
+# 않으므로 컨테이너는 정상으로 뜨고 리퍼도 돌고 ASG 헬스체크도 통과한다.
+# 어긋남은 **첫 요청에서야** 드러난다 — 이 스크립트 머리말이 말하는 그 실패다.
+#
+# 그래서 경로를 여기서 다시 계산하지 않는다(그러면 같은 버그를 복사하는 꼴이다).
+# AMI에 들어간 conda 환경의 python 으로 모듈을 **실제로 import 해서** 코드가
+# 해석한 값을 받아온다. 컨테이너도 같은 prefix 의 같은 env 를 쓰므로 결과가 같다.
+PYBIN=$EMR_ROOT/miniconda3/envs/sam3d/bin/python
+if [ ! -x "$PYBIN" ]; then
+  bad "$PYBIN 없음 — sam3d conda 환경이 안 풀렸다"
+else
+  _err=$(mktemp)
+  CODE_CKPT=$(EMR_ROOT="$EMR_ROOT" PYTHONPATH="$EMR_REPO_DIR/sam3d/backend" \
+    "$PYBIN" -c 'from services import sam3d_runner as r; print("CKPT_DIR="+r.CKPT_DIR)' \
+    2>"$_err" | sed -n 's/^CKPT_DIR=//p')
+  if [ -z "$CODE_CKPT" ]; then
+    bad "sam3d_runner 를 import 하지 못했다: $(tail -1 "$_err")"
+  elif [ "$CODE_CKPT" != "$HFCK" ]; then
+    # 개인 홈 경로가 그대로 남아 있으면 여기서 걸린다.
+    bad "코드가 보는 CKPT_DIR=$CODE_CKPT 인데 가중치는 $HFCK 에 있다 — 첫 추론에서 죽는다"
+  elif [ ! -f "$CODE_CKPT/pipeline.yaml" ]; then
+    bad "코드가 보는 $CODE_CKPT 에 pipeline.yaml 이 없다"
+  else
+    ok "코드가 보는 CKPT_DIR 이 $EMR_ROOT 아래 가중치와 같다"
+  fi
+  rm -f "$_err"; unset _err
+fi
+
 # 컨테이너는 uid 1000으로 돈다. HF 캐시는 락 파일을 쓰므로 쓰기 권한이 필요하다.
 HF_UID=$(stat -c %u "$EMR_ROOT/.cache/huggingface" 2>/dev/null || echo "?")
 [ "$HF_UID" = "1000" ] && ok "HF 캐시 소유자 uid 1000" \
