@@ -155,15 +155,28 @@ echo "▶ 위생"
 [ -f "$EMR_REPO_DIR/deploy/.env" ] \
   && warn ".env 가 남아있다 — userdata가 덮어쓰지만 AMI 공유 시 새어나간다" \
   || ok ".env 없음(부팅 때 생성된다)"
+# 디렉터리 **존재**로 판정하면 안 된다. config.sh 가 계정 번호를 얻으려고
+# `aws sts get-caller-identity` 를 부르고, CLI v2 는 그때마다 ~/.aws/cli/cache/
+# session.db 를 쓴다. 그런데 이 스크립트 자신이 맨 위에서 config.sh 를 읽는다 —
+# 즉 자기가 만든 파일을 자기가 잡고 실패한다. 실제로 그랬다. bake-ami.sh 가
+# 지워도 그 뒤에 돌리라고 안내한 smoke-test.sh / verify-ami.sh 가 되살린다.
+#
+# 그래서 둘을 나눈다.
+#   - credentials / config : 정적 키다. 있으면 AMI를 공유하는 순간 같이 나간다 → 실패
+#   - cli/cache/session.db : CLI 텔레메트리용이다. 열어보니 테이블이
+#     session(key, session_id, timestamp) 와 host_id(key, id) 뿐이고 키 문자열은
+#     없었다. 보안 문제는 아니지만 **호스트 식별자**라서, 구워두면 이 AMI로 뜬
+#     인스턴스가 전부 같은 id를 공유한다(machine-id 와 같은 성격). 아래에서 지운다.
+#
 # sudo -n 을 쓴다. 비밀번호 프롬프트로 sudo가 실패하면 test 도 실패하는데,
 # 그걸 "파일 없음"으로 읽으면 확인하지 못한 것을 통과시킨다.
 for p in /root/.aws /home/ubuntu/.aws; do
   if ! sudo -n true 2>/dev/null; then
     warn "$p — sudo 불가라 확인하지 못했다(직접 봐야 한다)"
-  elif sudo -n test -e "$p"; then
-    bad "$p 가 AMI에 남아있다 — 인스턴스 역할을 쓰므로 있어선 안 된다"
+  elif sudo -n sh -c "[ -f '$p/credentials' ] || [ -f '$p/config' ]"; then
+    bad "$p 에 정적 자격증명이 있다 — 인스턴스 역할을 쓰므로 있어선 안 된다"
   else
-    ok "$p 없음"
+    ok "$p 정적 자격증명 없음"
   fi
 done
 # conda 패키지 캐시는 환경을 만들고 나면 쓸모가 없는데 35GB까지 부푼다.
@@ -178,6 +191,13 @@ df -h / | awk 'NR==2 {printf "  ✔ 루트 %s 중 %s 사용 (여유 %s)\n", $2, 
 
 echo
 if [ "$FAIL" -eq 0 ]; then
+  # **여기가 인스턴스에서 도는 마지막 코드다.** 다음 단계인 create-image 는 개발
+  # PC에서 부른다. config.sh 를 읽는 스크립트는 전부 CLI 캐시를 되살리므로,
+  # 지우고도 안 되살아나는 자리는 여기뿐이다. 검사가 다 통과했을 때만 지운다.
+  sudo -n rm -rf /root/.aws/cli /home/ubuntu/.aws/cli 2>/dev/null \
+    && echo "  ✔ CLI 세션 캐시 제거(호스트 식별자가 AMI에 굳지 않게)" \
+    || echo "  ! CLI 세션 캐시를 못 지웠다 — sudo rm -rf ~/.aws/cli 를 직접 돌릴 것"
+  echo
   echo "✔ 검증 통과 — 스냅샷을 찍어도 된다."
   echo "  aws ec2 create-image --instance-id <이 인스턴스> --name emr-gpu-$EMR_IMAGE_TAG --no-reboot"
 else
