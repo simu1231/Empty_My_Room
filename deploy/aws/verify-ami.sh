@@ -94,6 +94,26 @@ else
   ok "이미지에 구워진 EMR_ROOT 가 설정과 같다"
 fi
 
+# SAM3D 가중치 12.3GB로 가는 길. 파이프라인은 pipeline.yaml 과 같은 디렉터리의
+# *.ckpt / *.pt 를 읽는데, 그게 HF 캐시의 blob 파일명(sha256)으로 걸린 **상대**
+# 심링크 7개다. 캐시를 통째로 옮기지 않고 새로 받으면 blob 이름이 달라져 여기가
+# 끊기고, 스택은 멀쩡히 뜬 뒤 첫 추론에서 죽는다. 굽기 전에 잡을 마지막 지점이다.
+HFCK=$EMR_ROOT/sam-3d-objects/checkpoints/hf/checkpoints
+if [ ! -f "$HFCK/pipeline.yaml" ]; then
+  bad "$HFCK/pipeline.yaml 없음 — SAM3D 파이프라인 설정이 빠졌다"
+else
+  _n=0; _broken=""
+  for l in "$HFCK"/*.ckpt "$HFCK"/*.pt; do
+    [ -e "$l" ] && _n=$((_n+1)) || _broken="$_broken $(basename "$l")"
+  done
+  if [ -n "$_broken" ]; then
+    bad "끊어진 체크포인트 링크:$_broken — HF blob 이름이 어긋났다"
+  else
+    ok "SAM3D 체크포인트 링크 ${_n}개 모두 연결됨"
+  fi
+  unset _n _broken
+fi
+
 # 컨테이너는 uid 1000으로 돈다. HF 캐시는 락 파일을 쓰므로 쓰기 권한이 필요하다.
 HF_UID=$(stat -c %u "$EMR_ROOT/.cache/huggingface" 2>/dev/null || echo "?")
 [ "$HF_UID" = "1000" ] && ok "HF 캐시 소유자 uid 1000" \

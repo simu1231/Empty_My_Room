@@ -1,0 +1,191 @@
+#!/bin/bash
+# **AMI 원본 인스턴스 안에서** 한 번 돈다. pack-envs.sh가 S3에 올려둔 것들을
+# $EMR_ROOT 에 복원한다. 끝나면 bake-ami.sh → verify-ami.sh 순서로 이어간다.
+#
+#   sudo EMR_AMI_PREFIX=ami/v1 bash bootstrap-ami.sh
+#
+# 기반 AMI에 필요한 것 — NVIDIA 드라이버, 도커, nvidia-container-toolkit.
+# AWS의 "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)" 가 셋을
+# 다 갖고 있다. 프레임워크가 들어간 일반 DLAMI는 쓰지 않는다 — PyTorch가 이미
+# 깔려 있어도 우리는 conda 환경을 따로 쓰므로 수십 GB를 그냥 들고 다니는 셈이고,
+# 그만큼 스냅샷 요금과 부팅 워밍 시간이 늘어난다.
+#
+# 빌더 인스턴스의 루트 볼륨은 **150GB로 띄운다**(= config.sh의 EMR_VOLUME_GB).
+# AMI 스냅샷 크기가 빌더의 볼륨 크기로 굳고, 그게 EMR_VOLUME_GB의 하한이 된다.
+# 더 크게 띄우면 20-launch-template.sh 가 "스냅샷보다 작은 볼륨" 이라고 거부한다.
+#
+# tarball을 디스크에 떨어뜨리지 않고 S3에서 바로 tar로 흘려보낸다(파이프). 받아서
+# 풀면 28GB짜리 HF tar 때문에 피크가 그만큼 더 커진다 — 150GB에서 그 여유는 아깝다.
+# 대신 중간에 끊기면 그 조각은 처음부터 다시 받는다(조각 단위 재시도는 아래 참고).
+set -euo pipefail
+
+PREFIX=${EMR_AMI_PREFIX:-ami/v1}
+
+cd "$(dirname "$0")"
+. ./config.sh
+S3=s3://$S3_BUCKET/$PREFIX
+
+echo "▶ 복원 대상 $EMR_ROOT ← $S3"
+
+# ── 0. 사전 점검 ─────────────────────────────────────────────────────────
+[ "$(id -u)" = "0" ] || { echo "✗ root로 실행하세요: sudo bash $0"; exit 1; }
+
+for c in aws docker nvidia-smi tar; do
+  command -v "$c" >/dev/null || { echo "✗ $c 가 없습니다 — 기반 AMI를 확인하세요"; exit 1; }
+done
+
+# 인스턴스 역할로 S3를 읽는다. 정적 키를 AMI에 넣지 않는 이유는 README의
+# 보안 절과 같다 — AMI를 공유하는 순간 키가 같이 나간다.
+aws sts get-caller-identity >/dev/null 2>&1 || {
+  echo "✗ AWS 자격증명이 없습니다 — 인스턴스에 emr 역할을 붙여 띄웠는지 확인하세요"; exit 1; }
+
+# 드라이버가 실제로 GPU를 보는지. 여기서 안 보이면 컨테이너에서도 안 보이고,
+# 그건 AMI를 다 구운 뒤 첫 추론에서야 드러난다.
+nvidia-smi -L | grep -q GPU || { echo "✗ nvidia-smi 가 GPU를 못 찾습니다"; exit 1; }
+
+# 도커가 GPU를 넘길 수 있는지(nvidia-container-toolkit). 이게 빠진 기반 AMI를
+# 쓰면 컨테이너는 뜨는데 torch.cuda.is_available() 이 False가 된다.
+docker info 2>/dev/null | grep -q nvidia || {
+  echo "✗ 도커에 nvidia 런타임이 없습니다 — nvidia-container-toolkit을 설치하세요"; exit 1; }
+
+# 내용물 약 85GB. 여유 90GB를 요구한다(스트리밍이라 tarball 공간은 안 센다).
+FREE_GB=$(df -BG --output=avail / | tail -1 | tr -dc 0-9)
+echo "  루트 여유 ${FREE_GB}GB"
+[ "$FREE_GB" -ge 90 ] || {
+  echo "✗ 여유 ${FREE_GB}GB — 90GB 이상 필요합니다. 루트 볼륨을 150GB로 띄우세요."; exit 1; }
+
+# ── 1. 매니페스트 ────────────────────────────────────────────────────────
+# pack-envs.sh가 **마지막에** 올리는 파일이다. 있다는 건 앞 조각이 다 올라갔다는 뜻.
+# 없으면 업로드가 덜 끝난 것이므로, 반쯤 복원해놓고 헤매지 않고 여기서 멈춘다.
+MAN=/tmp/emr-manifest.json
+aws s3 cp "$S3/manifest.json" "$MAN" --only-show-errors || {
+  echo "✗ $S3/manifest.json 이 없습니다 — pack-envs.sh가 아직 안 끝났거나,"
+  echo "  버킷의 7일 수명주기로 지워졌습니다. 개발 PC에서 pack-envs.sh를 다시 돌리세요."
+  exit 1; }
+
+jq_() { python3 -c "import json,sys;print($1)" < "$MAN"; }
+SRC_ROOT=$(jq_ 'json.load(sys.stdin)["src_root"]')
+MAN_ROOT=$(jq_ 'json.load(sys.stdin)["emr_root"]')
+ENVS=$(jq_ '" ".join(json.load(sys.stdin)["envs"])')
+
+# 포장할 때 구워 넣은 복원 경로와 지금 복원하려는 경로가 다르면, 환경 안의
+# 절대경로가 전부 어긋난다. conda-pack --dest-prefix 는 포장 시점에 고정된다.
+[ "$MAN_ROOT" = "$EMR_ROOT" ] || {
+  echo "✗ 매니페스트는 $MAN_ROOT 로 포장됐는데 지금 설정은 $EMR_ROOT 입니다."
+  echo "  EMR_ROOT=$MAN_ROOT 로 맞추거나, 개발 PC에서 다시 포장하세요."; exit 1; }
+echo "  원본 $SRC_ROOT → 복원 $EMR_ROOT / 환경: $ENVS"
+
+install -d -o 1000 -g 1000 "$EMR_ROOT" "$EMR_ROOT/.cache"
+
+# S3에서 바로 tar로 흘린다. 조각이 이미 복원돼 있으면 건너뛰므로 재실행이 싸다.
+stream() {   # stream <s3키> <tar옵션> <풀 위치>
+  echo "  내려받아 푸는 중: $1"
+  aws s3 cp "$S3/$1" - | tar -x"$2"f - -C "$3"
+}
+
+# ── 2. conda 환경 ────────────────────────────────────────────────────────
+# conda-pack 산출물은 **최상위 디렉터리가 없다**(내용이 바로 루트에 있다).
+# 그래서 환경 디렉터리를 먼저 만들고 그 안으로 푼다.
+for e in $ENVS; do
+  d=$EMR_ROOT/miniconda3/envs/$e
+  if [ -x "$d/bin/python" ]; then echo "▶ 환경 $e — 이미 있음, 건너뜀"; continue; fi
+  echo "▶ 환경 $e 복원"
+  rm -rf "$d"; install -d "$d"
+  stream "envs/$e.tar.gz" z "$d"
+  # --dest-prefix 로 포장했으면 경로가 이미 최종값이라 할 일이 없지만, 버전에
+  # 따라 conda-unpack 이 같이 들어오기도 한다. 있으면 돌려서 손해 볼 게 없다.
+  [ -x "$d/bin/conda-unpack" ] && "$d/bin/conda-unpack" || true
+done
+
+# ── 3. 소스 트리 ─────────────────────────────────────────────────────────
+if [ -d "$EMR_ROOT/sam-3d-objects" ]; then echo "▶ 소스 — 이미 있음, 건너뜀"; else
+  echo "▶ 소스 트리 5개 복원"
+  stream "sources.tar.gz" z "$EMR_ROOT"
+fi
+
+# ── 4. 체크포인트 ────────────────────────────────────────────────────────
+# 소스 tar에서 이름으로 빼둔 대용량 3개를 제자리에 돌려놓는다.
+echo "▶ 체크포인트 3개"
+python3 -c "import json,sys;[print(k,v) for k,v in json.load(sys.stdin)['ckpt_dest'].items()]" < "$MAN" |
+while read -r name dest; do
+  full=$EMR_ROOT/$dest
+  if [ -s "$full" ]; then echo "  $name — 이미 있음"; continue; fi
+  install -d "$(dirname "$full")"
+  aws s3 cp "$S3/ckpt/$name" "$full" --only-show-errors
+  echo "  $name → $dest"
+done
+
+# ── 5. 캐시 ──────────────────────────────────────────────────────────────
+# HF 캐시는 blobs/snapshots 의 심링크·하드링크 구조가 그대로 보존돼야 한다.
+# sam-3d-objects/checkpoints/hf/checkpoints 의 체크포인트 7개가 blob 파일명으로
+# 걸린 **상대** 심링크이기 때문이다(`../../../../.cache/...`). 상대 경로라서
+# 루트가 바뀌어도 따라오지만, blobs 안의 파일명이 하나라도 달라지면 끊긴다.
+# 그래서 다시 받지 않고 캐시를 통째로 옮긴다.
+if [ -d "$EMR_ROOT/.cache/huggingface/hub" ]; then echo "▶ HF 캐시 — 이미 있음, 건너뜀"; else
+  echo "▶ HF 캐시 복원 (28GB, 몇 분 걸립니다)"
+  stream "hfcache.tar" "" "$EMR_ROOT/.cache"
+fi
+if [ -d "$EMR_ROOT/.cache/torch" ]; then echo "▶ torch 캐시 — 이미 있음, 건너뜀"; else
+  echo "▶ torch 캐시 복원"
+  stream "torchhub.tar" "" "$EMR_ROOT/.cache"
+fi
+
+# ── 6. 남은 구경로 정리 ──────────────────────────────────────────────────
+# conda-pack --dest-prefix 는 **환경 안의** 경로만 바꾼다. detectron2와 pytorch3d는
+# editable로 깔려 있어서 환경 밖 소스 트리를 가리키는데(`__editable___*_finder.py`,
+# `*.pth`), 그 경로는 conda-pack이 손댈 수 없다. 여기서 바꾼다.
+#
+# -I 로 텍스트 파일만 고른다. 개발 PC에서 재어보니 구경로를 담은 파일은
+# 전부 텍스트였고(sam3d 697 / uLayout 192 / omni3d 335개) **바이너리는 0개**였다.
+# 바이너리에 박혀 있었다면 sed로는 못 고치고 길이가 달라져 깨진다 — 그래서 셌다.
+echo "▶ 환경 안에 남은 구경로 치환 ($SRC_ROOT → $EMR_ROOT)"
+for e in $ENVS; do
+  d=$EMR_ROOT/miniconda3/envs/$e
+  n=$(grep -rlI -- "$SRC_ROOT" "$d" 2>/dev/null | wc -l)
+  if [ "$n" -gt 0 ]; then
+    grep -rlI -- "$SRC_ROOT" "$d" 2>/dev/null \
+      | xargs -r -d '\n' sed -i "s|$SRC_ROOT|$EMR_ROOT|g"
+  fi
+  echo "  $e: ${n}개 파일 치환"
+done
+
+# 위 sed는 텍스트 파일만 고쳤다. 그래서 **지금 남아 있는 건 바이너리뿐이다.**
+# 바이너리에 박힌 경로는 sed로 못 고친다(길이가 달라지면 파일이 깨진다). 있으면
+# 그 패키지는 첫 import에서 죽으므로, AMI를 굽기 전에 여기서 멈춘다.
+LEFT=$(grep -rl -- "$SRC_ROOT" "$EMR_ROOT/miniconda3/envs" 2>/dev/null | wc -l)
+[ "$LEFT" = "0" ] || {
+  echo "✗ 바이너리 ${LEFT}개에 구경로가 남았습니다 — sed로 못 고칩니다:"
+  grep -rl -- "$SRC_ROOT" "$EMR_ROOT/miniconda3/envs" 2>/dev/null | head
+  exit 1; }
+
+# ── 7. 저장소 ────────────────────────────────────────────────────────────
+# bake-ami.sh 는 저장소가 $EMR_REPO_DIR 에 있기를 요구한다.
+if [ -d "$EMR_REPO_DIR/.git" ]; then
+  echo "▶ 저장소 — 이미 있음"
+else
+  echo "▶ 저장소 clone"
+  git clone "${EMR_GIT_URL:-https://github.com/simu1231/Empty_My_Room.git}" "$EMR_REPO_DIR"
+  [ -n "${EMR_GIT_REF:-}" ] && git -C "$EMR_REPO_DIR" checkout -q "$EMR_GIT_REF"
+fi
+
+# clone한 코드가 /opt/emr 경로 변경을 포함하는지 본다. 옛 커밋에는 Dockerfile에
+# 홈 경로가 박혀 있어서, 그걸로 이미지를 구우면 컨테이너가 뜨고 나서 첫 요청에
+# ModuleNotFoundError 로 죽는다 — AMI를 다 구운 뒤다. 여기서 막는다.
+grep -q 'ARG EMR_ROOT' "$EMR_REPO_DIR/deploy/gpu/Dockerfile" || {
+  echo "✗ clone한 저장소의 deploy/gpu/Dockerfile 에 'ARG EMR_ROOT' 가 없습니다."
+  echo "  경로 변경 커밋이 아직 push되지 않았습니다. 개발 PC에서 push한 뒤 다시 돌리세요"
+  echo "  (또는 EMR_GIT_REF=<커밋> 으로 지정)."; exit 1; }
+
+# ── 8. 소유권 ────────────────────────────────────────────────────────────
+# 컨테이너는 uid 1000(emr)으로 돈다. HF 캐시는 락 파일을 쓰므로 읽기 권한만으로는
+# 부족하다 — root 소유로 두면 첫 추론에서 PermissionError 가 난다.
+echo "▶ 소유권 uid 1000 으로 정리"
+chown -R 1000:1000 "$EMR_ROOT"
+
+echo
+echo "✔ 복원 완료"
+du -sh "$EMR_ROOT" 2>/dev/null | awk '{print "  "$2" 사용량: "$1}'
+df -h / | tail -1 | awk '{print "  루트 "$3" 사용 / "$4" 남음"}'
+echo
+echo "  다음: cd $EMR_REPO_DIR/deploy/aws"
+echo "        ./bake-ami.sh && ./verify-ami.sh"

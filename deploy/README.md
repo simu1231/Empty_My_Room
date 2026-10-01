@@ -361,26 +361,38 @@ GPU 컨테이너는 conda 환경과 소스를 **호스트에서 bind-mount로 �
 
 | 항목 | 크기 |
 |---|---|
-| conda 환경 3개 (sam3d 19G + uLayout 7.0G + omni3d 5.9G) | 32 GB |
+| conda 환경 3개 (sam3d 19G + uLayout 7.0G + omni3d 13G) | 39 GB |
 | HuggingFace 캐시 — 실질적인 **모델 가중치 저장소** | 28 GB |
-| torch 캐시 | 3.4 GB |
-| 소스 5개 (sam-3d-objects 2.3G + uLayout 1.2G + 나머지 0.5G) | 4.0 GB |
-| miniconda3 본체(base 환경) | 약 1 GB |
+| torch 캐시 (ZoeDepth/DINOv2/PerspectiveFields/resnet50) | 3.4 GB |
+| 소스 5개 + 체크포인트 3개 (`.git` 제외) | 3.3 GB |
 | 저장소(web 빌드 산출물 제외) | 0.3 GB |
 | 도커 이미지 | 3.0 GB |
-| OS + NVIDIA 드라이버 | 약 8 GB |
-| **AMI 합계** | **약 80 GB** |
+| OS + NVIDIA 드라이버 (Base DLAMI) | 약 8 GB |
+| **AMI 합계** | **약 85 GB** |
 
-> 앞서 이 표에 **47GB**라고 적어뒀었는데 틀렸다. HuggingFace 캐시 28GB가 빠져
-> 있었다. 가중치가 conda 환경 안이 아니라 `~/.cache/huggingface` 에 있어서
-> "환경 + 소스"만 세면 제일 큰 덩어리를 통째로 놓친다. 볼륨을 80GB로 잡았으면
-> 환경 설치 중에 디스크가 찼을 것이다.
+이 표를 두 번 틀렸고, 두 번 다 **측정 방법** 때문이었다. 기록해 둔다.
 
-**굽는 도중 피크는 115GB다.** `conda create` 가 받은 패키지가
-`~/miniconda3/pkgs` 에 35GB까지 쌓였다가 `conda clean -a` 로 사라진다. 그래서
-루트 볼륨은 150GB로 잡는다(`EMR_VOLUME_GB`). 스냅샷 요금은 **쓴 블록만** 세므로
-안 쓴 70GB는 돈을 안 낸다 — 넉넉히 잡는 쪽이 싸다. 정리를 깜빡하면
-`verify-ami.sh` 가 경고한다.
+> **1차: 47GB.** HuggingFace 캐시 28GB가 빠져 있었다. 가중치가 conda 환경 안이
+> 아니라 `~/.cache/huggingface` 에 있어서 "환경 + 소스"만 세면 제일 큰 덩어리를
+> 통째로 놓친다.
+>
+> **2차: 80GB.** `du -sh envs/sam3d envs/uLayout envs/omni3d` 가 32GB라고 했다.
+> `du` 는 **한 번의 호출 안에서 하드링크를 한 번만 센다.** uLayout과 omni3d는
+> 둘 다 Python 3.10이라 7GB를 공유하고 있었고, 그게 한 번만 세어졌다.
+> `du --count-links` 로 다시 재면 19 + 7.0 + 13 = **39GB**다. conda-pack 결과물은
+> 하드링크가 없으니 EC2에서 차지하는 건 39GB 쪽이다. omni3d의 tar가 `du` 가
+> 말한 5.9G가 아니라 13G로 나와서 알았다.
+
+**굽는 도중 피크도 약 85GB다.** 예전 계획(EC2에서 `conda create` 로 환경을 다시
+설치)이었다면 `~/miniconda3/pkgs` 에 패키지가 35GB까지 쌓여 피크가 115GB였다.
+지금은 `pack-envs.sh` 가 개발 PC에서 포장한 것을 `bootstrap-ami.sh` 가 S3에서
+**파이프로 바로 풀기** 때문에 패키지 캐시도, 중간 tarball도 생기지 않는다.
+
+그래도 루트 볼륨은 150GB로 잡는다(`EMR_VOLUME_GB`). 스냅샷 요금은 **쓴 블록만**
+세므로 안 쓴 65GB는 돈을 안 낸다 — 넉넉히 잡는 쪽이 싸다. 빌더 인스턴스도 같은
+150GB로 띄워야 한다: **AMI 스냅샷 크기가 빌더의 볼륨 크기로 굳고, 그게
+`EMR_VOLUME_GB` 의 하한이 된다**(더 크게 띄우면 `20-launch-template.sh` 가
+"스냅샷보다 작은 볼륨" 이라고 거부한다).
 
 스냅샷에서 복원한 EBS 볼륨은 블록을 **처음 읽을 때** S3에서 지연 로딩된다. 이 중 실제로
 읽는 10GB 남짓을 실효 50~100MB/s로 당겨오면 첫 부팅에만 2분 이상이 더 붙는다. EBS Fast
@@ -388,6 +400,52 @@ Snapshot Restore가 이 문제를 없애주지만 스냅샷·AZ당 시간 $0.75(
 취지에 정면으로 어긋난다 — 쓰지 않는다. 대신 루트 볼륨 처리량을 gp3 기본 125에서
 250 MB/s로 올려뒀다(`EMR_VOLUME_THROUGHPUT`). 125 초과분은 MB/s당 월 $0.04이고
 인스턴스가 떠 있는 시간만큼만 비례 과금된다.
+
+### AMI를 어떻게 만드나 — 설치가 아니라 이사다
+
+처음에는 EC2에서 설치를 재현할 계획이었다(집 회선으로 51GB를 올리는 것보다 AWS
+안에서 받는 쪽이 빠르고 공짜다). 실제 상태를 들여다보고 접었다. **재현할 명세가
+없다.**
+
+| 재현을 막은 것 | 실태 |
+|---|---|
+| conda 환경 3개 | `environment.yml` 도 requirements 고정본도 없다. 손으로 패치해 맞춘 결과물이고, `conda create` 는 그날 인덱스에 따라 다른 버전을 고른다. |
+| 소스 3개 | 커밋 안 된 수정이 있다 — sam-3d-objects 7파일 + `depth_pro.py` 신규, uLayout `room_rectify.py`, omni3d는 `server.py`·`configs`·`tools` 가 전부 untracked. `git clone` 은 이걸 하나도 안 가져오면서 **성공한다.** |
+| HF 캐시 | 새로 받아서는 재현되지 않는 상태다(아래). |
+| `facebook/sam-3d-objects` | 게이트 저장소. 받으려면 인스턴스에 HF 토큰을 올려야 한다. |
+| `runwayml/stable-diffusion-inpainting` | 허브에서 내려갔을 수 있다(4GB). |
+
+HF 캐시 건이 결정적이었다. 파이프라인이 읽는 경로는
+`sam-3d-objects/checkpoints/hf/checkpoints/*.ckpt` 인데, 이게 **blob 파일명(sha256)으로
+걸린 심링크 7개**다. 그런데 그 저장소의 `snapshots/` 디렉터리는 비어 있다 — 가중치
+12.3GB는 `blobs/` 에만 있다. 새로 받으면 `snapshots/` 는 제대로 채워지는 대신 blob
+이름이 달라질 수 있고, 그러면 심링크가 끊긴다. **AMI를 다 구운 뒤 첫 추론에서야
+드러나는 종류의 고장이다.**
+
+그래서 전부 올린다(≈51GB). S3 수신은 공짜고 한 번 치르는 비용이다. 대신 외부 의존이
+0이 된다 — 게이트도, 토큰도, 삭제된 저장소도, blob 해시 의존도 없다.
+
+운이 좋았던 점 하나: 그 심링크 7개는 `../../../../.cache/...` 즉 **상대 경로**다.
+루트가 `$HOME` 에서 `/opt/emr` 로 바뀌어도 같은 상대 위치를 가리키므로 손댈 필요가
+없었다.
+
+| 순서 | 어디서 | 무엇 |
+|---|---|---|
+| 1 | 개발 PC | `./pack-envs.sh` — conda-pack(`--dest-prefix /opt/emr/...`)으로 환경을 포장하고 캐시·소스·체크포인트와 함께 S3에 올린다 |
+| 2 | AWS | Base DLAMI(Ubuntu 22.04) + g6.xlarge 온디맨드 1대, 루트 **150GB**, emr 인스턴스 역할 |
+| 3 | 빌더 안 | `sudo bash bootstrap-ami.sh` — S3에서 **파이프로 바로** 풀어 `/opt/emr` 을 만든다 |
+| 4 | 빌더 안 | `./bake-ami.sh` → `./verify-ami.sh` |
+| 5 | 로컬 | `aws ec2 create-image` 후 **빌더를 직접 종료한다** |
+
+5번을 강조하는 이유 — 빌더는 ASG 밖의 맨 인스턴스다. 리퍼도 가디언도 그 안에서
+돌지 않으므로(가디언은 `bake-ami.sh` 가 설치하지만 ASG에 속한 인스턴스만 회수한다)
+**아무도 회수해 주지 않는다.** 깜빡 켜두면 g6.xlarge 온디맨드가 시간당 $0.99,
+하룻밤에 $24다.
+
+`pack-envs.sh` 의 스테이징은 기본값이 `/mnt/d` 다. WSL2에서 `df /` 는 여유 779GB라고
+하지만 그 ext4는 C드라이브 위의 vhdx 파일이고 C에는 35GB밖에 없다. WSL 안에 28GB짜리
+tar를 만들면 vhdx가 커지며 C를 채우고, 그때부터 CUDA가 엉뚱한 오류를 낸다. 전에
+한 번 당했다 — `dmesg` 의 `dxg` 줄에 `-75` 가 찍힌다.
 
 ## 4단계: 오토스케일링 + 스케일투제로
 
