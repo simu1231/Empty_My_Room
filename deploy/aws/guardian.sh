@@ -19,7 +19,20 @@
 # (워커가 하트비트로 가시성을 늘리므로, 죽으면 자동으로 되돌아온다).
 set -uo pipefail
 
-STATE=${GUARDIAN_STATE_DIR:-/var/lib/emr}   # 테스트에서 덮어쓸 수 있게
+# 상태(실패 카운터)는 **tmpfs인 /run 에 둔다**. 영구 디스크(/var/lib)에 두면
+# AMI를 굽는 순간의 카운터가 그대로 박힌다 — 실제로 그랬다. bake-ami.sh 가 지워도
+# 그 **뒤에** 도는 smoke-test.sh 가 스택을 내리는 순간 가디언이 다시 쌓기 시작해서,
+# 스냅샷에는 11이 들어간 채로 굳었다. 그 AMI로 뜨는 워커는 유예 15분이 끝나는
+# 바로 그 순간 N=11+1 로 임계값을 넘어버려서, 설계상 더 봐주기로 한 5분이
+# 통째로 사라진다. "지운 뒤에 다시 생기는" 걸 rm 으로 쫓아다니는 대신
+# (verify-ami.sh 의 ~/.aws 건과 똑같은 함정이다) 부팅마다 비워지는 자리로
+# 옮겨 구조적으로 막는다.
+#
+# systemd 의 RuntimeDirectory= 로 만들면 안 된다. 이 유닛은 Type=oneshot 이라
+# 매분 실행이 끝날 때마다 유닛이 "정지"되고 RuntimeDirectory 도 같이 지워진다.
+# 그러면 카운터가 1분마다 0으로 돌아가 영원히 FAIL_MIN 에 못 닿는다 — 가디언이
+# 조용히 무력화된다. 그래서 디렉터리는 아래에서 mkdir 로 직접 만든다.
+STATE=${GUARDIAN_STATE_DIR:-/run/emr}   # 테스트에서 덮어쓸 수 있게
 FAILFILE=$STATE/guardian.fail
 GRACE_SEC=${GUARDIAN_GRACE_SEC:-900}
 FAIL_MIN=${GUARDIAN_FAIL_MIN:-5}

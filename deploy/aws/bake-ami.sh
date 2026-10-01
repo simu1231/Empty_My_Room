@@ -50,7 +50,8 @@ export EMR_IMAGE_TAG
 sudo install -d -m 755 /opt/emr/bin
 sudo install -m 755 self-retire.sh /opt/emr/bin/self-retire.sh
 sudo install -m 755 guardian.sh    /opt/emr/bin/guardian.sh
-sudo install -d -m 755 /var/lib/emr
+# 가디언의 상태 디렉터리를 여기서 만들지 않는다. 이젠 /run/emr (tmpfs) 이라
+# 부팅마다 사라지고, guardian.sh 가 돌 때마다 직접 mkdir 한다.
 
 sudo tee /etc/systemd/system/emr-guardian.service >/dev/null <<UNIT
 [Unit]
@@ -92,7 +93,13 @@ sudo rm -f "$REPO_ROOT/deploy/.env"
 sudo rm -rf /root/.aws /home/ubuntu/.aws
 # cloud-init 상태를 지워야 새 인스턴스에서 userdata가 처음처럼 돈다.
 sudo cloud-init clean --logs 2>/dev/null || true
-sudo rm -f /var/log/emr-userdata.log /var/lib/emr/guardian.fail
+sudo rm -f /var/log/emr-userdata.log
+# 예전에는 가디언 실패 카운터가 /var/lib/emr 에 있었고, 여기서 그걸 지우고
+# 있었다. 그런데 이 줄 **뒤에** smoke-test.sh 가 돌면서 스택을 내리면 가디언이
+# 곧바로 다시 쌓기 시작해서, 스냅샷에는 결국 카운터가 박혔다. 지우는 순서를
+# 바꾸는 대신 카운터를 tmpfs 로 옮겨서 고쳤다(guardian.sh 주석 참고).
+# 아래는 옛 버전 AMI를 다시 굽는 경우를 위한 뒷정리다.
+sudo rm -rf /var/lib/emr
 
 echo "✔ 준비 완료 — 굽기 전에 두 가지를 순서대로 돌린다:"
 echo "    ./smoke-test.sh    실제로 도는지 (세 모델에 진짜 작업을 통과시킨다)"

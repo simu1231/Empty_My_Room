@@ -179,6 +179,17 @@ for p in /root/.aws /home/ubuntu/.aws; do
     ok "$p 정적 자격증명 없음"
   fi
 done
+# 가디언 실패 카운터가 구워지면 안 된다. 이 AMI로 뜨는 워커는 부팅 유예
+# (GUARDIAN_GRACE_SEC)가 끝나는 그 순간 카운터를 읽는다. 0이 아니라 이미
+# 임계값을 넘은 값이 들어있으면, 리퍼가 잠시 없을 뿐인 정상 워커도 그
+# 자리에서 곧바로 종료된다 — 더 봐주기로 한 FAIL_MIN 분이 통째로 사라진다.
+# 지금은 /run/emr (tmpfs) 라 구조적으로 불가능하지만, 누군가 STATE 를 다시
+# 영구 디스크로 되돌리면 조용히 돌아온다. 그걸 여기서 잡는다.
+if [ -e /var/lib/emr/guardian.fail ]; then
+  bad "/var/lib/emr/guardian.fail 이 남아있다 — 구워지면 워커가 조기 종료된다"
+else
+  ok "가디언 카운터가 영구 디스크에 없음(tmpfs 사용)"
+fi
 # conda 패키지 캐시는 환경을 만들고 나면 쓸모가 없는데 35GB까지 부푼다.
 # 스냅샷은 쓴 블록만 세므로, 이걸 안 지우면 매달 그 35GB만큼 돈을 더 낸다.
 PKGS=$(du -sm "$EMR_ROOT/miniconda3/pkgs" 2>/dev/null | cut -f1 || echo 0)
