@@ -9,6 +9,35 @@ cd "$(dirname "$0")" && source ./config.sh
 : "${EMR_AMI_ID:?AMI ID를 지정하세요: EMR_AMI_ID=ami-xxxx $0}"
 : "${EMR_SG_ID:?보안그룹 ID를 지정하세요: EMR_SG_ID=sg-xxxx $0}"
 
+# ── 이미지 태그는 **AMI에서** 읽는다 ────────────────────────
+# config.sh 의 EMR_IMAGE_TAG 기본값은 **지금 작업 중인 저장소의 git HEAD** 다.
+# 그런데 워커가 쓸 이미지는 **AMI를 굽던 시점의** 태그로 박혀 있다. 굽고 나서
+# 커밋을 하나만 더 해도 둘이 어긋나고, 그러면 시작 템플릿에 **AMI에 없는**
+# 태그가 박힌다. 워커는 --no-build 라 그 자리에서 부팅을 거부한다.
+#
+# 배포하려는 AMI 가 정답을 들고 있으므로(bake 때 GitSha 태그를 붙였다)
+# 작업 디렉터리 상태를 묻지 말고 거기서 읽는다. 명령줄로 준 EMR_IMAGE_TAG 는
+# 그대로 존중한다(수동 복구용).
+AMI_SHA=$(aws ec2 describe-images --image-ids "$EMR_AMI_ID" \
+           --query "Images[0].Tags[?Key=='GitSha'].Value | [0]" --output text 2>/dev/null || echo "")
+if [ -n "${EMR_IMAGE_TAG_OVERRIDE:-}" ]; then
+  EMR_IMAGE_TAG=$EMR_IMAGE_TAG_OVERRIDE
+  echo "▶ 태그 $EMR_IMAGE_TAG (명령줄 지정)"
+elif [ -n "$AMI_SHA" ] && [ "$AMI_SHA" != "None" ]; then
+  if [ "$AMI_SHA" != "$EMR_IMAGE_TAG" ]; then
+    echo "▶ 태그 $AMI_SHA (AMI 기준) — 작업트리는 $EMR_IMAGE_TAG 라 서로 다르다"
+    echo "  AMI를 굽고 나서 저장소가 앞서갔다는 뜻이다. 워커는 AMI 안의 이미지를 쓴다."
+  else
+    echo "▶ 태그 $AMI_SHA (AMI 와 작업트리 일치)"
+  fi
+  EMR_IMAGE_TAG=$AMI_SHA
+else
+  echo "✗ AMI $EMR_AMI_ID 에 GitSha 태그가 없습니다."
+  echo "  어떤 태그의 이미지가 구워져 있는지 확인한 뒤 명시하세요:"
+  echo "    EMR_IMAGE_TAG_OVERRIDE=<sha> EMR_AMI_ID=$EMR_AMI_ID bash $0"
+  exit 1
+fi
+
 echo "▶ 유저데이터 생성 (설정값을 치환해 굽는다)"
 sed -e "s|__REGION__|${AWS_REGION}|g" \
     -e "s|__S3_BUCKET__|${S3_BUCKET}|g" \
