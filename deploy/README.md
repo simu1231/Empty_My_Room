@@ -40,6 +40,23 @@ React ──► API 서버 ──► SQS ──► GPU Worker ──► S3
 | SAM3D 메쉬 (50초) | 큐 `emr-sam3d` | GPU 점유 김 |
 | uLayout 방 치수, Omni3D 크기 | 큐 `emr-scene` | GPU 필요 |
 
+> **5단계 현재 상태 (2026-10-01).** 위 표의 "상시 서버"는 아직 AWS에 없다.
+> 이번에 굽는 AMI가 서빙하는 것은 큐를 타는 **GPU 배치 3개뿐**이고
+> (`sam3d_mesh` / `room_layout` / `omni3d` — worker.py 의 HANDLERS),
+> SAM2·LaMa·SD·가구추출·색상텍스처를 가진 모놀리식 `sam3d/backend/main.py`는
+> 어떤 배포 compose 에도 들어 있지 않다.
+>
+> 그냥 빠뜨린 게 아니라 풀리지 않은 설계 문제다. 저 셋은 전부 `device='cuda'`라
+> "상시 서버"가 곧 **꺼지지 않는 GPU 인스턴스**를 뜻하는데, 그건 이 구조가
+> 피하려고 만들어진 비용 그 자체다. `docker-compose.aws.yml` 이 API 를 보내는
+> t4g.small 은 ARM CPU라 저 모델들이 올라가지 않는다.
+>
+> 그래서 이번 배포의 목표는 제품 전체가 아니라 **비용 구조(스케일투제로 +
+> 오토스케일링)의 검증**이다. 가중치도 그에 맞춰 올린다 — `sam2_repo`,
+> `lama_repo`, `lama_model` 은 AMI 에 없다. (SD 는 HF 캐시 안에 들어 있어
+> 의도와 무관하게 딸려 들어간다.) 붙일 때 무엇을 해야 하는지는 위 표가
+> 그대로 답이다: 큐로 옮길 것이 아니라 상시 GPU 를 어떻게 감당할지를 정해야 한다.
+
 **전환 스위치.** `VITE_USE_JOB_QUEUE=1`이면 큐, 비워두면 기존 동기 호출.
 호출부 코드는 동일하다(`callModel()`). 3단계에서 워커에 실제 모델이 들어가기
 전까지 로컬 개발이 깨지지 않게 하기 위한 것이다.
