@@ -18,6 +18,16 @@ cd "$(dirname "$0")" && source ./config.sh
 # 배포하려는 AMI 가 정답을 들고 있으므로(bake 때 GitSha 태그를 붙였다)
 # 작업 디렉터리 상태를 묻지 말고 거기서 읽는다. 명령줄로 준 EMR_IMAGE_TAG 는
 # 그대로 존중한다(수동 복구용).
+#
+# aws 가 PATH 에 없는 경우를 먼저 가른다. 아래 호출을 2>/dev/null 로 감싸 놨으니
+# CLI 부재도 "태그가 비었다"로 흘러들어, 엉뚱하게 "AMI 에 GitSha 태그가
+# 없습니다"를 찍는다. 그 메시지를 믿고 AMI 태그를 들여다보면 아무 문제가 없어서
+# 한참 헤맨다. 원인과 메시지를 일치시킨다.
+command -v aws >/dev/null 2>&1 || {
+  echo "✗ aws CLI 를 찾을 수 없습니다 (PATH=$PATH)"
+  echo "  이 PC 에서는 ~/.local/bin 에 있다: export PATH=\"\$HOME/.local/bin:\$PATH\""
+  exit 1
+}
 AMI_SHA=$(aws ec2 describe-images --image-ids "$EMR_AMI_ID" \
            --query "Images[0].Tags[?Key=='GitSha'].Value | [0]" --output text 2>/dev/null || echo "")
 if [ -n "${EMR_IMAGE_TAG_OVERRIDE:-}" ]; then
