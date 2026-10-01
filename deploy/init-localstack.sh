@@ -26,17 +26,18 @@ awslocal s3api put-bucket-cors --bucket emr-jobs --cors-configuration '{
   }]
 }'
 
-echo "▶ DLQ 생성 (실패한 작업이 모이는 곳)"
+echo "▶ 작업 큐 + DLQ 생성"
 # DLQ가 없으면 실패한 메시지가 무한 재시도되며 GPU 비용을 계속 태운다.
-DLQ_URL=$(awslocal sqs create-queue --queue-name emr-sam3d-dlq --output text --query QueueUrl)
-DLQ_ARN=$(awslocal sqs get-queue-attributes --queue-url "$DLQ_URL" \
-            --attribute-names QueueArn --output text --query 'Attributes.QueueArn')
-
-echo "▶ 작업 큐 생성"
+# 큐마다 DLQ를 따로 둔다 — 하나를 같이 쓰면 실패한 메시지를 보고 어느
+# 파이프라인이 터진 건지 알 수 없다. aws/15-resources.sh 와 같은 구성이다.
+#
 # VisibilityTimeout=120 : SAM3D가 50초 걸리므로 기본 30초로는 부족하다.
 #                         워커가 하트비트로 더 연장하지만 시작값도 넉넉히 둔다.
 # maxReceiveCount=3     : 3번 실패하면 DLQ로 보낸다.
 for Q in emr-sam3d emr-scene; do
+  DLQ_URL=$(awslocal sqs create-queue --queue-name "${Q}-dlq" --output text --query QueueUrl)
+  DLQ_ARN=$(awslocal sqs get-queue-attributes --queue-url "$DLQ_URL" \
+              --attribute-names QueueArn --output text --query 'Attributes.QueueArn')
   awslocal sqs create-queue --queue-name "$Q" --attributes "{
     \"VisibilityTimeout\": \"120\",
     \"MessageRetentionPeriod\": \"3600\",

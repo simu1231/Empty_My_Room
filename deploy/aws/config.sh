@@ -11,7 +11,26 @@ PROJECT=emr
 # ── 이름 ────────────────────────────────────────────────────────────────
 export Q_SAM3D=emr-sam3d
 export Q_SCENE=emr-scene
-export S3_BUCKET=emr-jobs
+# S3 버킷 이름은 **전 세계에서 유일**해야 한다(계정별이 아니다). 그냥 emr-jobs 로
+# 두면 언제든 다른 사람이 먼저 가져가서 배포가 중간에 막힌다.
+#
+# 계정 ID를 접미사로 붙이는 게 흔한 방법이지만 쓰지 않았다. 브라우저가 결과
+# 메쉬를 presigned URL 로 S3에서 직접 받으므로, 버킷 이름이 곧 사용자에게
+# 보이는 URL 에 들어간다 — 계정 ID를 거기 노출할 이유가 없다. 대신 계정 ID의
+# 해시 앞 8자리를 쓴다. 같은 계정이면 항상 같은 값이라 따로 저장할 필요가 없고,
+# 역으로 계정 ID를 알아낼 수는 없다.
+#
+# 로컬(LocalStack)은 전역 유일성이 필요 없어서 그냥 emr-jobs 를 쓴다. 이름이
+# 다른 건 의도된 것이고, 코드는 양쪽 다 환경변수로만 읽는다.
+if [ -z "${S3_BUCKET:-}" ]; then
+  _acct=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "")
+  if [ -n "$_acct" ]; then
+    export S3_BUCKET="emr-jobs-$(printf '%s' "$_acct" | sha256sum | cut -c1-8)"
+  else
+    export S3_BUCKET="emr-jobs"   # 자격증명 없이 소스될 때(문법 검사 등)
+  fi
+  unset _acct
+fi
 export DDB_TABLE=emr-jobs
 
 export LT_NAME=${PROJECT}-gpu-worker            # 시작 템플릿

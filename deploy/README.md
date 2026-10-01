@@ -626,6 +626,8 @@ vi config.sh
 
 ./05-preflight.sh              # 자격증명 + GPU 쿼터 — 통과해야 다음으로
 ./10-iam.sh                    # 역할 2개 (GPU 워커 / API 서버)
+./15-resources.sh              # 큐 2개(+DLQ) / S3 버킷 / DynamoDB 테이블
+./10-iam.sh                    # 버킷 이름이 정해진 뒤 정책 ARN을 다시 맞춘다
 
 # --- 여기서 AMI를 굽는다 (원본 인스턴스 안에서 bake-ami.sh → verify-ami.sh) ---
 
@@ -633,6 +635,20 @@ EMR_AMI_ID=ami-xxxx EMR_SG_ID=sg-xxxx ./20-launch-template.sh
 EMR_SUBNETS=subnet-a,subnet-b,subnet-c ./30-asg.sh
 ./40-scaling.sh                # 정책 + 알람 + 그룹 지표 수집
 ```
+
+#### 10-iam.sh 를 두 번 돌리는 이유
+
+S3 버킷 이름은 **계정별이 아니라 전 세계에서 유일**해야 한다. 그래서
+`config.sh` 가 계정 ID의 해시 앞 8자리를 붙여 `emr-jobs-xxxxxxxx` 를 만든다.
+계정 ID를 그대로 붙이지 않은 건, 브라우저가 결과 메쉬를 presigned URL 로 S3에서
+직접 받기 때문이다 — 버킷 이름이 곧 사용자에게 보이는 URL 에 들어간다.
+
+IAM 정책은 이 버킷 ARN을 박아서 쓰므로, 버킷을 만들기 전에 돌린 정책은 존재하지
+않는 이름을 가리킨다. 리소스를 만든 뒤 한 번 더 돌려서 맞춘다. 두 스크립트 다
+여러 번 돌려도 안전하다.
+
+로컬(LocalStack)은 전역 유일성이 필요 없어서 `emr-jobs` 를 그대로 쓴다. 이름이
+다른 건 의도된 것이고, 코드는 양쪽 다 환경변수로만 읽는다.
 
 #### 왜 사전점검이 맨 앞인가
 
