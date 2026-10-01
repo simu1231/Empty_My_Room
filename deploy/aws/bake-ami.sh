@@ -85,6 +85,28 @@ sudo systemctl daemon-reload
 sudo systemctl enable emr-guardian.timer
 sudo systemctl start  emr-guardian.timer
 
+# ── 2.5 워밍 목록 사전 생성 ──────────────────────────────────────────────
+# 기동 뒤 워밍이 읽을 파일 목록을 **지금** 만들어 AMI 에 넣는다.
+#
+# 부팅할 때마다 find 로 만들고 있었는데, 그게 혼자 53초를 먹었다(파일 수십만
+# 개의 inode 를 지연 로딩으로 긁는다). 백그라운드로 옮기고 io 우선순위를 idle
+# 로 깔자 더 느려져서, 워커 9호는 **읽기를 시작도 못 한 채** 유휴 회수됐다.
+#
+# 그런데 이 목록의 대상은 AMI 안의 불변 데이터다. 부팅마다 다시 세어야 할
+# 이유가 없다. 여기서 한 번 세어 두면 워커는 파일을 읽기만 하면 된다.
+# (목록이 없는 옛 AMI 로도 떠야 하므로 userdata 쪽에 find 폴백을 남겨 뒀다.)
+WARMLIST=/tmp/emr-warmlist
+: > "$WARMLIST"
+for d in $EMR_WARM_BG_DIRS; do
+  if [ -d "$d" ]; then
+    find "$d" -type f -size +8M ! -name '*.a' -print >> "$WARMLIST" 2>/dev/null
+  else
+    echo "  ⚠ $d 없음 — 워밍 목록에서 빠진다"
+  fi
+done
+sudo install -m 644 "$WARMLIST" /opt/emr/warmlist
+echo "  워밍 목록 $(wc -l < "$WARMLIST")개 → /opt/emr/warmlist"
+
 # ── 3. 스냅샷 위생 ───────────────────────────────────────────────────────
 # .env 는 인스턴스가 뜰 때 userdata가 다시 만든다. AMI에 남겨두면 옛 큐 이름이
 # 굳어버리고, 혹시 자격증명이 들어가면 AMI를 공유하는 순간 같이 나간다.

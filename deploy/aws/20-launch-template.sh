@@ -58,10 +58,10 @@ sed -e "s|__REGION__|${AWS_REGION}|g" \
     -e "s|__REPO_DIR__|${EMR_REPO_DIR}|g" \
     -e "s|__EMR_ROOT__|${EMR_ROOT}|g" \
     -e "s|__IMAGE_TAG__|${EMR_IMAGE_TAG}|g" \
-    -e "s|__WARM_DIRS__|${EMR_WARM_DIRS}|g" \
-    -e "s|__WARM_TIMEOUT__|${EMR_WARM_TIMEOUT}|g" \
     -e "s|__WARM_JOBS__|${EMR_WARM_JOBS}|g" \
     -e "s|__WARM_SKIP__|${EMR_WARM_SKIP}|g" \
+    -e "s|__WARM_BG_DIRS__|${EMR_WARM_BG_DIRS}|g" \
+    -e "s|__WARM_BG_TIMEOUT__|${EMR_WARM_BG_TIMEOUT}|g" \
     -e "s|__GUARDIAN_GRACE_SEC__|${GUARDIAN_GRACE_SEC}|g" \
     -e "s|__GUARDIAN_FAIL_MIN__|${GUARDIAN_FAIL_MIN}|g" \
     userdata.sh > /tmp/emr-userdata.rendered.sh

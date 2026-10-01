@@ -29,9 +29,10 @@ exec > >(tee /var/log/emr-userdata.log "$CONSOLE" | logger -t emr-userdata) 2>&1
 
 REPO=__REPO_DIR__
 IMAGE_TAG=__IMAGE_TAG__
-WARM_TIMEOUT=__WARM_TIMEOUT__
 WARM_JOBS=__WARM_JOBS__
 WARM_SKIP="__WARM_SKIP__"
+WARM_BG_DIRS="__WARM_BG_DIRS__"
+WARM_BG_TIMEOUT=__WARM_BG_TIMEOUT__
 EMR_ROOT=__EMR_ROOT__
 RETIRE=/opt/emr/bin/self-retire.sh
 
@@ -119,112 +120,9 @@ Environment=GUARDIAN_FAIL_MIN=__GUARDIAN_FAIL_MIN__
 CONF
 systemctl daemon-reload
 
-# ── 스냅샷 워밍 ──────────────────────────────────────────────────────────
-# 스냅샷에서 복원한 볼륨은 블록을 처음 읽을 때 S3에서 끌어온다(지연 로딩).
-# 추론 중에 처음 읽으면 첫 작업이 몇 분 걸리므로 미리 훑어 부팅 시간으로 옮긴다.
-# 장치명(/dev/nvme1n1)이 아니라 파일 경로로 읽는다 — 장치 번호는 구성 따라
-# 바뀌고, 틀리면 조용히 건너뛰어 워밍이 0바이트인 걸 모른다.
-#
-# 반드시 병렬이어야 한다. 순차 dd 는 250 MB/s 볼륨에서 10.5 MB/s 밖에 못 냈고
-# (2026-10-01 첫 실부팅) 그게 콜드스타트 21분의 원인이었다. 지연 로딩은
-# 대역폭이 아니라 왕복 지연에 묶이기 때문이다. 자세한 근거와 EMR_WARM_SKIP
-# 목록의 출처는 config.sh 의 EMR_WARM_JOBS / EMR_WARM_SKIP 주석에 있다.
-#
-# 상한은 xargs 전체가 아니라 dd 하나하나에 건다(근거는 아래). xargs 를 통째로
-# 감싸면 자식 dd 가 고아로 남아 컴포즈 기동 중에도 디스크를 계속 두드린다.
-# set +x: 파일이 수백 개라 추적을 켜 두면 콘솔 버퍼(64KB)가 앞부분을 밀어낸다.
-warm() {
-  local t0 raw=/run/emr-warmlist.raw list=/run/emr-warmlist done=/run/emr-warmdone
-  local flag=/run/emr-warming deadline bytes files el mbps pat read_bytes mon
-  local s0 disk_mb
-  set +x
-  # 읽은 양은 **디스크에게 직접 묻는다.** 다 읽은 파일만 더하면 상한에 걸렸을 때
-  # 중간까지 읽힌 수십 GB가 통째로 빠진다 — 실제로 26GB를 읽고 16.6GB로 보고해
-  # 속도를 39 MB/s 로 과소평가했다(CloudWatch 실측은 70 MB/s 였다). 그 숫자가
-  # 다음 조정의 유일한 근거라 틀리면 엉뚱한 데를 고치게 된다.
-  # /sys/block/<디스크>/stat 의 3번째 값이 누적 읽기 섹터(512B)다. 파티션은
-  # /sys/block 에 없으므로 중복 집계되지 않는다.
-  rdsect() { local t=0 f n
-    for f in /sys/block/*/stat; do n=${f%/stat}; n=${n##*/}
-      case "$n" in loop*|ram*|zram*) continue;; esac
-      t=$(( t + $(awk '{print $3}' "$f") ))
-    done; echo "$t"; }
-  t0=$(date +%s)
-  deadline=$(( t0 + WARM_TIMEOUT ))
-
-  # +8M 만. '*.a' 제외 — 정적 라이브러리 5GB는 링크용이라 런타임에 안 읽힌다.
-  : > "$raw"
-  for d in __WARM_DIRS__; do
-    if [ -d "$d" ]; then
-      find "$d" -type f -size +8M ! -name '*.a' -printf '%s\t%p\n' 2>/dev/null >> "$raw"
-    else
-      echo "[warm] $d 없음 — 건너뜀"
-    fi
-  done
-
-  # WARM_SKIP: 세 서비스가 안 읽는 가중치를 뺀다(config.sh 참고).
-  if [ -n "$WARM_SKIP" ]; then
-    pat=$(printf '%s\n' $WARM_SKIP | paste -sd'|' -)
-    grep -Ev "$pat" "$raw" > "$list" || true
-  else
-    cp "$raw" "$list"
-  fi
-
-  files=$(wc -l < "$list")
-  if [ "$files" -eq 0 ]; then
-    echo "[warm] 대상이 없다 — 건너뜀 (EMR_WARM_DIRS 가 맞는지 확인할 것)"
-    set -x
-    return 0
-  fi
-  bytes=$(awk -F'\t' '{t+=$1} END{print t+0}' "$list")
-  echo "[warm] 대상 ${files}개 $(( bytes / 1048576 ))MB (제외 뒤), 동시 ${WARM_JOBS}개, 상한 ${WARM_TIMEOUT}초"
-
-  # 큰 것부터. 상한에 걸려도 무거운 가중치는 먼저 들어와 있게 된다.
-  # 다 읽은 것만 $done 에 남긴다. 상한에 걸렸을 때 대상 크기로 속도를 계산하면
-  # 안 읽은 양을 읽은 척하게 되는데, 이 숫자가 다음 조정의 유일한 근거다.
-  #
-  # dd 를 timeout 으로 감싼다. "시작 전에 마감을 본다"만으로는 상한이 안 된다 —
-  # 큰 것부터 읽으므로 마감 직전에 4.6GB 짜리가 32개 떠 있을 수 있고, 그것들이
-  # 끝날 때까지 몇 분이 더 간다. 실제로 상한 600초를 17분까지 넘겼고 그 사이
-  # 가디언이 부팅 중인 워커를 죽였다.
-  #
-  # 진행 표시는 1초마다 깨어나 플래그를 보고 60초마다 한 줄 찍는다. sleep 60
-  # 한 번으로 재우고 나중에 kill 하면 안 된다 — 서브셸만 죽고 자식 sleep 은
-  # init 에 입양돼 cloud-init 이 끝난 뒤까지 상속받은 fd 를 붙들고 남는다.
-  : > "$done"; : > "$flag"
-  s0=$(rdsect)
-  ( n=0
-    while [ -e "$flag" ]; do
-      sleep 1; n=$(( n + 1 ))
-      if [ $(( n % 60 )) -eq 0 ]; then
-        echo "[warm] 진행 $(wc -l < "$done")/${files}개, $(( ($(rdsect) - s0) / 2048 ))MB, ${n}초"
-      fi
-    done ) &
-  mon=$!
-  sort -rn "$list" | cut -f2- \
-    | WARM_DEADLINE=$deadline WARM_DONE=$done xargs -d '\n' -P "$WARM_JOBS" -n 1 sh -c '
-        rem=$(( WARM_DEADLINE - $(date +%s) ))
-        [ "$rem" -gt 0 ] || exit 0
-        timeout "$rem" dd if="$1" of=/dev/null bs=4M status=none 2>/dev/null || exit 0
-        printf "%s\n" "$1" >> "$WARM_DONE"
-      ' _ || true
-  rm -f "$flag"
-  wait "$mon" 2>/dev/null || true
-
-  el=$(( $(date +%s) - t0 ))
-  if [ "$el" -lt 1 ]; then el=1; fi
-  disk_mb=$(( ($(rdsect) - s0) / 2048 ))
-  read_bytes=$(awk -F'\t' 'NR==FNR{sz[$2]=$1; next} ($0 in sz){t+=sz[$0]} END{print t+0}' "$list" "$done")
-  mbps=$(( disk_mb / el ))
-  echo "[warm] 디스크 ${disk_mb}MB, ${el}초, 약 ${mbps} MB/s (끝까지 읽은 파일 $(wc -l < "$done")/${files}개 $(( read_bytes / 1048576 ))MB)"
-  if [ "$el" -ge "$WARM_TIMEOUT" ]; then
-    echo "[warm] 상한에 걸렸다 — 나머지 약 $(( bytes / 1048576 - disk_mb ))MB 는 첫 요청 때 읽힌다"
-  fi
-  set -x
-  return 0
-}
-STEP="스냅샷 워밍"
-warm   # 실패해도 기동은 계속한다(느려질 뿐이지 틀리지는 않는다)
+# 스냅샷 워밍은 여기(부팅 경로)에 있었는데 기동 뒤로 옮겼다. 맨 아래 참고.
+# 네 번 재보니 부팅 경로에서 데우는 건 매번 손해였다(674 → 345초). 되살리고
+# 싶어지면 먼저 config.sh 의 EMR_WARM_TIMEOUT 자리에 남긴 측정표를 읽을 것.
 
 # ── 기동 ─────────────────────────────────────────────────────────────────
 # --no-build 가 핵심이다. 위에서 태그를 확인했지만, 컴포즈가 만에 하나 다른
@@ -243,3 +141,75 @@ for i in $(seq 30); do
   [ "$i" -eq 30 ] && { echo "[userdata] 리퍼가 30초 안에 안 떴다"; exit 1; }
   sleep 1
 done
+
+# ── 기동 뒤 백그라운드 워밍 ──────────────────────────────────────────────
+# 부팅을 막지 않으면서 첫 요청(스모크 187초)만 데운다. 근거와 측정표는
+# config.sh 의 EMR_WARM_BG_DIRS 주석에 있다. 여기서 중요한 건 셋뿐이다:
+#   systemd-run : `&` 로 띄우면 상속한 fd 를 붙들어 cloud-init 이 끝난 것으로
+#                 안 보이고, 가디언의 "running 이면 판단 보류"가 안 풀린다.
+#   우선순위     : 실제 작업이 들어오면 양보해야 한다(nice 10 + io idle).
+#   journal+console : 콘솔로 내보내야 바깥에서 측정할 수 있다.
+STEP="백그라운드 워밍 예약"
+if [ -n "$WARM_BG_DIRS" ] && command -v systemd-run >/dev/null 2>&1; then
+  cat > /run/emr-warm-bg.sh <<'BGEOF'
+#!/bin/sh
+set -u
+t0=$(date +%s); L=/run/emr-warmbg.list; : > "$L"
+# 목록은 AMI 를 구울 때 미리 만들어 둔다(bake-ami.sh 2.5 단계). 대상이 AMI 안의
+# 불변 데이터라 부팅마다 셀 이유가 없다 — 그 find 가 혼자 53초였고, io 우선순위를
+# idle 로 깔자 더 느려져 워커 9호는 읽기를 시작도 못 한 채 회수됐다.
+if [ -s /opt/emr/warmlist ]; then
+  cp /opt/emr/warmlist "$L"
+else
+  # 목록이 없는 옛 AMI 용 폴백. 느리지만 틀리지는 않는다.
+  echo "[warm-bg] 구워둔 목록이 없다 — find 로 만든다(느리다)"
+  for d in $BG_DIRS; do
+    # if/else 로 쓴다. `[ -d ] && find || echo` 는 find 가 권한 오류 등으로
+    # 0이 아닌 값을 내면 "없음"을 잘못 찍는다 — 틀린 로그가 제일 비싸다.
+    if [ -d "$d" ]; then
+      find "$d" -type f -size +8M ! -name '*.a' -print 2>/dev/null >> "$L"
+    else
+      echo "[warm-bg] $d 없음 — 건너뜀"
+    fi
+  done
+fi
+if [ -n "${BG_SKIP:-}" ]; then
+  grep -Ev "$(printf '%s\n' $BG_SKIP | paste -sd'|' -)" "$L" > "$L.f" || true
+  mv "$L.f" "$L"
+fi
+# 목록 작성 시간을 **따로** 찍는다. 부팅 경로 워밍에서 이 find 가 혼자 53초를
+# 먹는 걸 몰라서 처리량을 세 번이나 잘못 계산했다. 게다가 여기서는 io 우선순위를
+# idle 로 깔았으니 더 느려질 수 있다 — 그러면 읽기를 시작도 못 하고 회수된다.
+echo "[warm-bg] 목록 $(wc -l < "$L")개, 작성 $(( $(date +%s) - t0 ))초"
+# 읽은 양은 디스크에 직접 묻는다(끝낸 파일만 더하면 중간까지 읽힌 양이 빠진다).
+rd() { t=0; for f in /sys/block/*/stat; do
+    case "$f" in */loop*|*/ram*|*/zram*) continue;; esac
+    t=$(( t + $(awk '{print $3}' "$f") )); done; echo "$t"; }
+s0=$(rd); t1=$(date +%s)
+# 리퍼가 유휴 회수로 중간에 끊을 수 있으니 진행을 주기적으로 남긴다. 끝 줄만
+# 찍으면 "얼마나 데웠나"를 영원히 모른다. 서브셸의 sleep 이 고아로 남는 건
+# 여기서는 걱정 없다 — systemd 유닛이라 cgroup 째로 정리된다.
+( while [ -e "$L" ]; do sleep 30
+    echo "[warm-bg] 진행 $(( ($(rd) - s0) / 2048 ))MB, $(( $(date +%s) - t1 ))초"
+  done ) &
+xargs -d '\n' -P "$BG_JOBS" -n 1 \
+  sh -c 'dd if="$1" of=/dev/null bs=4M status=none 2>/dev/null || true' _ < "$L" || true
+rm -f "$L"   # 진행 표시 루프를 멈춘다
+echo "[warm-bg] 끝 — $(( ($(rd) - s0) / 2048 ))MB, 읽기 $(( $(date +%s) - t1 ))초, 전체 $(( $(date +%s) - t0 ))초"
+BGEOF
+  chmod +x /run/emr-warm-bg.sh
+  if systemd-run --unit=emr-warm-bg --collect --nice=10 \
+       --property=IOSchedulingClass=idle \
+       --property=RuntimeMaxSec="$WARM_BG_TIMEOUT" \
+       --property=StandardOutput=journal+console \
+       --property=StandardError=journal+console \
+       --setenv=BG_DIRS="$WARM_BG_DIRS" --setenv=BG_SKIP="$WARM_SKIP" \
+       --setenv=BG_JOBS="$WARM_JOBS" \
+       /run/emr-warm-bg.sh >/dev/null 2>&1; then
+    echo "[warm-bg] 분리 기동 — 아래 기동 완료 뒤에도 계속 돈다 (동시 $WARM_JOBS, 상한 ${WARM_BG_TIMEOUT}초, 우선순위 낮춤)"
+  else
+    echo "[warm-bg] systemd-run 실패 — 첫 요청만 느려진다. 기동은 계속한다"
+  fi
+else
+  echo "[warm-bg] 대상이 없거나 systemd-run 이 없다 — 건너뜀"
+fi
