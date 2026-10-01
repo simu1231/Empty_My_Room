@@ -94,4 +94,7 @@ sudo rm -rf /root/.aws /home/ubuntu/.aws
 sudo cloud-init clean --logs 2>/dev/null || true
 sudo rm -f /var/log/emr-userdata.log /var/lib/emr/guardian.fail
 
-echo "✔ 준비 완료 — 이제 ./verify-ami.sh 를 돌리고, 통과하면 스냅샷을 찍는다."
+echo "✔ 준비 완료 — 굽기 전에 두 가지를 순서대로 돌린다:"
+echo "    ./smoke-test.sh    실제로 도는지 (세 모델에 진짜 작업을 통과시킨다)"
+echo "    ./verify-ami.sh    있어야 할 것이 있는지"
+echo "  둘 다 통과하면 스냅샷을 찍는다."
