@@ -22,7 +22,11 @@ export PROFILE_NAME=${PROJECT}-gpu-worker-profile
 
 # ── 용량 ────────────────────────────────────────────────────────────────
 # ①(세 컨테이너 한 대) 구성이라 인스턴스 1대 = sam3d 1건 + scene 1건 동시 처리다.
-export MAX_SPOT=3       # 스팟 그룹 최대
+#
+# 2026-10-01 현재 쿼터에 맞춰 2대로 묶어 뒀다(스팟 8 vCPU ÷ 4 = 2대).
+# 24 vCPU 신청은 아직 열려 있고(CASE_OPENED), 승인되면 3으로 되돌리고
+# 아래 INSTANCE_TYPES 에 2xlarge 를 다시 넣으면 된다.
+export MAX_SPOT=2       # 스팟 그룹 최대
 export MAX_OD=1         # 폴백은 1대면 충분하다. 여기가 커지면 비용이 튄다.
 
 # ── 스케일아웃 판단 ─────────────────────────────────────────────────────
@@ -40,9 +44,14 @@ export OD_FALLBACK_MIN=5
 
 # ── 인스턴스 후보 ───────────────────────────────────────────────────────
 # 전부 24GB급 단일 GPU다. 후보를 넓힐수록 스팟 풀이 늘어 "용량 없음"이 줄어든다.
-# 2xlarge는 GPU가 같고 CPU/RAM만 넉넉한 것이라 우리 워크로드에 그대로 쓸 수 있다.
 # g6e(L40S 48GB)는 비싸지만, 못 뜨는 것보단 나아서 맨 뒤에 둔다.
-export INSTANCE_TYPES="g6.xlarge g6.2xlarge g5.xlarge g5.2xlarge g6e.xlarge"
+#
+# 2xlarge(g6.2xlarge, g5.2xlarge)를 뺐다. GPU가 같아서 성능상 문제는 없지만
+# **vCPU가 8이라 한 대로 쿼터를 다 쓴다.** 쿼터가 8 vCPU인 지금 후보에 남겨두면
+# ASG가 그걸 고르는 순간 두 번째 인스턴스가 VcpuLimitExceeded 로 못 뜬다.
+# 그 실패는 ASG 활동 기록에만 남고 애플리케이션 쪽에는 "그냥 느림"으로 보인다.
+# 쿼터가 24로 올라가면 다시 넣는다(위 MAX_SPOT 주석 참고).
+export INSTANCE_TYPES="g6.xlarge g5.xlarge g6e.xlarge"
 
 # ── AMI / 이미지 ────────────────────────────────────────────────────────
 # 인스턴스 안에서 저장소가 어디에 있는지. userdata가 여기로 cd 한다.

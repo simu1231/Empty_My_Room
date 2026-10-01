@@ -57,6 +57,9 @@ check_quota() {   # $1=코드 $2=필요량 $3=사람이 읽을 이름
   cur=${cur%.*}
   if [ "$cur" -ge "$need" ]; then
     echo "  ✓ $label: ${cur} vCPU (필요 ${need})"
+    # 여유가 0이면 "지금 구성은 되지만 한 대도 더 못 뜬다"는 뜻이다.
+    # 후보 타입을 넓히거나 MAX_* 를 올리려면 쿼터 증설이 먼저다.
+    [ "$cur" -eq "$need" ] && echo "    └ 여유 0 — 구성을 키우려면 쿼터부터 올려야 한다"
   else
     echo "  ✗ $label: ${cur} vCPU — ${need} 필요"
     FAIL=1
