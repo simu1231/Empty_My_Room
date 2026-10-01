@@ -171,7 +171,10 @@ stream "torchcache" "torchhub.tar" "" "$EMR_ROOT/.cache"
 echo "▶ 환경 안에 남은 구경로 치환 ($SRC_ROOT → $EMR_ROOT)"
 for e in $ENVS; do
   d=$EMR_ROOT/miniconda3/envs/$e
-  n=$(grep -rlI -- "$SRC_ROOT" "$d" 2>/dev/null | wc -l)
+  # `|| true` 를 빼면 안 된다. 재실행처럼 **고칠 게 하나도 없을 때** grep이 1을
+  # 돌려주고, set -o pipefail 이 그걸 파이프 밖으로 내보내고, set -e 가 아무
+  # 메시지도 없이 스크립트를 끝낸다. 성공한 재실행이 침묵 속에 죽는 꼴이다.
+  n=$(grep -rlI -- "$SRC_ROOT" "$d" 2>/dev/null | wc -l || true)
   if [ "$n" -gt 0 ]; then
     grep -rlI -- "$SRC_ROOT" "$d" 2>/dev/null \
       | xargs -r -d '\n' sed -i "s|$SRC_ROOT|$EMR_ROOT|g"
