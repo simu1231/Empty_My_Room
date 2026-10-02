@@ -197,21 +197,21 @@ if [ -n "$WARM_BG_DIRS" ] && command -v systemd-run >/dev/null 2>&1; then
 #!/bin/sh
 set -u
 t0=$(date +%s); L=/run/emr-warmbg.list; : > "$L"
-# 목록은 AMI 를 구울 때 미리 만들어 둔다(bake-ami.sh 2.5 단계). 대상이 AMI 안의
-# 불변 데이터라 부팅마다 셀 이유가 없다 — 그 find 가 혼자 53초였고, io 우선순위를
-# idle 로 깔자 더 느려져 워커 9호는 읽기를 시작도 못 한 채 회수됐다.
+# 목록은 AMI 를 구울 때 미리 만든다(bake-ami.sh 2.5). AMI 안의 불변 데이터라
+# 부팅마다 셀 이유가 없다 — find 가 혼자 53초였다(경위는 config.sh).
 if [ -s /opt/emr/warmlist ]; then
   cp /opt/emr/warmlist "$L"
 else
   # 목록이 없는 옛 AMI 용 폴백. 느리지만 틀리지는 않는다.
   echo "[warm-bg] 구워둔 목록이 없다 — find 로 만든다(느리다)"
+  # if/else 로 쓴다. `[ -d ] && find || echo` 는 find 가 권한 오류 등으로 0이
+  # 아닌 값을 내면 "없음"을 잘못 찍는다 — 틀린 로그가 제일 비싸다. BG_DIRS 는
+  # 이제 파일 경로도 담으므로(-d 만 보면 전부 건너뛴다) -e 가지도 둔다.
   for d in $BG_DIRS; do
-    # if/else 로 쓴다. `[ -d ] && find || echo` 는 find 가 권한 오류 등으로
-    # 0이 아닌 값을 내면 "없음"을 잘못 찍는다 — 틀린 로그가 제일 비싸다.
     if [ -d "$d" ]; then
-      find "$d" -type f -size +8M ! -name '*.a' -print 2>/dev/null >> "$L"
-    else
-      echo "[warm-bg] $d 없음 — 건너뜀"
+      find -L "$d" -type f -size +8M ! -name '*.a' -print 2>/dev/null >> "$L"
+    elif [ -e "$d" ]; then echo "$d" >> "$L"
+    else echo "[warm-bg] $d 없음 — 건너뜀"
     fi
   done
 fi
@@ -219,10 +219,9 @@ if [ -n "${BG_SKIP:-}" ]; then
   grep -Ev "$(printf '%s\n' $BG_SKIP | paste -sd'|' -)" "$L" > "$L.f" || true
   mv "$L.f" "$L"
 fi
-# 목록 작성 시간을 **따로** 찍는다. 부팅 경로 워밍에서 이 find 가 혼자 53초를
-# 먹는 걸 몰라서 처리량을 세 번이나 잘못 계산했다. 게다가 여기서는 io 우선순위를
-# idle 로 깔았으니 더 느려질 수 있다 — 그러면 읽기를 시작도 못 하고 회수된다.
-echo "[warm-bg] 목록 $(wc -l < "$L")개, 작성 $(( $(date +%s) - t0 ))초"
+# 작성 시간을 **따로** 찍는다. find 가 혼자 53초 먹는 걸 몰라서 처리량을 세 번
+# 잘못 계산했다.
+echo "[warm-bg] 목록 조각 $(wc -l < "$L")개, 작성 $(( $(date +%s) - t0 ))초"
 # 읽은 양은 디스크에 직접 묻는다(끝낸 파일만 더하면 중간까지 읽힌 양이 빠진다).
 rd() { t=0; for f in /sys/block/*/stat; do
     case "$f" in */loop*|*/ram*|*/zram*) continue;; esac
@@ -234,8 +233,9 @@ s0=$(rd); t1=$(date +%s)
 ( while [ -e "$L" ]; do sleep 30
     echo "[warm-bg] 진행 $(( ($(rd) - s0) / 2048 ))MB, $(( $(date +%s) - t1 ))초"
   done ) &
+# 한 줄은 "경로 [skip] [count]"(4MiB 블록). 큰 파일을 조각내야 -P 가 꽉 찬다.
 xargs -d '\n' -P "$BG_JOBS" -n 1 \
-  sh -c 'dd if="$1" of=/dev/null bs=4M status=none 2>/dev/null || true' _ < "$L" || true
+  sh -c 'set -f; set -- $1; dd if="$1" of=/dev/null bs=4M skip="${2:-0}" ${3:+count=$3} status=none 2>/dev/null || true' _ < "$L" || true
 rm -f "$L"   # 진행 표시 루프를 멈춘다
 echo "[warm-bg] 끝 — $(( ($(rd) - s0) / 2048 ))MB, 읽기 $(( $(date +%s) - t1 ))초, 전체 $(( $(date +%s) - t0 ))초"
 BGEOF

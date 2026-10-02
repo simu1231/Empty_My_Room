@@ -174,21 +174,22 @@ export EMR_WARM_DIRS=${EMR_WARM_DIRS:-"$EMR_ROOT/.cache/huggingface $EMR_ROOT/mi
 export EMR_WARM_JOBS=${EMR_WARM_JOBS:-64}
 
 # 워밍에서 뺄 경로 조각(공백 구분, grep -E 로 묶어서 제외한다).
-# AMI의 HF 캐시 28GB에는 **배포하는 세 서비스가 안 쓰는** 모델이 섞여 있다.
-# 빌더에서 홈 디렉터리째 tar로 떠왔기 때문이다. 근거:
-#   control_v11p_sd15_canny / stable-diffusion-inpainting (5.4G)
-#     → sam3d/backend/services/sd_service.py 만 쓰는데, 그 모듈은 워커·API
-#       어느 쪽에서도 import 되지 않는다(사용자가 SD/인페인팅을 보류했다).
-#   zero123plus-v1.2 (5.2G) / TripoSR (1.6G)
-#     → 저장소 코드와 벤더 코드(sam-3d-objects, uLayout, omni3d) 어디에서도
-#       참조가 없다. SAM3D로 정착하기 전에 실험하던 대안 모델들이다.
-# 합쳐 12.2GB. 이걸 빼면 워밍 대상이 60GB에서 43GB가 된다.
+# AMI의 HF 캐시에는 **배포하는 세 서비스가 안 쓰는** 모델이 섞여 있다.
+# 빌더에서 홈 디렉터리째 tar로 떠왔기 때문이다.
+#
+#   control_v11p_sd15_canny (1.4G) / stable-diffusion-inpainting (4.0G)
+#     → deploy/ 파이프라인은 안 쓴다. web/backend 의 sd_service.py·lama 쪽에서
+#       쓰므로 **디스크에는 남겨 둔다**. 데우지만 않는다.
+#
+# zero123plus-v1.2(5.2G)와 TripoSR(1.6G)은 여기 있었는데 지웠다 — 목록에서
+# 뺀 게 아니라 **AMI 에서 지웠다**. 저장소·벤더 코드 어디에서도 참조가 없고
+# (SAM3D 로 정착하기 전 실험하던 대안 모델) 스냅샷만 6.8GB 먹고 있었다.
+# 없는 경로를 적어 둘 이유가 없으니 여기서도 뺀다.
 #
 # 틀렸을 때의 대가는 작다. 필요한 걸 실수로 빼도 기동은 멀쩡하고 그 모델만
 # 첫 요청 때 느리게 읽힌다. 반대로 안 쓰는 걸 데우면 **매 콜드스타트마다**
-# 그만큼 시간을 버린다. 그래서 확신이 서는 것만 뺐다 — moge-2-vitl(1.3G)과
-# depth_anything_vitl14(1.3G)도 참조를 못 찾았지만 금액이 작아서 남겨뒀다.
-export EMR_WARM_SKIP=${EMR_WARM_SKIP:-"models--lllyasviel--control_v11p_sd15_canny models--runwayml--stable-diffusion-inpainting models--sudo-ai--zero123plus models--stabilityai--TripoSR"}
+# 그만큼 시간을 버린다.
+export EMR_WARM_SKIP=${EMR_WARM_SKIP:-"models--lllyasviel--control_v11p_sd15_canny models--runwayml--stable-diffusion-inpainting"}
 
 # ── 기동 뒤 백그라운드 워밍 ──────────────────────────────────────────────
 # 부팅 경로에서 워밍을 빼면 345초에 기동하지만, 대신 **첫 추론 요청**이
@@ -204,9 +205,57 @@ export EMR_WARM_SKIP=${EMR_WARM_SKIP:-"models--lllyasviel--control_v11p_sd15_can
 # 판단 보류" 가 풀리지 않는다(= 고장난 워커를 회수하지 못한다). 진행 표시
 # 서브셸의 sleep 이 init 에 입양됐던 것과 같은 함정이라 systemd 로 떼어낸다.
 #
-# 대상은 부팅 경로용 목록을 그대로 쓴다. 뒤에서 도니까 시간 예산을 아낄 이유가
-# 없고, 부팅이 안 쓰는 94%도 결국 추론에서는 쓰인다.
-export EMR_WARM_BG_DIRS=${EMR_WARM_BG_DIRS:-"$EMR_WARM_DIRS"}
+# 대상. 예전엔 `$EMR_WARM_DIRS` 를 그대로 썼다 — "뒤에서 도니까 시간 예산을
+# 아낄 이유가 없고, 부팅이 안 쓰는 94%도 결국 추론에서는 쓰인다"는 논리였다.
+# 그 논리가 틀렸다. 빌더에서 재 보고 알았다.
+#
+#   ① 이 기계의 페이지 캐시는 **7GB 안팎**이다(RAM 15GiB - 컨테이너 셋).
+#      목록은 46GB였다. 46GB를 읽으면 뒤에 읽은 게 앞에 읽은 것을 밀어낸다.
+#      다 읽으면 다 식는다 — 워밍이 자기가 한 일을 스스로 지우고 있었다.
+#
+#   ② conda env 워밍은 **적중률 4%** 다. 콜드 상태에서 import torch +
+#      파이프라인 생성을 돌리고 fincore 로 재니, 목록에 든 13.19GB 중 실제로
+#      올라온 건 0.57GB뿐이었다. .so 는 mmap 이라 **건드린 페이지만** 상주한다
+#      (libtorch_cuda.so 864MB → 43MB, open3d pybind 754MB → 34MB). dd 로
+#      통째로 읽어 봐야 그 중 4%만 쓰인다. 13GB 예산을 0.5GB 값에 쓰는 셈이다.
+#
+#   ③ 8GB 넘게 데우는 건 어차피 못 쓴다. ss_generator.ckpt(6.23GB)를 끝까지
+#      읽었는데 끝난 뒤 상주는 2,214MB 뿐이었다 — free 가 7,632MB 나 남아
+#      있는데도 그렇다. torch.load 가 쓰는 자기 버퍼가 갓 데운 캐시를 밀어낸다.
+#
+# 그래서 워밍 자체를 버리는 게 아니라 **과녁**을 바꾼다. 기법은 여전히 옳다:
+# torch.load 는 zip 안의 텐서 수천 개를 걸어다니느라 23 MB/s 로 읽는데
+# (6.23GB / 267초), 64갈래 dd 는 80 MB/s 다. 3.5배 차이다.
+#
+# 넣는 것 — worker-sam3d 의 **첫 요청 경로**뿐이다. 근거는 체크포인트의
+# pipeline.yaml 과 콜드 로드 로그에서 읽는 순서 그대로다.
+# 빼는 것 — conda env 전부(위 ②), slat_generator.ckpt(4.68GB, 예산 초과),
+# uLayout·omni3d(②번 수정으로 기동 때 스스로 데운다), depth_pro(1.8GB,
+# 파이프라인은 MoGe 를 쓴다), sam-3d-objects 소스 트리.
+#
+# **순서가 곧 우선순위이자 데우는 순서**다. 작은 것부터 적는다 — 추론이
+# 제일 먼저 읽는 ss_generator 를 제일 **나중에** 데워야 살아남을 확률이 높다.
+# (앞의 1.7GB 는 작아서 6.2GB 를 데우는 동안 밀려날 일이 없다.)
+_SAM3D_CKPT=$EMR_ROOT/sam-3d-objects/checkpoints/hf/checkpoints
+export EMR_WARM_BG_DIRS=${EMR_WARM_BG_DIRS:-"\
+$_SAM3D_CKPT/ss_decoder.ckpt \
+$_SAM3D_CKPT/slat_decoder_mesh.ckpt \
+$EMR_ROOT/.cache/huggingface/hub/models--Ruicheng--moge-2-vitl \
+$_SAM3D_CKPT/ss_generator.ckpt"}
+#
+# 총량 상한. 위 넷을 합치면 7.96GB 이고 상한은 9G 다 — 딱 맞추지 않는다.
+# 상한을 넘기는 파일은 건너뛰므로(break 가 아니라 continue), 8G 로 조여 놓으면
+# 제일 값나가는 ss_generator 가 통째로 빠지고 그 자리를 자잘한 게 메우는
+# 최악이 난다. 목록을 늘릴 때 이 숫자부터 다시 보라.
+export EMR_WARM_BG_MAX_BYTES=${EMR_WARM_BG_MAX_BYTES:-9G}
+#
+# 청크 크기(MiB). 목록이 파일 4개로 줄면서 새 문제가 생겼다 — xargs -P 64 는
+# **파일 단위**로 갈라지므로 4개짜리 목록에서는 4갈래밖에 안 돈다. 그런데
+# 지연 로딩 볼륨에서 1갈래 순차는 10.5 MB/s 다(32갈래 70 MB/s). 8GB 를
+# 4갈래로 읽으면 200초, 1갈래면 800초다. 그래서 bake-ami.sh 가 큰 파일을
+# 128MiB 조각으로 잘라 목록에 "경로 skip count"(4MiB 블록 단위)로 적고,
+# 워밍 쪽은 조각을 병렬로 읽는다. 8GB → 64조각이라 -P 64 가 다시 꽉 찬다.
+export EMR_WARM_BG_CHUNK_MB=${EMR_WARM_BG_CHUNK_MB:-128}
 #
 # 워커 9호 실측(이 구조의 첫 측정):
 #   부팅 349.66초 — 워밍 없는 345.09초와 사실상 같다(인스턴스 변동 범위).
@@ -230,8 +279,9 @@ export EMR_WARM_BG_DIRS=${EMR_WARM_BG_DIRS:-"$EMR_WARM_DIRS"}
 # 작업을 돌려 보기 전에는 근거가 없으니 그대로 둔다.
 # 백그라운드 워밍의 상한(초). 부팅을 막지 않으니 넉넉하다. 그래도 상한은 둔다 —
 # dd 하나가 멈추면 유휴 판정이 날 때까지 디스크를 계속 두드린다.
-# 47GB를 80 MB/s 로 읽으면 약 600초이므로 그 세 배를 준다.
-export EMR_WARM_BG_TIMEOUT=${EMR_WARM_BG_TIMEOUT:-1800}
+# 8GB를 80 MB/s 로 읽으면 약 100초다(예전엔 47GB·600초 기준으로 1800을 줬다).
+# 그 여섯 배를 준다 — 지연 로딩이 느린 날을 감안해도 남는다.
+export EMR_WARM_BG_TIMEOUT=${EMR_WARM_BG_TIMEOUT:-600}
 
 # ── 루트 볼륨 ───────────────────────────────────────────────────────────
 # AMI에 들어가는 실제 내용물은 **약 123GB다**. 우리가 넣는 것만 세면 85GB지만

@@ -95,17 +95,82 @@ sudo systemctl start  emr-guardian.timer
 # 그런데 이 목록의 대상은 AMI 안의 불변 데이터다. 부팅마다 다시 세어야 할
 # 이유가 없다. 여기서 한 번 세어 두면 워커는 파일을 읽기만 하면 된다.
 # (목록이 없는 옛 AMI 로도 떠야 하므로 userdata 쪽에 find 폴백을 남겨 뒀다.)
+#
+# 예전에는 여기서 "8MB 넘는 파일 전부"를 담아 46GB 목록이 나왔다. 그런데 이
+# 기계의 페이지 캐시로 쓸 수 있는 건 7GB 안팎이다(RAM 15GiB - 컨테이너 셋).
+# 46GB를 읽으면 뒤에 읽은 게 앞에 읽은 것을 밀어낸다 — 다 읽으면 다 식는다.
+# 그래서 세 가지를 더 한다.
+#
+#   1) EMR_WARM_SKIP 을 **지금** 적용한다. 부팅 쪽 grep 도 그대로 남겨 둔다 —
+#      시작 템플릿에서 EMR_WARM_SKIP 만 바꿔 다시 굽지 않고 조정하는 길을
+#      막지 않기 위해서다. 여기서 미리 빼는 건 목록을 작게 만들기 위함이다.
+#
+#   2) 심링크 항목을 따라간다. sam3d 가중치는 checkpoints/hf/*.ckpt 라는
+#      **읽을 수 있는 이름**의 심링크이고 실제 파일은 HF 블롭의 해시 이름이다.
+#      우선순위를 파일 단위로 적으려면 이름 쪽을 적어야 한다(해시는 모델을
+#      다시 받으면 바뀐다). 심링크는 -type f 에 안 걸리므로 따로 받는다.
+#
+#   3) EMR_WARM_BG_MAX_BYTES 로 총량을 끊는다. EMR_WARM_BG_DIRS 의 **순서가
+#      우선순위**다. 예산을 넘기는 파일은 건너뛰고 뒤쪽 작은 파일로 자리를
+#      채운다(break 가 아니라 continue 다 — 남은 자리를 비워 둘 이유가 없다).
+#
+# 같은 파일이 두 경로로 들어올 수 있다(ckpt 심링크와 그 대상인 HF 블롭
+# 디렉터리). 실제 경로로 묶어 한 번만 읽는다 — 두 번 읽으면 예산만 먹는다.
 WARMLIST=/tmp/emr-warmlist
-: > "$WARMLIST"
-for d in $EMR_WARM_BG_DIRS; do
-  if [ -d "$d" ]; then
-    find "$d" -type f -size +8M ! -name '*.a' -print >> "$WARMLIST" 2>/dev/null
+CAND=/tmp/emr-warmcand
+SEEN=/tmp/emr-warmseen
+BUDGET=$(numfmt --from=iec "${EMR_WARM_BG_MAX_BYTES:-9G}")
+
+for p in $EMR_WARM_BG_DIRS; do
+  if [ -d "$p" ]; then
+    find -L "$p" -type f -size +8M ! -name '*.a' -print 2>/dev/null
+  elif [ -e "$p" ]; then
+    printf '%s\n' "$p"
   else
-    echo "  ⚠ $d 없음 — 워밍 목록에서 빠진다"
+    echo "  ⚠ $p 없음 — 워밍 목록에서 빠진다" >&2
   fi
-done
+done > "$CAND"
+
+if [ -n "${EMR_WARM_SKIP:-}" ]; then
+  # grep 이 전부 걸러내면 1을 반환한다 — set -e 에 걸리므로 받아낸다.
+  grep -Ev "$(printf '%s\n' $EMR_WARM_SKIP | paste -sd'|' -)" "$CAND" > "$CAND.f" || true
+  mv "$CAND.f" "$CAND"
+fi
+
+: > "$WARMLIST"
+: > "$SEEN"
+# 한 줄에 "경로 skip count" 를 적는다. 단위는 dd 가 쓰는 4MiB 블록이다.
+# 파일 하나를 통째로 한 줄에 적으면 xargs -P 64 가 **파일 단위**로만 갈라져서,
+# 4개짜리 목록에서는 4갈래밖에 안 돈다. 지연 로딩 볼륨은 1갈래 10.5 MB/s,
+# 32갈래 70 MB/s 다 — 갈래 수가 곧 속도다. 그래서 큰 파일을 조각내 둔다.
+# (경로에 공백이 있으면 깨진다. 모델 경로엔 없고, 예전 목록도 줄 단위였다.)
+CH=$(( ${EMR_WARM_BG_CHUNK_MB:-128} / 4 ))
+[ "$CH" -gt 0 ] || CH=32
+wl_bytes=0 wl_n=0 wl_over=0 wl_c=0
+while read -r f; do
+  r=$(readlink -f "$f" 2>/dev/null) || continue
+  [ -n "$r" ] && [ -f "$r" ] || continue
+  grep -Fxq "$r" "$SEEN" && continue
+  printf '%s\n' "$r" >> "$SEEN"
+  s=$(stat -c %s "$r" 2>/dev/null) || continue
+  # 첫 파일은 예산보다 커도 넣는다 — 그래야 예산을 잘못 잡아도 0개가 안 된다.
+  if [ "$wl_n" -gt 0 ] && [ $(( wl_bytes + s )) -gt "$BUDGET" ]; then
+    wl_over=$(( wl_over + 1 )); continue
+  fi
+  # 적는 건 $r(해시 이름)이 아니라 $f(읽을 수 있는 심링크 이름)다. 해시는
+  # 모델을 다시 받으면 바뀐다. dd 는 심링크를 알아서 따라간다.
+  nb=$(( (s + 4194304 - 1) / 4194304 ))   # 4MiB 블록 수(올림)
+  k=0
+  while [ "$k" -lt "$nb" ]; do
+    printf '%s %d %d\n' "$f" "$k" "$CH" >> "$WARMLIST"
+    k=$(( k + CH )); wl_c=$(( wl_c + 1 ))
+  done
+  wl_bytes=$(( wl_bytes + s )) wl_n=$(( wl_n + 1 ))
+done < "$CAND"
+
 sudo install -m 644 "$WARMLIST" /opt/emr/warmlist
-echo "  워밍 목록 $(wc -l < "$WARMLIST")개 → /opt/emr/warmlist"
+echo "  워밍 목록 파일 ${wl_n}개 / 조각 ${wl_c}개 / $(numfmt --to=iec "$wl_bytes")B → /opt/emr/warmlist"
+echo "    예산 $(numfmt --to=iec "$BUDGET")B, 넘쳐서 제외 ${wl_over}개, 후보 $(wc -l < "$CAND")개"
 
 # ── 3. 스냅샷 위생 ───────────────────────────────────────────────────────
 # .env 는 인스턴스가 뜰 때 userdata가 다시 만든다. AMI에 남겨두면 옛 큐 이름이
