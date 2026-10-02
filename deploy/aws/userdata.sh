@@ -157,39 +157,20 @@ DC="$DC -f deploy/docker-compose.aws.yml -f /run/emr-deploy-env.yml"
 # 컴포즈가 :ro 로 붙이므로 기동 **전에** 만든다.
 mkdir -p /run/emr
 
-STEP="컴포즈 기동"
-$DC up -d --no-build
-
-# ── 설정이 컨테이너까지 닿았는지 확인 ───────────────────────────────────
-# 위 404 사태의 진짜 교훈은 "오버라이드를 빠뜨렸다"가 아니라 **빠뜨렸는지
-# 아무도 안 본다**는 쪽이다. 컨테이너는 멀쩡히 떴고 리퍼도 떴고 가디언도
-# 조용했다. 틀린 건 첫 작업이 들어온 뒤에야 드러났고, 그때는 이미 돈이 나갔다.
-# 그래서 부팅에서 **실제 컨테이너의 환경변수**를 읽어 맞는지 본다.
-# 컴포즈 파일을 읽어 확인하면 의미가 없다 — 틀린 건 바로 그 파일이었다.
-STEP="설정 도달 확인"
-CID=$($DC ps -q worker-sam3d 2>/dev/null | head -1)
-EFF=$(docker inspect "$CID" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
-        | sed -n 's/^S3_BUCKET=//p' | head -1)
-if [ "$EFF" != "$S3_BUCKET" ]; then
-  echo "[userdata] 워커가 보는 버킷이 '$EFF' 다 — 배포가 정한 값은 '$S3_BUCKET'"
-  echo "[userdata] 이대로 두면 모든 작업이 404 로 죽는다. 기동을 중단한다."
-  exit 1
-fi
-echo "[userdata] 버킷 확인 — 워커가 $EFF 를 본다"
-
-# ── 리퍼 확인 ────────────────────────────────────────────────────────────
-# 여기까지 성공해도 리퍼 컨테이너가 안 떴으면 요금을 끊을 주체가 없다.
-# 가디언이 5분 뒤 잡긴 하지만, 아는 즉시 실패하는 편이 낫다.
-STEP="리퍼 확인"
-for i in $(seq 30); do
-  docker ps --filter name=reaper --filter status=running --format '{{.Names}}' | grep -q . && break
-  [ "$i" -eq 30 ] && { echo "[userdata] 리퍼가 30초 안에 안 떴다"; exit 1; }
-  sleep 1
-done
-
-# ── 기동 뒤 백그라운드 워밍 ──────────────────────────────────────────────
+# ── 기동과 동시에 백그라운드 워밍 ────────────────────────────────────────
 # 부팅을 막지 않으면서 첫 요청(스모크 187초)만 데운다. 근거와 측정표는
-# config.sh 의 EMR_WARM_BG_DIRS 주석에 있다. 여기서 중요한 건 셋뿐이다:
+# config.sh 의 EMR_WARM_BG_DIRS 주석에 있다.
+#
+# 컴포즈 기동 **앞**에 둔 이유: 컨테이너가 다 뜨는 데 수 분이 걸린다
+# (ulayout 헬스체크의 start_period 가 300초다). 예전엔 워밍을 그 뒤에
+# 걸어서, 디스크가 한가한 그 몇 분을 통째로 버리고 나서야 읽기 시작했다.
+# systemd-run 으로 분리해 띄우므로 여기서 먼저 걸어도 기동을 막지 않고,
+# nice 10 + io idle 이라 이미지 로드와 겹쳐도 컴포즈에 양보한다.
+#
+# 게이트 파일(/run/emr/warm-bg.done)을 워커가 :ro 로 보므로, 위의
+# mkdir -p /run/emr 뒤라는 순서는 그대로 지켜야 한다.
+#
+# 여기서 중요한 건 셋뿐이다:
 #   systemd-run : `&` 로 띄우면 상속한 fd 를 붙들어 cloud-init 이 끝난 것으로
 #                 안 보이고, 가디언의 "running 이면 판단 보류"가 안 풀린다.
 #   우선순위     : 실제 작업이 들어오면 양보해야 한다(nice 10 + io idle).
@@ -252,7 +233,7 @@ BGEOF
        --setenv=BG_DIRS="$WARM_BG_DIRS" --setenv=BG_SKIP="$WARM_SKIP" \
        --setenv=BG_JOBS="$WARM_JOBS" \
        /run/emr-warm-bg.sh >/dev/null 2>&1; then
-    echo "[warm-bg] 분리 기동 — 아래 기동 완료 뒤에도 계속 돈다 (동시 $WARM_JOBS, 상한 ${WARM_BG_TIMEOUT}초, 우선순위 낮춤)"
+    echo "[warm-bg] 분리 기동 — 컴포즈 기동과 겹쳐 돈다 (동시 $WARM_JOBS, 상한 ${WARM_BG_TIMEOUT}초, 우선순위 낮춤)"
   else
     echo "[warm-bg] systemd-run 실패 — 첫 요청만 느려진다. 기동은 계속한다"
     touch /run/emr/warm-bg.done   # 안 돌 거면 게이트를 즉시 연다
@@ -261,3 +242,34 @@ else
   echo "[warm-bg] 대상이 없거나 systemd-run 이 없다 — 건너뜀"
   touch /run/emr/warm-bg.done
 fi
+
+STEP="컴포즈 기동"
+$DC up -d --no-build
+
+# ── 설정이 컨테이너까지 닿았는지 확인 ───────────────────────────────────
+# 위 404 사태의 진짜 교훈은 "오버라이드를 빠뜨렸다"가 아니라 **빠뜨렸는지
+# 아무도 안 본다**는 쪽이다. 컨테이너는 멀쩡히 떴고 리퍼도 떴고 가디언도
+# 조용했다. 틀린 건 첫 작업이 들어온 뒤에야 드러났고, 그때는 이미 돈이 나갔다.
+# 그래서 부팅에서 **실제 컨테이너의 환경변수**를 읽어 맞는지 본다.
+# 컴포즈 파일을 읽어 확인하면 의미가 없다 — 틀린 건 바로 그 파일이었다.
+STEP="설정 도달 확인"
+CID=$($DC ps -q worker-sam3d 2>/dev/null | head -1)
+EFF=$(docker inspect "$CID" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+        | sed -n 's/^S3_BUCKET=//p' | head -1)
+if [ "$EFF" != "$S3_BUCKET" ]; then
+  echo "[userdata] 워커가 보는 버킷이 '$EFF' 다 — 배포가 정한 값은 '$S3_BUCKET'"
+  echo "[userdata] 이대로 두면 모든 작업이 404 로 죽는다. 기동을 중단한다."
+  exit 1
+fi
+echo "[userdata] 버킷 확인 — 워커가 $EFF 를 본다"
+
+# ── 리퍼 확인 ────────────────────────────────────────────────────────────
+# 여기까지 성공해도 리퍼 컨테이너가 안 떴으면 요금을 끊을 주체가 없다.
+# 가디언이 5분 뒤 잡긴 하지만, 아는 즉시 실패하는 편이 낫다.
+STEP="리퍼 확인"
+for i in $(seq 30); do
+  docker ps --filter name=reaper --filter status=running --format '{{.Names}}' | grep -q . && break
+  [ "$i" -eq 30 ] && { echo "[userdata] 리퍼가 30초 안에 안 떴다"; exit 1; }
+  sleep 1
+done
+
