@@ -23,11 +23,17 @@ async def extract_furniture(
     points: str = Form(...),
     labels: str = Form(...),
 ):
-    sam2    = request.app.state.sam2
     extract = request.app.state.extract
 
-    if sam2 is None:
-        raise HTTPException(503, "SAM2 모델이 로드되지 않았습니다")
+    # 2단계의 마지막 SAM2 호출이다 — 프런트는 이 응답을 받고 나서
+    # /api/segment/release 를 부른다. 그래도 ensure() 로 받는 이유는, 그 전에
+    # TTL 안전망(600초)이 먼저 돌아 내려가 있을 수 있기 때문이다. 예전처럼
+    # state 를 직접 읽으면 그 경우 503 이 났다.
+    # ensure() 와 use() 중 어느 쪽인지는 services/residency.py 의 ensure 주석에.
+    try:
+        sam2 = request.app.state.residency.ensure('sam2')
+    except Exception as e:
+        raise HTTPException(503, f"SAM2 모델을 올릴 수 없습니다: {e}")
 
     contents = await image.read()
     image_np = np.array(Image.open(io.BytesIO(contents)).convert("RGB"))

@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 os.environ['CUDA_HOME'] = os.environ.get('CONDA_PREFIX', '')
@@ -52,8 +53,29 @@ async def lifespan(app: FastAPI):
 
     app.state.moge = None  # 온디맨드 로드 (GPU 메모리 충돌 방지)
 
+    # SAM2/LaMa 상주 관리. 위에서 이미 올려뒀으므로 residency 는 그걸 인수받아
+    # 쓰기만 한다 — 첫 클릭을 빠르게 하려고 시작 로드는 그대로 둔다.
+    # 왜 해제가 필요한지, 왜 TTL 을 600초로 길게 두는지는 residency.py 머리말에.
+    from services.residency import SegmentResidency, SWEEP_SEC
+    app.state.residency = SegmentResidency(app)
+
+    async def _sweep_loop(res):
+        while True:
+            await asyncio.sleep(SWEEP_SEC)
+            try:
+                res.sweep()
+            except Exception as e:
+                print(f"[residency] 스위퍼 오류(무시하고 계속): {e}")
+
+    sweeper = None
+    if app.state.residency.ttl_sec > 0:
+        sweeper = asyncio.create_task(_sweep_loop(app.state.residency))
+        print(f"TTL 안전망 {app.state.residency.ttl_sec:.0f}초 (점검 {SWEEP_SEC:.0f}초 간격)")
+
     print("서버 준비 완료!")
     yield
+    if sweeper is not None:
+        sweeper.cancel()
     print("서버 종료")
 
 app = FastAPI(title="SAM3D Interior API", lifespan=lifespan)
@@ -85,4 +107,6 @@ def health():
         "sd":      "loaded" if getattr(app.state, 'sd',      None) else "not_loaded",
         "extract": "loaded" if getattr(app.state, 'extract', None) else "not_loaded",
         "sam3d":   "loaded" if getattr(app.state, 'sam3d',   None) else "not_loaded",
+        "residency": getattr(app.state, 'residency', None).status()
+                     if getattr(app.state, 'residency', None) else None,
     }

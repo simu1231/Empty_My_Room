@@ -179,9 +179,14 @@ async def generate_room_3d(
     if not room_pts:
         return JSONResponse({"success": False, "error": "포인트가 없습니다"}, status_code=400)
 
-    sam2 = request.app.state.sam2
-    if sam2 is None:
-        return JSONResponse({"success": False, "error": "SAM2 not loaded"}, status_code=500)
+    # 2단계가 끝나면 SAM2 는 내려간다(명시적 release + 600초 TTL). 이 엔드포인트는
+    # 현재 라이브 프런트가 부르지 않지만(RoomMakingStep 은 같은 URL 을
+    # extract-colors 로 바꿔 쓴다) 열려 있는 경로라, 내려간 상태로 들어오면
+    # 500 이 아니라 다시 올려서 처리한다.
+    try:
+        sam2 = request.app.state.residency.ensure('sam2')
+    except Exception as e:
+        return JSONResponse({"success": False, "error": f"SAM2 load failed: {e}"}, status_code=500)
 
     # SAM2 마스크 → 벽/바닥 색 추출
     orig_mask = sam2.predict(img_np, room_pts)["mask"].astype(bool)

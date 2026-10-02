@@ -25,9 +25,7 @@ async def remove_furniture(
     image: UploadFile = File(...),
     mask:  UploadFile = File(...),
 ):
-    lama = request.app.state.lama
-    if lama is None:
-        raise HTTPException(503, "LaMa 모델이 로드되지 않았습니다")
+    res = request.app.state.residency
 
     img_bytes  = await image.read()
     mask_bytes = await mask.read()
@@ -42,10 +40,13 @@ async def remove_furniture(
         mask_np = cv2.resize(mask_np, (w, h), interpolation=cv2.INTER_NEAREST)
         print(f"[DEBUG] mask resized to: {mask_np.shape}, nonzero after resize: {np.count_nonzero(mask_np)}")
 
-    # LaMa
+    # LaMa — use() 로 감싸는 이유는 services/residency.py 머리말에.
     print("LaMa 시작...")
     _t0 = time.time()
-    lama_result = lama.inpaint(image_np, mask_np)
+    with res.use('lama') as lama:
+        if lama is None:
+            raise HTTPException(503, "LaMa 모델을 올릴 수 없습니다")
+        lama_result = lama.inpaint(image_np, mask_np)
     _lama_time = time.time() - _t0
     print(f"[⏱ 처리시간] LaMa 인페인팅: {_lama_time:.2f}초")
 

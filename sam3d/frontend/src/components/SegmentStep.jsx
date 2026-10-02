@@ -230,6 +230,21 @@ export default function SegmentStep() {
     if (!data3.success) throw new Error('가구 추출 실패')
 
     setFurnitureList(data3.furniture)
+
+    // SAM2/LaMa 를 여기서 명시적으로 내린다. 이 줄 위까지가 둘을 쓰는 전부이고
+    // (segment → inpaint → extract), 3단계는 uLayout, 4단계는 Omni3D + SAM3D 라
+    // 같은 세션에서 다시 호출되지 않는다. 그 1.25GB 를 넘겨주지 않으면 4단계에서
+    // Omni3D 와 SAM3D 가 동시에 돌 때 GPU 여유가 1.7GB 까지 떨어진다.
+    //
+    // 타이머(TTL)로 하지 않은 이유: 2단계는 클릭마다 마스크를 다시 받는
+    // 대화형 루프라, 짧은 TTL 은 사용자가 가구를 고르다 잠깐 멈춘 사이에
+    // 모델을 내려버리고 다음 클릭을 기다리게 만든다. 백엔드에 600초 안전망이
+    // 따로 있으니 여기서는 "확실히 다 썼다"는 이 지점만 알려주면 된다.
+    //
+    // await 하지 않고 실패도 삼킨다 — 메모리 회수는 다음 단계로 넘어가는 것보다
+    // 급하지 않고, 실패해도 안전망이 결국 회수한다.
+    fetch(API.segmentRelease, { method: 'POST' }).catch(() => {})
+
     toast.success(`완료! 빈방 생성 + 가구 ${data3.furniture.length}개 추출 🎉`)
     setStep('roommaking')
 

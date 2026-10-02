@@ -23,9 +23,7 @@ async def create_mask(
     points: str = Form(...),
 ):
     _t0 = time.time()
-    sam2 = request.app.state.sam2
-    if sam2 is None:
-        raise HTTPException(503, "SAM2 모델이 로드되지 않았습니다")
+    res = request.app.state.residency
 
     contents = await image.read()
     # ImageOps.exif_transpose: 스마트폰 사진의 EXIF 회전 정보를 픽셀에 반영
@@ -48,8 +46,14 @@ async def create_mask(
 
     print(f"포인트 개수: {len(pts)}, 포인트: {pts}")
 
-    # 친구 코드 셀 4 그대로
-    result = sam2.predict(image_np, pts)
+    # 친구 코드 셀 4 그대로.
+    # use() 로 감싼 이유 둘: (1) 2 → 3 전이나 TTL 로 내려간 뒤 사용자가 새 사진을
+    # 올리면 여기서 다시 올려야 한다, (2) 추론 중에 해제가 끼어들어 참조가
+    # 끊기면 이 요청이 죽는다. 자세한 건 services/residency.py 머리말에.
+    with res.use('sam2') as sam2:
+        if sam2 is None:
+            raise HTTPException(503, "SAM2 모델을 올릴 수 없습니다")
+        result = sam2.predict(image_np, pts)
 
     h, w = image_np.shape[:2]
     print(f"[⏱ 처리시간] SAM2 세그멘테이션: {time.time()-_t0:.2f}초")
@@ -60,3 +64,17 @@ async def create_mask(
         "mask_b64": image_to_base64(result["mask"]),
         "resized_image_b64": image_to_base64(image_np),
     })
+
+@router.post("/release")
+async def release_models(request: Request):
+    """SAM2/LaMa 를 내린다. 프런트가 2 → 3 단계 전이에서 한 번 부른다.
+
+    2단계가 끝나면 둘은 그 세션에서 다시 쓰이지 않는다(3단계는 uLayout,
+    4단계는 Omni3D + SAM3D). 그 1.25GB 를 쥐고 있으면 4단계에서 Omni3D 와
+    SAM3D 가 동시에 돌 때 여유가 1.7GB 까지 떨어진다. 그래서 여기서 비운다.
+
+    진행중인 요청이 있으면 아무것도 하지 않고 그렇게 알려준다 — 프런트가
+    재시도할 필요는 없다. 안 내려가도 TTL 안전망이 결국 회수하고, 최악의
+    결과는 "메모리를 조금 더 오래 쥐고 있다"뿐이다.
+    """
+    return JSONResponse({"success": True, **request.app.state.residency.release("2→3 단계 전이")})

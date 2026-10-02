@@ -4,6 +4,7 @@ export const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001'
 
 export const API = {
   segment:    `${API_BASE}/api/segment/mask`,
+  segmentRelease: `${API_BASE}/api/segment/release`,
   inpaint:    `${API_BASE}/api/inpaint/remove`,
   extract:    `${API_BASE}/api/extract/furniture`,
   generate3d: `${API_BASE}/api/room/generate3d`,
