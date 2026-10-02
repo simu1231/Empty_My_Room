@@ -178,18 +178,22 @@ export EMR_WARM_JOBS=${EMR_WARM_JOBS:-64}
 # 빌더에서 홈 디렉터리째 tar로 떠왔기 때문이다.
 #
 #   control_v11p_sd15_canny (1.4G) / stable-diffusion-inpainting (4.0G)
-#     → deploy/ 파이프라인은 안 쓴다. web/backend 의 sd_service.py·lama 쪽에서
-#       쓰므로 **디스크에는 남겨 둔다**. 데우지만 않는다.
+#   zero123plus-v1.2 (5.2G) / TripoSR (1.6G)
+#     → 넷 다 **deploy/ 파이프라인은 안 쓰고 web/backend 가 쓴다.**
+#       web/backend/main.py 가 기동 때 Zero123Service·TripoSRService 를 올리고
+#       라우터(/api/zero123, /api/triposr)와 프런트(RelocateStep.jsx)가 부른다.
+#       sd/canny 는 sd_service.py·lama 가 쓴다. 그러니 **디스크에 남긴다** —
+#       데우지만 않는다.
 #
-# zero123plus-v1.2(5.2G)와 TripoSR(1.6G)은 여기 있었는데 지웠다 — 목록에서
-# 뺀 게 아니라 **AMI 에서 지웠다**. 저장소·벤더 코드 어디에서도 참조가 없고
-# (SAM3D 로 정착하기 전 실험하던 대안 모델) 스냅샷만 6.8GB 먹고 있었다.
-# 없는 경로를 적어 둘 이유가 없으니 여기서도 뺀다.
+# 한때 이 주석은 넷 다 "참조가 없다"고 적어 뒀고, 그 말을 믿고 12.2GB 를
+# 지울 뻔했다. 둘은 사용자가 잡아냈고 나머지 둘은 지우기 직전 grep 에서
+# 걸렸다. **grep 범위를 deploy/ 로 좁혀 놓고 "저장소 전체에 없다"고 쓴 것**이
+# 원인이다. 지우는 쪽 판단은 범위를 먼저 말하고 적는다.
 #
-# 틀렸을 때의 대가는 작다. 필요한 걸 실수로 빼도 기동은 멀쩡하고 그 모델만
-# 첫 요청 때 느리게 읽힌다. 반대로 안 쓰는 걸 데우면 **매 콜드스타트마다**
-# 그만큼 시간을 버린다.
-export EMR_WARM_SKIP=${EMR_WARM_SKIP:-"models--lllyasviel--control_v11p_sd15_canny models--runwayml--stable-diffusion-inpainting"}
+# 이 목록은 이제 안전망에 가깝다. EMR_WARM_BG_DIRS 가 디렉터리 훑기에서
+# 파일 네 개를 콕 집는 방식으로 바뀌어서, 여기 뭘 적든 실제로 걸러낼 후보가
+# 없다. 목록을 다시 넓힐 때를 대비해 남겨 둔다.
+export EMR_WARM_SKIP=${EMR_WARM_SKIP:-"models--lllyasviel--control_v11p_sd15_canny models--runwayml--stable-diffusion-inpainting models--sudo-ai--zero123plus models--stabilityai--TripoSR"}
 
 # ── 기동 뒤 백그라운드 워밍 ──────────────────────────────────────────────
 # 부팅 경로에서 워밍을 빼면 345초에 기동하지만, 대신 **첫 추론 요청**이
