@@ -69,6 +69,8 @@ RUN userdel -r ubuntu 2>/dev/null || true; \
 RUN install -d -o ${APP_UID} -g ${APP_UID} ${EMR_ROOT} ${EMR_ROOT}/.cache
 
 COPY --chown=${APP_UID} worker.py /app/worker.py
+# 검증 규칙은 API 와 공유한다 — deploy/worker/jobspec.py 주석 참고.
+COPY --chown=${APP_UID} jobspec.py /app/jobspec.py
 
 # 워커와 리퍼가 상태를 주고받는 디렉터리. 이미지 안에 미리 만들어야 한다.
 # 도커는 빈 named volume을 마운트할 때 **이미지 쪽 경로의 소유권/권한을 복사**하므로,

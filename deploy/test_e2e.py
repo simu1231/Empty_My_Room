@@ -87,6 +87,81 @@ def poll(job_id, timeout=300):
         time.sleep(1)
     return {"status": "TIMEOUT"}, time.time() - t0
 
+def non_retryable_regression():
+    """
+    ③ 회귀: 잘못된 파라미터는 **재시도 없이** 즉시 실패하고 큐에서 사라진다.
+
+    두 갈래를 다 본다.
+      ① API 가 제출 시점에 400 으로 막는가      (큐에 아예 안 들어간다)
+      ② 큐에 직접 넣으면 워커가 즉시 지우는가   (옛 메시지·다른 경로 대비)
+
+    ②가 중요한 이유: 지우지 않으면 가시성 120초 x 3회 동안 백로그 메트릭이
+    0 이 아니고, 그동안 오토스케일링이 GPU 를 깨운다. 지난 부하 테스트에서
+    테스트가 끝난 뒤 인스턴스가 한 대 더 뜬 게 이것 때문이었다.
+
+    input_key 를 **없는 키**로 둔 건 일부러다. 검증이 다운로드보다 앞서지
+    않으면 S3 404(= retryable)가 먼저 나서 failure_kind 가 달라진다.
+    즉 이 테스트는 "검증이 앞단에 있다"까지 같이 증명한다.
+    """
+    import uuid
+    import boto3
+
+    print("\n=== ③ non-retryable 회귀 ===")
+    ep = os.getenv("AWS_ENDPOINT_URL", "http://localhost:4566") or None
+    region = os.getenv("AWS_REGION", "ap-northeast-2")
+    sqs = boto3.client("sqs", endpoint_url=ep, region_name=region)
+    ddb = boto3.resource("dynamodb", endpoint_url=ep, region_name=region)
+    table = ddb.Table(os.getenv("DDB_TABLE", "emr-jobs"))
+    qname = os.getenv("Q_SCENE", "emr-scene")
+    qurl = sqs.get_queue_url(QueueName=qname)["QueueUrl"]
+
+    # ① API 가 막는가
+    with open(IMG, "rb") as f:
+        r = requests.post(f"{API}/api/jobs",
+                          files={"image": ("in.png", f.read(), "image/png")},
+                          data={"job_type": "omni3d"}, timeout=30)
+    api_ok = r.status_code == 400
+    print(f"    ① API 거절: {r.status_code} {'OK' if api_ok else 'FAIL(400 이어야 한다)'}")
+    if not api_ok:
+        print(f"       본문: {r.text[:200]}")
+
+    # ② 큐에 직접 넣으면 워커가 즉시 지우는가
+    jid = uuid.uuid4().hex
+    now = int(time.time())
+    msg = {"job_id": jid, "job_type": "omni3d",
+           "input_key": "input/없는키/in.png",
+           "input_keys": {"image": "input/없는키/in.png"}, "params": {}}
+    table.put_item(Item={**msg, "status": "queued", "created_at": now,
+                         "updated_at": now, "expires_at": now + 3600})
+    sqs.send_message(QueueUrl=qurl, MessageBody=json.dumps(msg))
+    print(f"    ② 큐 직접 주입 job_id={jid}")
+
+    res, el = poll(jid, timeout=120)
+    kind = res.get("failure_kind")
+    kind_ok = res.get("status") == "failed" and kind == "non_retryable"
+    print(f"       상태={res.get('status')} 분류={kind} ({el:.1f}초)"
+          f" {'OK' if kind_ok else 'FAIL'}")
+
+    # 삭제됐는지 — 큐가 비워질 때까지 본다. 재시도 창(약 240초)보다 훨씬 짧은
+    # 60초 안에 0 이 되어야 "즉시 지웠다"고 말할 수 있다.
+    drained, t0 = False, time.time()
+    while time.time() - t0 < 60:
+        a = sqs.get_queue_attributes(
+            QueueUrl=qurl,
+            AttributeNames=["ApproximateNumberOfMessages",
+                            "ApproximateNumberOfMessagesNotVisible"])["Attributes"]
+        depth = int(a["ApproximateNumberOfMessages"]) + \
+            int(a["ApproximateNumberOfMessagesNotVisible"])
+        if depth == 0:
+            drained = True
+            break
+        time.sleep(2)
+    print(f"       큐 비움: {'OK' if drained else 'FAIL(메시지가 남아 재시도된다)'}"
+          f" ({time.time()-t0:.1f}초)")
+
+    return api_ok and kind_ok and drained
+
+
 ensure_image()
 
 results = []
@@ -115,6 +190,9 @@ for i, (jt, params) in enumerate(JOBS, 1):
     results.append((label, ok, el, detail, fds))
     print(f"    -> {'OK' if ok else 'FAIL'} {el:.1f}s  {detail}"
           + (f"\n       워커 fd 수: {fds}" if fds is not None else ""))
+
+nr_ok = non_retryable_regression()
+results.append(("③ non-retryable", nr_ok, 0.0, "", None))
 
 print("\n" + "="*70)
 print(f"{'작업':<22}{'결과':<8}{'소요':>8}")

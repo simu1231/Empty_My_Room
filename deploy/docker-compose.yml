@@ -23,7 +23,11 @@ services:
       retries: 20
 
   api:
-    build: ./api
+    # 컨텍스트가 deploy/ 인 이유: worker/jobspec.py 를 API 이미지에도
+    # 넣어야 한다. 검증 규칙을 두 벌로 복사하면 반드시 어긋난다.
+    build:
+      context: .
+      dockerfile: api/Dockerfile
     image: emr/api:${EMR_IMAGE_TAG:-dev}
     ports: ["8000:8000"]
     environment: &aws_env

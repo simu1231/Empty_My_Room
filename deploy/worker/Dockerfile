@@ -11,7 +11,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY worker.py idle_reaper.py ./
+COPY worker.py idle_reaper.py jobspec.py ./
 
 # 워커와 리퍼가 상태를 주고받는 디렉터리(gpu/Dockerfile과 같은 이유로 0777).
 RUN install -d -m 0777 /state

@@ -22,6 +22,8 @@ from botocore.config import Config
 from fastapi import FastAPI, HTTPException, Request
 
 import capacity
+# 워커와 **같은** 검증 파일. Dockerfile 이 worker/jobspec.py 를 복사해 넣는다.
+import jobspec
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -40,6 +42,13 @@ QUEUE_NAMES = {
     "room_layout": os.getenv("Q_SCENE",  "emr-scene"),
     "omni3d":      os.getenv("Q_SCENE",  "emr-scene"),
 }
+
+# 라우팅 표(어느 큐로 보낼까)와 검증 표(무엇이 유효한가)는 다른 관심사라
+# 따로 둔다. 다만 둘이 어긋나면 "검증은 통과했는데 보낼 큐가 없는" 작업이
+# 생기므로, 기동 시점에 한 번 맞춰 본다. 조용히 틀린 채 도는 것보다 낫다.
+assert set(QUEUE_NAMES) == set(jobspec.JOB_TYPES), (
+    f"QUEUE_NAMES {sorted(QUEUE_NAMES)} 와 jobspec.JOB_TYPES "
+    f"{sorted(jobspec.JOB_TYPES)} 가 다릅니다")
 
 # presigned URL은 "브라우저가 직접 여는 주소"다. 컨테이너 내부 주소로 서명하면
 # API 서버끼리는 통하지만 사용자 브라우저에서는 열리지 않는다.
@@ -104,17 +113,14 @@ async def create_job(request: Request):
     input_keys: dict[str, str] = {}
     params: dict = {}
 
+    # 2단으로 나눈다. 먼저 텍스트 파트만 모아 검증하고, 통과한 작업만 업로드한다.
+    # 한 번에 하면 400 으로 거절할 작업의 이미지가 이미 S3 에 올라가 고아로 남는다.
+    uploads: list = []
     for field, value in form.multi_items():
         if field == "job_type":
             continue
         if isinstance(value, StarletteUploadFile):
-            # 이미지는 S3로. SQS 메시지에 직접 넣으면 안 된다(메시지 최대 256KB).
-            key = f"input/{job_id}/{field}/{value.filename or 'file'}"
-            s3.put_object(
-                Bucket=BUCKET, Key=key, Body=await value.read(),
-                ContentType=value.content_type or "application/octet-stream",
-            )
-            input_keys[field] = key
+            uploads.append((field, value))
         elif field == "params":
             # 구조가 있는 값은 params에 JSON으로 한 번에 보낼 수도 있다.
             try:
@@ -124,8 +130,22 @@ async def create_job(request: Request):
         else:
             params[field] = value
 
-    if "image" not in input_keys:
-        raise HTTPException(400, "image 파일 파트가 필요합니다")
+    # 워커와 **같은** 함수로 검증한다. 여기서 통과한 작업은 워커도 통과시킨다.
+    # 규칙이 갈라지면 사용자는 접수 응답을 받고 기다렸다가 failed 를 본다.
+    try:
+        jobspec.validate(job_type, params, {f: "" for f, _ in uploads})
+    except jobspec.InvalidJob as e:
+        raise HTTPException(400, str(e))
+
+    # 검증을 통과했으니 이제 올린다.
+    # 이미지는 S3로. SQS 메시지에 직접 넣으면 안 된다(메시지 최대 256KB).
+    for field, value in uploads:
+        key = f"input/{job_id}/{field}/{value.filename or 'file'}"
+        s3.put_object(
+            Bucket=BUCKET, Key=key, Body=await value.read(),
+            ContentType=value.content_type or "application/octet-stream",
+        )
+        input_keys[field] = key
 
     job_msg = {
         "job_id": job_id,
@@ -181,6 +201,9 @@ def get_job(job_id: str):
         )
     elif item["status"] == "failed":
         resp["error"] = item.get("error", "알 수 없는 오류")
+        # non_retryable 은 큐에서 즉시 지워져 DLQ 에 남지 않는다. DLQ 알람으로는
+        # 영영 안 보이므로, 조회 응답이 유일한 흔적이다. 반드시 내보낸다.
+        resp["failure_kind"] = item.get("failure_kind", "retryable")
     return resp
 
 

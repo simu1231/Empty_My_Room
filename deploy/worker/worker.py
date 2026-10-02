@@ -21,6 +21,11 @@ import traceback
 import boto3
 from botocore.config import Config
 
+# API 와 **같은 파일**을 본다. 검증 규칙이 갈라지면 API 는 받아놓고 워커가
+# 버리는 조합이 생긴다. deploy/worker/jobspec.py 주석 참고.
+import jobspec
+from jobspec import InvalidJob
+
 ENDPOINT   = os.getenv("AWS_ENDPOINT_URL") or None
 REGION     = os.getenv("AWS_REGION", "ap-northeast-2")
 BUCKET     = os.getenv("S3_BUCKET", "emr-jobs")
@@ -231,7 +236,21 @@ def _post_sidecar(url: str, local_input: str, data: dict):
     with open(local_input, "rb") as f:
         files = {"image": ("input.png", f.read(), "image/png")}
     resp = requests.post(url, files=files, data=data, timeout=SIDECAR_TIMEOUT)
+    # 4xx 면 raise_for_status 가 HTTPError 를 던지고, jobspec.is_non_retryable 이
+    # 그걸 "이 입력으로는 안 된다"로 읽어 즉시 삭제한다. 5xx 는 재시도한다.
     resp.raise_for_status()
+
+    # omni3d 는 지원하지 않는 카테고리를 **200 으로** 돌려준다
+    # (omni3d/server.py 의 unsupported 분기). 그대로 두면 실패 메시지가
+    # "결과물"로 S3 에 올라가고 상태가 done 이 된다 — 거짓 성공이다.
+    # 재시도해도 카테고리 목록은 안 바뀌므로 non-retryable 로 올린다.
+    try:
+        body = resp.json()
+    except ValueError:
+        body = None
+    if isinstance(body, dict) and body.get("unsupported"):
+        raise InvalidJob(body.get("error") or "사이드카가 지원하지 않는 입력입니다")
+
     # 사이드카 JSON을 가공 없이 그대로 올린다. 프런트엔드가 동기 호출 때 받던
     # 응답과 한 글자도 다르지 않아야 결과 처리 코드를 손대지 않아도 된다.
     return resp.content, "application/json"
@@ -247,10 +266,9 @@ def _run_room_layout(job, local_input, local_inputs):
 
 
 def _run_omni3d(job, local_input, local_inputs):
-    params = job.get("params") or {}
-    missing = [k for k in ("bbox", "category") if k not in params]
-    if missing:
-        raise ValueError(f"omni3d 작업에 필요한 파라미터 누락: {missing}")
+    # 필수 파라미터 검사는 process() 가 다운로드 전에 이미 끝냈다(jobspec.validate).
+    # 여기서 다시 세지 않는다 — 두 군데서 세면 규칙이 갈라진다.
+    params = job["params"]
     return _post_sidecar(
         f"{OMNI3D_URL}/estimate",
         local_input,
@@ -286,7 +304,9 @@ def run_inference(job: dict, local_input: str, local_inputs: dict | None = None)
 
     handler = HANDLERS.get(job_type)
     if handler is None:
-        raise ValueError(f"처리할 수 없는 job_type: {job_type}")
+        # 있을 수 없는 경로다(jobspec.validate 가 먼저 막는다). 그래도 남겨 두고,
+        # 재시도해도 소용없는 오류라는 뜻으로 InvalidJob 을 쓴다.
+        raise InvalidJob(f"처리할 수 없는 job_type: {job_type}")
     return handler(job, local_input, local_inputs or {"image": local_input})
 
 
@@ -306,7 +326,14 @@ def process(queue_url: str, msg: dict):
 
         # 파트 이름 → 로컬 경로. SAM3D 얇은 가구 경로처럼 입력이 여러 개인
         # 작업이 있어서, 주 입력만이 아니라 온 것을 전부 내려받는다.
-        input_keys = job.get("input_keys") or {"image": job["input_key"]}
+        input_keys = job.get("input_keys") or (
+            {"image": job["input_key"]} if job.get("input_key") else {})
+
+        # **S3 다운로드와 GPU 호출보다 앞**에서 검증한다. 잘못된 입력 때문에
+        # 수십 MB 를 내려받고 모델을 깨울 이유가 없다. 여기서 InvalidJob 이
+        # 나면 아래 except 가 메시지를 즉시 지운다.
+        jobspec.validate(job.get("job_type"), job.get("params"), input_keys)
+
         local_inputs = {}
         for field, key in input_keys.items():
             path = f"/tmp/{job_id}.{field}"
@@ -329,10 +356,25 @@ def process(queue_url: str, msg: dict):
 
     except Exception as e:
         traceback.print_exc()
-        set_status(job_id, "failed", error=str(e)[:500])
-        # 메시지를 지우지 않는다 → 가시성 타임아웃이 지나면 자동 재시도되고,
-        # 지정 횟수를 넘기면 DLQ로 넘어간다. 삭제해버리면 원인 분석이 불가능해진다.
-        print(f"[worker] 실패 job_id={job_id}: {e}")
+        # 화이트리스트 분류(jobspec.is_non_retryable). 명시한 것만 즉시 삭제하고
+        # 나머지는 전부 재시도한다 — 분류를 틀렸을 때 싼 쪽으로 기울인다.
+        kind = "non_retryable" if jobspec.is_non_retryable(e) else "retryable"
+
+        # 즉시 삭제한 건은 DLQ 로 가지 않으므로 DLQ 알람에 안 잡힌다.
+        # 조회로만 보이니 분류를 반드시 남긴다.
+        set_status(job_id, "failed", error=str(e)[:500], failure_kind=kind)
+
+        if kind == "non_retryable":
+            # 재시도해도 결과가 같다. 큐에 돌려보내면 maxReceiveCount 를 소진할
+            # 때까지(3회 x 가시성 120초 ≈ 240초) 백로그 메트릭이 0 이 아니고,
+            # 그동안 오토스케일링이 GPU 를 깨운다. 지난 부하 테스트에서 이걸로
+            # 테스트가 끝난 뒤에도 인스턴스가 한 대 더 떴다(약 12분, $0.09).
+            sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=receipt)
+            print(f"[worker] 즉시 실패 — 재시도 안 함 job_id={job_id}: {e}")
+        else:
+            # 지우지 않는다 → 가시성 타임아웃이 지나면 자동 재시도되고,
+            # 지정 횟수를 넘기면 DLQ로 넘어간다. 삭제하면 원인 분석이 불가능해진다.
+            print(f"[worker] 실패 — 재시도함 job_id={job_id}: {e}")
     finally:
         stop_hb.set()
         publish_state(busy=False)

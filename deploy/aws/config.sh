@@ -11,6 +11,16 @@ PROJECT=emr
 # ── 이름 ────────────────────────────────────────────────────────────────
 export Q_SAM3D=emr-sam3d
 export Q_SCENE=emr-scene
+
+# ── 알림 ────────────────────────────────────────────────────────────────
+# DLQ 에 메시지가 쌓이면 메일을 받는다. DLQ 는 "재시도를 다 쓰고도 안 된 작업"이
+# 모이는 곳이라, 조용히 쌓이면 아무도 모르는 사이에 사용자 작업이 사라진다.
+#
+# 주의: non-retryable 로 분류돼 즉시 삭제된 작업은 **DLQ 에 오지 않는다.**
+# 그건 DynamoDB 의 failure_kind 로만 보인다(worker.py 의 except 분기 참고).
+# 이 알람이 커버하는 건 "재시도를 소진한" 쪽이다.
+export EMR_ALERT_EMAIL=${EMR_ALERT_EMAIL:-wyr24353354@gmail.com}
+export EMR_ALERT_TOPIC=${EMR_ALERT_TOPIC:-${PROJECT:-emr}-alerts}
 # S3 버킷 이름은 **전 세계에서 유일**해야 한다(계정별이 아니다). 그냥 emr-jobs 로
 # 두면 언제든 다른 사람이 먼저 가져가서 배포가 중간에 막힌다.
 #

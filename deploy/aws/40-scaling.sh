@@ -71,6 +71,33 @@ aws cloudwatch put-metric-alarm \
 # INSUFFICIENT_DATA로 빠진다. 0으로 메워야 "sam3d에만 일이 있는" 정상 상황을
 # 제대로 읽는다.
 
+# ── 1-b. DLQ 알람 ───────────────────────────────────────────────────────
+# 백로그 알람과 목적이 정반대다. 저건 "일이 있으니 켜라"이고 이건 "사람이 봐야
+# 한다"이다. DLQ 에 왔다는 건 재시도를 다 쓰고도 안 됐다는 뜻이라, 자동으로
+# 할 수 있는 일이 더 없다.
+#
+# 여기에 안 잡히는 실패가 있다: non-retryable 로 분류돼 큐에서 즉시 삭제된 건은
+# DLQ 를 거치지 않는다. 그건 DynamoDB 의 failure_kind 로만 보인다
+# (deploy/worker/worker.py 의 except 분기, deploy/worker/jobspec.py 참고).
+#
+# create-topic 은 멱등이라 ARN 조회를 겸한다. 토픽의 주인은 15-resources.sh 이고
+# 이메일 구독도 거기서 한다 — 여기서는 보낼 곳만 알면 된다.
+echo "▶ DLQ 알람"
+TOPIC_ARN=$(aws sns create-topic --name "$EMR_ALERT_TOPIC" --query TopicArn --output text)
+for Q in "$Q_SAM3D" "$Q_SCENE"; do
+  aws cloudwatch put-metric-alarm \
+    --alarm-name "${Q}-dlq-not-empty" \
+    --alarm-description "${Q}-dlq 에 실패 작업이 쌓였다 — 사람이 봐야 한다" \
+    --namespace AWS/SQS --metric-name ApproximateNumberOfMessagesVisible \
+    --dimensions "Name=QueueName,Value=${Q}-dlq" \
+    --statistic Maximum --period 300 \
+    --evaluation-periods 1 --datapoints-to-alarm 1 \
+    --threshold 1 --comparison-operator GreaterThanOrEqualToThreshold \
+    --treat-missing-data notBreaching \
+    --alarm-actions "$TOPIC_ARN"
+  echo "  ${Q}-dlq ≥ 1 → $EMR_ALERT_EMAIL"
+done
+
 # ── 2. 온디맨드 폴백 ────────────────────────────────────────────────────
 echo "▶ 온디맨드 폴백 정책"
 OD_OUT_ARN=$(aws autoscaling put-scaling-policy \

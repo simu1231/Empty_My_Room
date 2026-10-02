@@ -115,10 +115,37 @@ else
   echo "  TTL 이미 $TTL"
 fi
 
+# ── SNS (알림) ──────────────────────────────────────────────────────────
+# DLQ 에 뭔가 쌓이면 메일을 받는다. create-topic 과 subscribe 는 둘 다 멱등이라
+# 여러 번 돌려도 안전하다. 다만 이메일 구독은 **본인이 확인 메일을 눌러야**
+# 활성화된다 — 안 누르면 PendingConfirmation 으로 남고 알림이 안 온다.
+echo "▶ SNS 알림 토픽"
+TOPIC_ARN=$(aws sns create-topic --name "$EMR_ALERT_TOPIC" --tags "$TAGS" \
+              --query TopicArn --output text)
+echo "  $TOPIC_ARN"
+SUB=$(aws sns list-subscriptions-by-topic --topic-arn "$TOPIC_ARN" \
+        --query "Subscriptions[?Endpoint=='$EMR_ALERT_EMAIL'].SubscriptionArn | [0]" \
+        --output text 2>/dev/null || echo None)
+case "$SUB" in
+  None|"")
+    aws sns subscribe --topic-arn "$TOPIC_ARN" --protocol email \
+      --notification-endpoint "$EMR_ALERT_EMAIL" >/dev/null
+    echo "  구독 요청 → $EMR_ALERT_EMAIL"
+    echo "  ⚠ 메일함의 'Confirm subscription' 을 눌러야 알림이 온다"
+    ;;
+  PendingConfirmation)
+    echo "  ⚠ 구독 미승인 — $EMR_ALERT_EMAIL 의 확인 메일을 눌러라"
+    ;;
+  *)
+    echo "  구독 확인됨 → $EMR_ALERT_EMAIL"
+    ;;
+esac
+
 echo
 echo "✔ 리소스 준비 완료"
 echo "   큐     $Q_SAM3D / $Q_SCENE (+ 각각 -dlq)"
 echo "   버킷   $S3_BUCKET"
 echo "   테이블 $DDB_TABLE"
+echo "   알림   $EMR_ALERT_TOPIC → $EMR_ALERT_EMAIL"
 echo
 echo "   버킷 이름이 바뀌었다면 ./10-iam.sh 를 다시 돌려야 정책 ARN이 맞는다."
