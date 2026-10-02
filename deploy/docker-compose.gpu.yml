@@ -92,18 +92,29 @@ services:
     build: *gpu_build
     image: emr/gpu:${EMR_IMAGE_TAG:-dev}
     working_dir: ${EMR_ROOT:-${HOME}}/uLayout
-    command: ["${EMR_ROOT:-${HOME}}/miniconda3/envs/uLayout/bin/python", "-u", "server.py"]
+    # server.py 를 직접 띄우지 않고 래퍼를 띄운다. 래퍼가 server 를 import 해서
+    # '모델 로드 → 더미 추론 1회 → 그 다음에 READY' 로 기동 순서만 바꾼다.
+    # 원본은 :ro 마운트라 못 고치고, 고칠 필요도 없다(ulayout_boot.py 머리말).
+    command: ["${EMR_ROOT:-${HOME}}/miniconda3/envs/uLayout/bin/python", "-u", "/app/ulayout_boot.py"]
     environment:
       HOME: ${EMR_ROOT:-${HOME}}
+      ULAYOUT_DIR: ${EMR_ROOT:-${HOME}}/uLayout
+      # 더미 입력 해상도. 프론트·백엔드 어디에도 축소가 없어서 폰 사진이
+      # 원본 크기로 들어온다 — 같은 크기로 덥혀야 의미가 있다.
+      ULAYOUT_WARM_SIZE: ${ULAYOUT_WARM_SIZE:-3024x4032}
     # /health는 모델이 안 올라가도 status:ok 를 반환한다. 그래서 status가 아니라
     # ulayout_loaded 플래그를 봐야 한다. 이미지에 curl이 없어 python으로 짠다.
+    # 래퍼를 쓰면서 이 플래그는 '웜업까지 끝났다'는 뜻으로 좁아졌다.
     healthcheck:
       test: ["CMD", "${EMR_ROOT:-${HOME}}/miniconda3/envs/uLayout/bin/python", "-c",
              "import urllib.request,json,sys; d=json.load(urllib.request.urlopen('http://localhost:8002/health',timeout=5)); sys.exit(0 if d.get('ulayout_loaded') else 1)"]
       interval: 10s
       timeout: 10s
       retries: 40        # 모델 로드가 느려도 기다린다 (start_period 뒤 40회 x 10초)
-      start_period: 120s
+      # 로드만 할 땐 120초로 넉넉했지만 이제 더미 추론 한 번이 뒤에 붙는다.
+      # 이 구간의 실패는 unhealthy 로 세지 않는다 — 늘려도 느려지지 않고
+      # 첫 성공이 뜨는 즉시 healthy 가 된다.
+      start_period: 300s
     volumes: *model_mounts
     ulimits: *big_nofile
     deploy: *gpu_reservation
