@@ -73,21 +73,41 @@ aws s3api put-bucket-cors --bucket "$S3_BUCKET" --cors-configuration '{
   }]
 }'
 
-# 작업 결과는 임시 파일이다. 지우지 않으면 스토리지 요금이 단조증가한다 —
-# 스케일투제로로 GPU를 0으로 만들어도 S3는 계속 쌓인다.
+# 수명주기는 prefix 별로 나눈다. 예전엔 Prefix "" 에 7일 만료를 걸어서 버킷
+# 전체를 대상으로 삼았는데, 같은 버킷 ami/ 아래에 AMI 부트스트랩 tar(hfcache 등
+# 57GB)가 들어 있다. 그대로 두면 재굽기용 tar 가 7일 뒤 조용히 사라지고, 다음
+# 부팅이 404 로 죽는다. 그래서 만료는 input/ 과 result/ 에만 건다.
+#
+# 세 번째 규칙이 따로 있는 이유: AbortIncompleteMultipartUpload 도 예전엔 같은
+# Prefix "" 규칙에 얹혀 있었다. 만료만 좁히고 이걸 안 빼내면, 29.8GB tar 처럼
+# 멀티파트로 올라가는 ami/ 업로드가 중간에 끊겼을 때 그 조각이 영구히 남아
+# 요금을 낸다. 조각 정리는 버킷 전체에 유지하고, 만료만 분리한다.
 aws s3api put-bucket-lifecycle-configuration --bucket "$S3_BUCKET" \
   --lifecycle-configuration '{
-    "Rules": [{
-      "ID": "expire-jobs",
-      "Status": "Enabled",
-      "Filter": {"Prefix": ""},
-      "Expiration": {"Days": 7},
-      "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 1}
-    }]
+    "Rules": [
+      {
+        "ID": "expire-input",
+        "Status": "Enabled",
+        "Filter": {"Prefix": "input/"},
+        "Expiration": {"Days": 7}
+      },
+      {
+        "ID": "expire-result",
+        "Status": "Enabled",
+        "Filter": {"Prefix": "result/"},
+        "Expiration": {"Days": 7}
+      },
+      {
+        "ID": "abort-incomplete-uploads",
+        "Status": "Enabled",
+        "Filter": {"Prefix": ""},
+        "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 1}
+      }
+    ]
   }'
 aws s3api put-bucket-tagging --bucket "$S3_BUCKET" \
   --tagging 'TagSet=[{Key=Project,Value=emr}]'
-echo "  퍼블릭 차단 / CORS / 7일 수명주기 적용"
+echo "  퍼블릭 차단 / CORS / 수명주기 적용 (input,result 7일 / ami 만료없음)"
 
 # ── DynamoDB ────────────────────────────────────────────────────────────
 echo "▶ DynamoDB $DDB_TABLE"
