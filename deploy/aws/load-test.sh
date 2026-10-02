@@ -176,6 +176,26 @@ for s in range(sessions):
                           # 영원히 남으면 나중에 테이블을 보고 헷갈린다.
                           "expires_at": {"N": str(now + 7 * 24 * 3600)}})
         keys.append({"job_id": {"S": jid}})
+# ③ 독 메시지 1건. 일부러 params 를 비워 보낸다 — jobspec.validate 가
+# non-retryable 로 잡아 **재시도 없이** 즉시 지워야 한다. 안 지우면 가시성
+# 120초 x maxReceiveCount 3 = 240초 동안 백로그가 >0 으로 남아 함대를
+# 계속 깨운다. 6단계에서 omni3d 6건이 실제로 그랬다(dff1769).
+# 큐 배정은 sam3d_mesh 가 아니면 전부 scene 이라 omni3d 그대로 보내면 된다.
+if os.environ.get("POISON", "1") == "1":
+    pjid = uuid.uuid4().hex
+    jobs.append({"job_id": pjid, "job_type": "omni3d", "input_key": img_key,
+                 "input_keys": {"image": img_key}, "params": {}})
+    ddb_items.append({"job_id": {"S": pjid}, "job_type": {"S": "omni3d"},
+                      "input_key": {"S": img_key},
+                      "input_keys": {"M": {"image": {"S": img_key}}},
+                      "params": {"M": {}},
+                      "status": {"S": "queued"},
+                      "created_at": {"N": str(now)},
+                      "updated_at": {"N": str(now)},
+                      "expires_at": {"N": str(now + 7 * 24 * 3600)}})
+    keys.append({"job_id": {"S": pjid}})
+    open(f"{run}/poison.txt", "w").write(pjid)
+    print("  + 독 메시지 1건 (omni3d, params 비움) — 즉시 버려져야 한다")
 for i, (m, it) in enumerate(zip(jobs, ddb_items)):
     json.dump(it, open(f"{run}/ddb-{i:03d}.json", "w"))
     json.dump(m, open(f"{run}/msg-{i:03d}.json", "w"))
@@ -338,6 +358,17 @@ print("-" * 72)
 for t, v in per.items():
     print(f"{t:<12} 건수 {len(v):<3} 최초 {v[0]}s  최소 {min(v)}s  중앙 {sorted(v)[len(v)//2]}s")
 print("=" * 72)
+# ③ 독 메시지는 즉시 failed 로 끝나고 **다시 안 나타나야** 한다.
+# 재시도되면 여기서 끝까지 미완으로 남거나 상태가 오락가락한다.
+pf = f"{run}/poison.txt"
+if os.path.exists(pf):
+    pa = at.get(open(pf).read().strip(), {})
+    if "failed" in pa:
+        print(f"독 메시지      : {pa['failed']}s 에 failed — 즉시 버렸다(기대한 동작)")
+    elif pa:
+        print(f"독 메시지      : ⚠ 상태 {sorted(pa)} — failed 로 안 끝났다")
+    else:
+        print("독 메시지      : ⚠ 상태 변화 없음 — 워커가 집지도 못했다")
 dones = [a["done"] for a in at.values() if "done" in a]
 runs  = [a["running"] for a in at.values() if "running" in a]
 if runs: print(f"첫 작업 시작   : {min(runs)}s   (= 0대에서 워커가 일을 집기까지)")
