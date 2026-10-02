@@ -27,6 +27,20 @@
 # 기본값을 안 준다(`:?`). 값이 비면 여기서 즉시 멈추는 편이, 그럴듯한 이름으로
 # 조용히 떨어져 404 를 보는 것보다 훨씬 싸다 — 이번에 치른 값이 그 증거다.
 
+# 공통 환경변수. 예전에는 worker-sam3d 의 environment 에 앵커를 달아 두고
+# scene/reaper 가 그걸 재사용했는데, 그러면 sam3d **한 쪽에만** 주고 싶은 값을
+# 넣을 자리가 없다(넣는 순간 셋 다 받는다). 그래서 서비스 밖으로 뺐다.
+x-aws-real: &aws_real
+  # 빈 문자열이면 boto3가 실제 AWS 엔드포인트를 쓴다(worker.py가 `or None` 처리).
+  AWS_ENDPOINT_URL: ""
+  AWS_PUBLIC_ENDPOINT_URL: ""
+  AWS_ACCESS_KEY_ID: ""      # IAM 역할에서 받는다 — 키를 넣으면 오히려 역할을 가린다
+  AWS_SECRET_ACCESS_KEY: ""
+  AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+  S3_BUCKET: ${S3_BUCKET:?deploy/.env 에 S3_BUCKET 이 없다 — userdata 가 쓴다}
+  DDB_TABLE: ${DDB_TABLE:?deploy/.env 에 DDB_TABLE 이 없다 — userdata 가 쓴다}
+  MOCK: "0"
+
 services:
   # LocalStack은 이미지 자체를 띄우지 않는다. scale: 0 으로 비활성화한다.
   localstack:
@@ -35,18 +49,19 @@ services:
     scale: 0
 
   worker-sam3d:
-    environment: &aws_real
-      # 빈 문자열이면 boto3가 실제 AWS 엔드포인트를 쓴다(worker.py가 `or None` 처리).
-      AWS_ENDPOINT_URL: ""
-      AWS_PUBLIC_ENDPOINT_URL: ""
-      AWS_ACCESS_KEY_ID: ""      # IAM 역할에서 받는다 — 키를 넣으면 오히려 역할을 가린다
-      AWS_SECRET_ACCESS_KEY: ""
-      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
-      S3_BUCKET: ${S3_BUCKET:?deploy/.env 에 S3_BUCKET 이 없다 — userdata 가 쓴다}
-      DDB_TABLE: ${DDB_TABLE:?deploy/.env 에 DDB_TABLE 이 없다 — userdata 가 쓴다}
+    environment:
+      <<: *aws_real
       QUEUE_NAME: ${Q_SAM3D:-emr-sam3d}
-      MOCK: "0"
       IDLE_EXIT_SEC: "0"          # 스스로 안 끝낸다 — 리퍼가 인스턴스째 회수한다
+      # 워밍 게이트는 **이 워커에만** 건다. scene 은 사이드카로 넘기기만 해서
+      # 디스크를 거의 안 읽는다 — 같이 묶어 세우면 가벼운 작업까지 늦어진다.
+      WARM_GATE_FILE: /warm/warm-bg.done
+      WARM_GATE_MAX_SEC: ${WARM_GATE_MAX_SEC:-600}
+    volumes:
+      # 호스트의 백그라운드 워밍이 끝났다는 플래그만 보려고 붙인다. 읽기 전용이고
+      # /run 이라 tmpfs 다(부팅마다 깨끗하다 — 지난 부팅의 플래그가 남으면 게이트가
+      # 처음부터 열려 의미가 없다). userdata 가 만들고 systemd ExecStopPost 가 쓴다.
+      - /run/emr:/warm:ro
     # localstack 의존만 끊고 사이드카 의존은 반드시 남긴다. 여기서 통째로 비우면
     # ①(세 컨테이너 한 대)의 전제인 "scene이 VRAM을 먼저 확보한다"가 깨진다.
     # depends_on은 맵이라 병합되므로, 기본 파일의 localstack 항목을 !reset으로

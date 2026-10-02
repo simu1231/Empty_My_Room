@@ -47,6 +47,12 @@ ULAYOUT_URL = os.getenv("ULAYOUT_URL", "http://localhost:8002")
 OMNI3D_URL  = os.getenv("OMNI3D_URL",  "http://localhost:8003")
 SIDECAR_TIMEOUT = int(os.getenv("SIDECAR_TIMEOUT", "120"))
 
+# 워밍 게이트: 호스트의 백그라운드 디스크 워밍(systemd emr-warm-bg)이 끝났다는
+# 플래그 파일. 설정돼 있으면 그 파일이 생길 때까지 SQS 폴링을 미룬다.
+# AWS 오버레이에서 sam3d 워커에만 켠다 — scene 은 가볍고 먼저 받는 편이 낫다.
+WARM_GATE_FILE    = os.getenv("WARM_GATE_FILE", "")
+WARM_GATE_MAX_SEC = int(os.getenv("WARM_GATE_MAX_SEC", "600"))
+
 # 유휴 종료: 이 시간 동안 작업이 없으면 프로세스를 끝낸다.
 # 0 이하면 스스로 끝내지 않는다 — ①(세 컨테이너 한 대) 구성의 기본값이다.
 # 그 구성에서는 한 인스턴스에 워커가 둘이라, 한쪽이 마음대로 프로세스를 끝내면
@@ -399,12 +405,58 @@ def resolve_queue_url(retries: int = 30, delay: float = 2.0) -> str:
     raise RuntimeError(f"큐 '{QUEUE_NAME}'를 {retries}회 시도했으나 찾지 못했습니다")
 
 
+def wait_for_warm_gate(heartbeat=None, poll: float = 1.0) -> float:
+    """
+    백그라운드 디스크 워밍이 끝날 때까지 작업 수신을 미룬다. 기다린 초를 돌려준다.
+
+    워밍은 nice 10 / io idle 로 47GB 를 읽는다. 그 와중에 sam3d 첫 작업이
+    같은 디스크에서 모델을 끌어오면 둘이 서로를 늦춘다. 워밍을 없애는 대신
+    순서를 준다 — 워밍이 끝난 뒤에 받는다.
+
+    절대 영원히 막히면 안 된다. 플래그를 못 쓰는 버그 하나로 GPU 한 대가
+    아무 일도 못 하고 요금만 먹는 게 제일 비싼 고장이다. 그래서 상한을 두고,
+    넘기면 경고만 남기고 그냥 시작한다.
+    """
+    if not WARM_GATE_FILE:
+        return 0.0
+    gate_dir = os.path.dirname(WARM_GATE_FILE) or "/"
+    if not os.path.isdir(gate_dir):
+        # 로컬 개발이거나 이 마운트가 없는 옛 AMI 다. 기다릴 대상이 아예 없다.
+        print(f"[worker] 워밍 게이트 꺼짐 — {gate_dir} 가 없다")
+        return 0.0
+
+    t0 = time.monotonic()
+    said = 0.0
+    while not os.path.exists(WARM_GATE_FILE):
+        waited = time.monotonic() - t0
+        if waited >= WARM_GATE_MAX_SEC:
+            print(f"[worker] ⚠ 워밍 게이트 {WARM_GATE_MAX_SEC}초 초과 — 그냥 시작한다. "
+                  f"{WARM_GATE_FILE} 이 끝내 안 생겼다(플래그 버그를 의심한다)")
+            return waited
+        if _shutdown.is_set():
+            return waited
+        if waited - said >= 30:
+            said = waited
+            print(f"[worker] 워밍 대기 {int(waited)}초 / 상한 {WARM_GATE_MAX_SEC}초")
+        if heartbeat:
+            # 리퍼는 상태 파일의 mtime 이 오래되면 '워커가 멎었다'고 보고 종료를
+            # 보류한다. 기다리는 동안에도 갱신해야 판단이 정상으로 돈다.
+            heartbeat()
+        time.sleep(poll)
+
+    waited = time.monotonic() - t0
+    print(f"[worker] 워밍 끝 — {waited:.0f}초 기다렸다")
+    return waited
+
+
 def main():
     queue_url = resolve_queue_url()
     idle_desc = f"{IDLE_EXIT_SEC}초" if IDLE_EXIT_SEC > 0 else "안 함(리퍼가 판단)"
     print(f"[worker] 시작 queue={QUEUE_NAME} mock={MOCK} 자가유휴종료={idle_desc}")
     last_work = time.time()
     publish_state(busy=False)   # 리퍼에게 "나 떴고 지금은 논다"를 먼저 알린다
+    wait_for_warm_gate(heartbeat=lambda: publish_state(busy=False))
+    last_work = time.time()     # 기다린 시간은 유휴로 세지 않는다
 
     while not _shutdown.is_set():
         if draining():

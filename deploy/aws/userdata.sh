@@ -149,6 +149,11 @@ YML
 DC="docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml"
 DC="$DC -f deploy/docker-compose.aws.yml -f /run/emr-deploy-env.yml"
 
+# 워커의 워밍 게이트가 볼 플래그 디렉터리. /run 은 tmpfs라 부팅마다 비어
+# 있다 — 지난 부팅의 플래그가 남으면 게이트가 처음부터 열려 의미가 없다.
+# 컴포즈가 :ro 로 붙이므로 기동 **전에** 만든다.
+mkdir -p /run/emr
+
 STEP="컴포즈 기동"
 $DC up -d --no-build
 
@@ -238,6 +243,7 @@ BGEOF
   if systemd-run --unit=emr-warm-bg --collect --nice=10 \
        --property=IOSchedulingClass=idle \
        --property=RuntimeMaxSec="$WARM_BG_TIMEOUT" \
+       --property=ExecStopPost="/usr/bin/touch /run/emr/warm-bg.done" \
        --property=StandardOutput=journal+console \
        --property=StandardError=journal+console \
        --setenv=BG_DIRS="$WARM_BG_DIRS" --setenv=BG_SKIP="$WARM_SKIP" \
@@ -246,7 +252,9 @@ BGEOF
     echo "[warm-bg] 분리 기동 — 아래 기동 완료 뒤에도 계속 돈다 (동시 $WARM_JOBS, 상한 ${WARM_BG_TIMEOUT}초, 우선순위 낮춤)"
   else
     echo "[warm-bg] systemd-run 실패 — 첫 요청만 느려진다. 기동은 계속한다"
+    touch /run/emr/warm-bg.done   # 안 돌 거면 게이트를 즉시 연다
   fi
 else
   echo "[warm-bg] 대상이 없거나 systemd-run 이 없다 — 건너뜀"
+  touch /run/emr/warm-bg.done
 fi
