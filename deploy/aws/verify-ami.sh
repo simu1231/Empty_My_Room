@@ -210,7 +210,20 @@ if [ "$FAIL" -eq 0 ]; then
     || echo "  ! CLI 세션 캐시를 못 지웠다 — sudo rm -rf ~/.aws/cli 를 직접 돌릴 것"
   echo
   echo "✔ 검증 통과 — 스냅샷을 찍어도 된다."
-  echo "  aws ec2 create-image --instance-id <이 인스턴스> --name emr-gpu-$EMR_IMAGE_TAG --no-reboot"
+  # 명령을 통째로 찍는다. 예전엔 "<이 인스턴스>" 자리와 태그를 손으로 채우게
+  # 뒀는데, GitSha 태그가 빠진 AMI 가 나왔다. 20-launch-template.sh:45 는 그
+  # 태그가 없으면 하드 실패하므로, 굽고 한참 뒤 배포 단계에서야 알게 된다.
+  # 어느 스크립트도 이 태그를 안 붙인다 — 붙이는 곳은 이 명령 하나뿐이다.
+  # IMDSv2 전용이다(시작 템플릿이 HttpTokens=required 로 잠갔다).
+  _T=$(curl -sf -X PUT "http://169.254.169.254/latest/api/token" \
+         -H "X-aws-ec2-metadata-token-ttl-seconds: 60" --max-time 2 || echo "")
+  IID=$(curl -sf -H "X-aws-ec2-metadata-token: $_T" --max-time 2 \
+         "http://169.254.169.254/latest/meta-data/instance-id" || echo "")
+  echo "  aws ec2 create-image --region $AWS_REGION \\"
+  echo "    --instance-id ${IID:-<이 인스턴스>} --name emr-gpu-$EMR_IMAGE_TAG --no-reboot \\"
+  echo "    --tag-specifications \\"
+  echo "      'ResourceType=image,Tags=[{Key=GitSha,Value=$EMR_IMAGE_TAG},{Key=Project,Value=emr},{Key=Name,Value=emr-gpu-$EMR_IMAGE_TAG}]' \\"
+  echo "      'ResourceType=snapshot,Tags=[{Key=GitSha,Value=$EMR_IMAGE_TAG},{Key=Project,Value=emr}]'"
 else
   echo "✗ 검증 실패 — 이대로 구우면 부팅은 되고 요금만 나가는 인스턴스가 된다."
 fi
