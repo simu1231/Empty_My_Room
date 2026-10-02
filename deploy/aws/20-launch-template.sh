@@ -50,6 +50,7 @@ fi
 
 echo "▶ 유저데이터 생성 (설정값을 치환해 굽는다)"
 sed -e "s|__REGION__|${AWS_REGION}|g" \
+    -e "s|__LOG_GROUP__|${LOG_GROUP}|g" \
     -e "s|__S3_BUCKET__|${S3_BUCKET}|g" \
     -e "s|__DDB_TABLE__|${DDB_TABLE}|g" \
     -e "s|__Q_SAM3D__|${Q_SAM3D}|g" \

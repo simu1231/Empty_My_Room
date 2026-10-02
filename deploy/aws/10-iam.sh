@@ -24,6 +24,19 @@ echo "▶ 권한 정책"
 # 권한을 최소로 좁힌다. 특히 autoscaling:TerminateInstanceInAutoScalingGroup 은
 # 워낙 강한 권한이라 Condition으로 "우리 두 ASG"에만 걸어둔다. 안 그러면 이 역할을
 # 얻은 코드가 계정 안의 아무 ASG나 비울 수 있다.
+#
+# Logs 는 6단계 부하 테스트에서 추가했다. 이 배포에는 기기 밖으로 로그가 나오는
+# 경로가 하나도 없었다 — SSH 키 없음, 워커 SG 인바운드 0개, 콘솔은 64KB 상한에
+# 커널 부팅 메시지로 가득 찬다. 그래서 "sam3d 첫 건이 1230초"라는 현상을 보고도
+# 컨테이너 안에서 무슨 일이 있었는지 끝까지 확인할 수 없었다.
+#
+# 순서가 중요하다: 이 권한을 **먼저** 넣고 나서 시작 템플릿에 awslogs 드라이버를
+# 붙여야 한다. 로그 드라이버가 자격증명 때문에 실패하면 도커는 컨테이너를
+# 시작하지 않는다 — 권한 없이 드라이버를 켜면 워커가 전부 못 뜬다.
+#
+# 범위는 /emr/ 접두어로만 좁힌다. CreateLogGroup 까지 주는 건
+# awslogs-create-group=true 의 폴백용이다(평소에는 15-resources.sh 가 보존기간
+# 7일로 미리 만들어 둔다 — 자동 생성된 그룹은 보존기간이 무한이라 계속 과금된다).
 cat > /tmp/emr-worker-policy.json <<JSON
 {
   "Version": "2012-10-17",
@@ -51,6 +64,18 @@ cat > /tmp/emr-worker-policy.json <<JSON
       "Effect": "Allow",
       "Action": ["dynamodb:UpdateItem", "dynamodb:GetItem"],
       "Resource": "arn:aws:dynamodb:${AWS_REGION}:${ACCOUNT}:table/${DDB_TABLE}"
+    },
+    {
+      "Sid": "Logs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogStream", "logs:PutLogEvents",
+        "logs:DescribeLogStreams", "logs:CreateLogGroup"
+      ],
+      "Resource": [
+        "arn:aws:logs:${AWS_REGION}:${ACCOUNT}:log-group:/emr/*",
+        "arn:aws:logs:${AWS_REGION}:${ACCOUNT}:log-group:/emr/*:log-stream:*"
+      ]
     },
     {
       "Sid": "ReaperReadsOwnGroup",

@@ -312,8 +312,14 @@ PY
   if [ -n "$SEEN_INST" ] && [ $(( $(date +%s) - LAST_CONSOLE )) -ge 60 ]; then
     LAST_CONSOLE=$(date +%s)
     for iid in $SEEN_INST; do
+      # base64 -d 를 붙이면 안 된다. AWS CLI **v2 는 이미 디코드해서** 평문을
+      # 내려주므로, 거기에 다시 base64 -d 를 걸면 0바이트가 나온다. 그래서
+      # 2026-10-02 부하 테스트 요약의 "warm-bg 콘솔" 칸이 통째로 비었고,
+      # 워밍이 안 뜬 줄 알고 한참 헤맸다(실제로는 8.5GB 를 115초에 읽었다 —
+      # 커널 타임스탬프로 뒤늦게 확인했다). v1 은 base64 로 줬으니, 이 코드가
+      # v1 에서 옮겨온 것이면 같은 함정을 다시 밟게 된다.
       aws ec2 get-console-output --instance-id "$iid" --latest \
-        --query Output --output text 2>/dev/null | base64 -d > "$RUN/console-$iid.txt" 2>/dev/null
+        --query Output --output text > "$RUN/console-$iid.txt" 2>/dev/null
     done
     # 새로 나타난 warm-bg 줄만 화면에 올린다
     cat "$RUN"/console-*.txt 2>/dev/null | grep -h 'warm-bg' | sort -u > "$RUN/.warm.now" || true

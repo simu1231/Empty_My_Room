@@ -115,6 +115,26 @@ else
   echo "  TTL 이미 $TTL"
 fi
 
+# ── CloudWatch Logs ─────────────────────────────────────────────────────
+# 6단계 부하 테스트에서 추가했다. 그때까지 이 배포에는 컨테이너 로그가 기기 밖으로
+# 나오는 경로가 아예 없었다 — 워커는 SSH 키가 없고(KeyName: None), 워커 보안그룹은
+# 인바운드 규칙이 0개고, EC2 콘솔 출력은 64KB 상한이라 커널 부팅 메시지가 그걸 다
+# 채운다. "sam3d 첫 건이 1230초"를 관측해 놓고도 컨테이너 안을 들여다볼 수 없었다.
+#
+# 그룹을 **미리** 만드는 이유는 보존기간이다. awslogs 드라이버가
+# awslogs-create-group=true 로 자동 생성한 그룹은 보존기간이 "만료 없음"이고,
+# 그러면 디버깅용 로그가 영구히 과금된다. 7일로 미리 박아두면 드라이버는 이미
+# 있는 그룹을 그냥 쓴다(미리 만들기는 드라이버 쪽 자동 생성과 충돌하지 않는다).
+#
+# 그룹 하나에 서비스별 스트림을 둔다(유저데이터의 tag: "{{.Name}}/{{.ID}}").
+# 그래야 `aws logs tail /emr/worker --follow` 한 줄로 다섯 컨테이너를 같이 본다 —
+# 서비스마다 그룹을 쪼개면 사이드카와 워커의 시간 순서를 맞춰 볼 수 없다.
+echo "▶ CloudWatch Logs $LOG_GROUP"
+aws logs create-log-group --log-group-name "$LOG_GROUP" --tags Project=emr >/dev/null 2>&1 \
+  || echo "  (이미 있음)"
+aws logs put-retention-policy --log-group-name "$LOG_GROUP" --retention-in-days 7
+echo "  보존기간 7일"
+
 # ── SNS (알림) ──────────────────────────────────────────────────────────
 # DLQ 에 뭔가 쌓이면 메일을 받는다. create-topic 과 subscribe 는 둘 다 멱등이라
 # 여러 번 돌려도 안전하다. 다만 이메일 구독은 **본인이 확인 메일을 눌러야**
@@ -147,5 +167,6 @@ echo "   큐     $Q_SAM3D / $Q_SCENE (+ 각각 -dlq)"
 echo "   버킷   $S3_BUCKET"
 echo "   테이블 $DDB_TABLE"
 echo "   알림   $EMR_ALERT_TOPIC → $EMR_ALERT_EMAIL"
+echo "   로그   $LOG_GROUP (보존 7일)  →  aws logs tail $LOG_GROUP --follow"
 echo
 echo "   버킷 이름이 바뀌었다면 ./10-iam.sh 를 다시 돌려야 정책 ARN이 맞는다."

@@ -124,21 +124,30 @@ systemctl daemon-reload
 # 싶어지면 먼저 config.sh 의 EMR_WARM_TIMEOUT 자리에 남긴 측정표를 읽을 것.
 
 # ── 기동 ─────────────────────────────────────────────────────────────────
-# --no-build 가 핵심이다. 위에서 태그를 확인했지만, 컴포즈가 만에 하나 다른
-# 서비스를 빌드하려 들면 부팅이 몇십 분짜리가 된다. 빌드는 굽는 시점의 일이다.
+# --no-build 가 핵심이다. 컴포즈가 만에 하나 빌드하려 들면 부팅이 몇십 분짜리가
+# 된다. 빌드는 굽는 시점의 일이다.
 #
-# 네 번째 -f 가 하는 일: AMI 안의 컴포즈 파일은 **구운 시점에 굳는다.** 6단계
-# 부하 테스트에서 기본 파일의 `S3_BUCKET: emr-jobs` 리터럴을 AWS 오버라이드가
-# 안 덮는 걸 발견했고(실제 버킷엔 계정 해시가 붙는다), 워커 14건이 전부
-# HeadObject 404 로 죽었다. 저장소는 고쳤지만 낡은 AMI 로도 떠야 한다.
-# 유저데이터는 시작 템플릿에 있어 재굽기 없이 바꿀 수 있으니 여기서 마지막으로
-# 덮는다. 값은 위 .env 와 같은 쉘 변수라 새로 적는 숫자는 없다.
+# 네 번째 -f: AMI 안의 컴포즈 파일은 구운 시점에 굳는다. 유저데이터는 시작
+# 템플릿에 있으니 재굽기 없이 바꿀 수 있다 — 낡은 AMI 를 고치는 유일한 통로다.
+# 왜 버킷/테이블을 덮는지는 deploy/docker-compose.aws.yml 머리말,
+# 왜 awslogs 를 붙이는지는 config.sh 의 LOG_GROUP 주석에 있다.
 STEP="컴포즈 덮어쓰기"
 cat > /run/emr-deploy-env.yml <<YML
+x-log: &log
+  driver: awslogs
+  options:
+    awslogs-region: "__REGION__"
+    awslogs-group: "__LOG_GROUP__"
+    awslogs-create-group: "true"
+    mode: non-blocking
+    max-buffer-size: 4m
+    tag: "{{.Name}}/{{.ID}}"
 services:
-  worker-sam3d: {environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE"}}
-  worker-scene: {environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE"}}
-  reaper:       {environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE"}}
+  worker-sam3d: {logging: *log, environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE"}}
+  worker-scene: {logging: *log, environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE"}}
+  reaper:       {logging: *log, environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE"}}
+  ulayout:      {logging: *log}
+  omni3d:       {logging: *log}
 YML
 DC="docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml"
 DC="$DC -f deploy/docker-compose.aws.yml -f /run/emr-deploy-env.yml"

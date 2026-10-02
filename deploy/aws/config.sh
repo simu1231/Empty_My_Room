@@ -57,6 +57,16 @@ if [ -z "${S3_BUCKET:-}" ]; then
 fi
 export DDB_TABLE=emr-jobs
 
+# ── 로그 ────────────────────────────────────────────────────────────────
+# 컨테이너 로그를 CloudWatch 로 보낼 그룹. 15-resources.sh 가 보존기간 7일로
+# 미리 만들고, userdata.sh 가 awslogs 드라이버에 이 이름을 넘긴다.
+#
+# 그룹은 **하나**로 두고 서비스를 스트림으로 가른다(tag: "{{.Name}}/{{.ID}}").
+# 서비스마다 그룹을 쪼개면 사이드카(ulayout/omni3d)와 워커의 시간 순서를
+# 맞춰 볼 수 없는데, 6단계에서 보고 싶은 게 바로 그 순서다 —
+# "sam3d 첫 건 1230초" 동안 어느 컨테이너가 디스크를 쥐고 있었는지.
+export LOG_GROUP=${LOG_GROUP:-/emr/worker}
+
 export LT_NAME=${PROJECT}-gpu-worker            # 시작 템플릿
 export ASG_SPOT=${PROJECT}-gpu-spot             # 평소 쓰는 스팟 그룹
 export ASG_OD=${PROJECT}-gpu-ondemand           # 스팟이 안 뜰 때만 쓰는 폴백 그룹

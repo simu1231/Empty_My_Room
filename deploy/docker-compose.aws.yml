@@ -41,6 +41,37 @@ x-aws-real: &aws_real
   DDB_TABLE: ${DDB_TABLE:?deploy/.env 에 DDB_TABLE 이 없다 — userdata 가 쓴다}
   MOCK: "0"
 
+# ── 로그 ────────────────────────────────────────────────────────────────
+# 6단계 부하 테스트까지 이 배포에는 컨테이너 로그가 기기 밖으로 나오는 경로가
+# 하나도 없었다. 워커는 SSH 키가 없고(KeyName: None), 워커 보안그룹은 인바운드
+# 규칙이 0개고, EC2 콘솔 출력은 64KB 상한이라 커널 부팅 메시지가 그걸 다 채운다.
+# 그래서 "sam3d 첫 건 1230초, 두 번째 49초"를 관측해 놓고도 그 20분 동안
+# 컨테이너 안에서 무슨 일이 있었는지 확인할 방법이 없었다.
+#
+# mode: non-blocking 이 필수다. awslogs 드라이버는 기본이 blocking 이라
+# CloudWatch 가 느려지면 **컨테이너의 stdout 쓰기가 막힌다.** GPU 워커가 로그
+# 전송 때문에 멈추는 건 말이 안 된다. 버퍼가 차면 로그를 버리는 쪽을 택한다.
+#
+# 사이드카(ulayout/omni3d)도 넣는다. 보고 싶은 게 "워커가 느릴 때 사이드카가
+# 뭘 하고 있었나"라서, 워커만 보내면 정작 궁금한 쪽이 빠진다.
+#
+# 그룹 하나 + 서비스별 스트림이다. tag 에 {{.ID}} 를 반드시 남긴다 — 인스턴스가
+# 여러 대면 같은 이름의 컨테이너가 여럿이고, 컨테이너 ID 가 없으면 두 인스턴스의
+# worker-sam3d 가 같은 스트림에 섞여 들어간다.
+#
+# 기본값을 주는 이유: userdata 가 .env 에 LOG_GROUP 을 쓰지 않는다(유저데이터
+# 16KB 한도가 빡빡하다). 대신 네 번째 -f 오버라이드가 config.sh 의 값을 직접
+# 넣으므로, config.sh 를 고치면 **재굽기 없이** 그쪽이 이긴다.
+x-log: &log
+  driver: awslogs
+  options:
+    awslogs-region: ${AWS_REGION:-ap-northeast-2}
+    awslogs-group: ${LOG_GROUP:-/emr/worker}
+    awslogs-create-group: "true"
+    mode: non-blocking
+    max-buffer-size: 4m
+    tag: "{{.Name}}/{{.ID}}"
+
 services:
   # LocalStack은 이미지 자체를 띄우지 않는다. scale: 0 으로 비활성화한다.
   localstack:
@@ -49,6 +80,7 @@ services:
     scale: 0
 
   worker-sam3d:
+    logging: *log
     environment:
       <<: *aws_real
       QUEUE_NAME: ${Q_SAM3D:-emr-sam3d}
@@ -77,6 +109,7 @@ services:
       omni3d:  {condition: service_healthy}
 
   worker-scene:
+    logging: *log
     environment:
       <<: *aws_real
       QUEUE_NAME: ${Q_SCENE:-emr-scene}
@@ -86,6 +119,7 @@ services:
       omni3d:  {condition: service_healthy}
 
   reaper:
+    logging: *log
     environment:
       <<: *aws_real
       QUEUE_NAME: ""
@@ -102,3 +136,10 @@ services:
     # 1이라 컨테이너에서는 막힌다. 시작 템플릿에서 홉 한도를 2로 올려두었다
     # (20-launch-template.sh의 MetadataOptions 참고).
     restart: unless-stopped
+
+  # 사이드카는 이 파일에서 바꿀 게 로그뿐이다. 나머지 설정은 기본/GPU 파일을
+  # 그대로 쓴다 — 여기 적으면 두 군데를 맞춰야 한다.
+  ulayout:
+    logging: *log
+  omni3d:
+    logging: *log
