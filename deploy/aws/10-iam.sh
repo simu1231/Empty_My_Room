@@ -151,6 +151,42 @@ aws iam create-instance-profile --instance-profile-name "$API_PROFILE" >/dev/nul
 aws iam add-role-to-instance-profile \
   --instance-profile-name "$API_PROFILE" --role-name "$API_ROLE" 2>/dev/null || echo "  (이미 연결됨)"
 
+# ── 배포 사용자 자신의 SNS 권한 ──────────────────────────────────────────
+# 위의 둘은 '인스턴스가' 쓸 역할이고, 이건 '이 스크립트를 돌리는 사람'이
+# 15-resources.sh 에서 알림 토픽을 만들 수 있게 하는 권한이다.
+# emr-deploy 에는 SNS 권한이 아예 없어서 CreateTopic 이 AuthorizationError 로 막힌다.
+# AmazonSNSFullAccess 를 붙이면 한 줄로 끝나지만 계정 안 모든 토픽이 열린다.
+# 쓰는 토픽이 하나뿐이니 그 ARN 하나로 좁힌다.
+CALLER_USER=$(aws sts get-caller-identity --query Arn --output text | sed -n 's|.*:user/||p')
+if [ -z "$CALLER_USER" ]; then
+  echo "▶ SNS 권한: 건너뜀 (IAM 사용자가 아니라 역할로 실행 중)"
+else
+  echo "▶ SNS 권한: $CALLER_USER → $EMR_ALERT_TOPIC"
+  cat > /tmp/emr-deploy-sns.json <<JSON
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "ManageAlertTopicOnly",
+    "Effect": "Allow",
+    "Action": [
+      "sns:CreateTopic",
+      "sns:TagResource",
+      "sns:GetTopicAttributes",
+      "sns:SetTopicAttributes",
+      "sns:Subscribe",
+      "sns:ListSubscriptionsByTopic"
+    ],
+    "Resource": "arn:aws:sns:${AWS_REGION}:${ACCOUNT}:${EMR_ALERT_TOPIC}"
+  }]
+}
+JSON
+  aws iam put-user-policy --user-name "$CALLER_USER" \
+    --policy-name "emr-deploy-sns" \
+    --policy-document file:///tmp/emr-deploy-sns.json
+  echo "  인라인 정책 emr-deploy-sns 적용 (토픽 1개로 한정)"
+fi
+
 echo "✔ IAM 준비 완료"
 echo "   GPU 워커: $PROFILE_NAME"
 echo "   API 서버: $API_PROFILE"
+echo "   알림 토픽: $EMR_ALERT_TOPIC (쓰기 권한만)"
