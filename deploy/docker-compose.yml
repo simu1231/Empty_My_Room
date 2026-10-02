@@ -13,6 +13,17 @@ services:
     environment:
       SERVICES: s3,sqs,dynamodb
       DEBUG: "0"
+      # init-localstack.sh 가 만들 자원 이름. 앱이 보는 값과 **같은 변수**를
+      # 흘려보낸다. 예전엔 그 스크립트가 emr-jobs 를 리터럴로 박고 있었는데,
+      # config.sh 가 S3_BUCKET 을 계정 해시가 붙은 이름으로 계산하게 된 뒤로
+      # 스모크 테스트에서 앱만 새 이름을 보게 됐다 — 첫 작업 접수가 PutObject
+      # NoSuchBucket 으로 500 이 됐고 AMI 를 굽기 직전에 터졌다.
+      # 베껴 써서 맞추지 않는 이유는 아래 S3_BUCKET 주석과 같다: 이름이 우연히
+      # 같아지면 스모크 테스트가 설정 전달 경로를 다시 못 본다.
+      S3_BUCKET: ${S3_BUCKET:-emr-jobs}
+      DDB_TABLE: ${DDB_TABLE:-emr-jobs}
+      Q_SAM3D: ${Q_SAM3D:-emr-sam3d}
+      Q_SCENE: ${Q_SCENE:-emr-scene}
     volumes:
       # ready.d 에 넣은 스크립트는 LocalStack 기동 완료 후 자동 실행된다.
       - ./init-localstack.sh:/etc/localstack/init/ready.d/init.sh:ro
