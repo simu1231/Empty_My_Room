@@ -116,9 +116,14 @@ sudo systemctl start  emr-guardian.timer
 #
 # 같은 파일이 두 경로로 들어올 수 있다(ckpt 심링크와 그 대상인 HF 블롭
 # 디렉터리). 실제 경로로 묶어 한 번만 읽는다 — 두 번 읽으면 예산만 먹는다.
-WARMLIST=/tmp/emr-warmlist
-CAND=/tmp/emr-warmcand
-SEEN=/tmp/emr-warmseen
+# mktemp 로 받는다. 고정 이름(/tmp/emr-warmcand)을 쓰다가 막혔다 — 우분투는
+# fs.protected_regular=2 라 sticky 디렉터리(/tmp)에서 **root 가 남의 소유
+# 파일을 열지 못한다**. 검증하느라 ubuntu 로 한 번 돌려 둔 찌꺼기가 남아
+# 있었고, sudo 로 다시 돌리니 거기서 Permission denied 로 죽었다. 세계
+# 쓰기 가능한 디렉터리에 예측 가능한 이름을 만드는 것 자체가 좋지 않다.
+WARMLIST=$(mktemp -t emr-warmlist.XXXXXXXX)
+CAND=$(mktemp -t emr-warmcand.XXXXXXXX)
+SEEN=$(mktemp -t emr-warmseen.XXXXXXXX)
 BUDGET=$(numfmt --from=iec "${EMR_WARM_BG_MAX_BYTES:-9G}")
 
 for p in $EMR_WARM_BG_DIRS; do
@@ -171,6 +176,7 @@ done < "$CAND"
 sudo install -m 644 "$WARMLIST" /opt/emr/warmlist
 echo "  워밍 목록 파일 ${wl_n}개 / 조각 ${wl_c}개 / $(numfmt --to=iec "$wl_bytes")B → /opt/emr/warmlist"
 echo "    예산 $(numfmt --to=iec "$BUDGET")B, 넘쳐서 제외 ${wl_over}개, 후보 $(wc -l < "$CAND")개"
+rm -f "$WARMLIST" "$CAND" "$CAND.f" "$SEEN"
 
 # ── 3. 스냅샷 위생 ───────────────────────────────────────────────────────
 # .env 는 인스턴스가 뜰 때 userdata가 다시 만든다. AMI에 남겨두면 옛 큐 이름이
