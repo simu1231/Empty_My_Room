@@ -240,14 +240,19 @@ export EMR_WARM_SKIP=${EMR_WARM_SKIP:-"models--lllyasviel--control_v11p_sd15_can
 # **순서가 곧 우선순위이자 데우는 순서**다. 작은 것부터 적는다 — 추론이
 # 제일 먼저 읽는 ss_generator 를 제일 **나중에** 데워야 살아남을 확률이 높다.
 # (앞의 1.7GB 는 작아서 6.2GB 를 데우는 동안 밀려날 일이 없다.)
+# 디코더는 **넷 다** 적는다. 처음엔 메쉬 작업이니 mesh 디코더만 쓰겠거니 하고
+# gs/gs_4 를 뺐는데, inference_pipeline.py:141-154 가 파이프라인을 만들 때
+# 넷을 조건 없이 올린다 — 쓰든 안 쓰든 첫 요청에서 읽힌다. 합쳐 327MB 다.
 _SAM3D_CKPT=$EMR_ROOT/sam-3d-objects/checkpoints/hf/checkpoints
 export EMR_WARM_BG_DIRS=${EMR_WARM_BG_DIRS:-"\
 $_SAM3D_CKPT/ss_decoder.ckpt \
+$_SAM3D_CKPT/slat_decoder_gs.ckpt \
+$_SAM3D_CKPT/slat_decoder_gs_4.ckpt \
 $_SAM3D_CKPT/slat_decoder_mesh.ckpt \
 $EMR_ROOT/.cache/huggingface/hub/models--Ruicheng--moge-2-vitl \
 $_SAM3D_CKPT/ss_generator.ckpt"}
 #
-# 총량 상한. 위 넷을 합치면 7.96GB 이고 상한은 9G 다 — 딱 맞추지 않는다.
+# 총량 상한. 위 여섯을 합치면 8.24GB 이고 상한은 9G 다 — 딱 맞추지 않는다.
 # 상한을 넘기는 파일은 건너뛰므로(break 가 아니라 continue), 8G 로 조여 놓으면
 # 제일 값나가는 ss_generator 가 통째로 빠지고 그 자리를 자잘한 게 메우는
 # 최악이 난다. 목록을 늘릴 때 이 숫자부터 다시 보라.

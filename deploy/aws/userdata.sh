@@ -10,19 +10,13 @@
 # ASG 헬스체크는 EC2 타입이라 "켜져 있음"만 보고 정상으로 판단한다. 그 상태로
 # g6.xlarge는 일 없이 시간당 $0.45, 한 달 $327을 먹는다.
 set -euxo pipefail
-# /dev/console 에도 흘린다. 이게 없으면 이 스크립트가 실패했을 때 로그를 볼
-# 방법이 없다. 워커는 SSH 키도 인바운드 규칙도 없고(그게 맞다 — 큐에서
-# 당겨 쓰는 구조라 누구도 접속할 일이 없다), 실패하면 트랩이 인스턴스를
-# 곧바로 회수해서 /var/log/emr-userdata.log 자체가 사라진다.
-#
-# logger 만으로는 안 된다. 그건 syslog/journald 로 가고, journald 는 기본값이
-# ForwardToConsole=no 라 직렬 콘솔에 안 나온다. EC2 의 get-console-output 은
-# 직렬 콘솔에 쓴 것만 보여준다 — 즉 지금까지는 전부 무언가에 기록되지만
-# 정작 밖에서는 아무것도 안 보였다.
-#
-# 콘솔이 없거나 못 쓰는 환경도 있으므로 미리 검사한다. tee 는 대상 하나가
-# 안 열리면 종료코드를 1로 돌려주는데, 이 줄은 set -e 아래의 exec 이라
-# 거기서 기동이 통째로 죽는다.
+# /dev/console 에도 흘린다. 워커는 SSH 키도 인바운드 규칙도 없고(큐에서 당겨
+# 쓰는 구조라 접속할 일이 없다) 실패하면 트랩이 인스턴스를 회수해서
+# /var/log/emr-userdata.log 가 같이 사라진다. logger 만으로는 안 된다 —
+# journald 기본값이 ForwardToConsole=no 이고 get-console-output 은 직렬
+# 콘솔에 쓴 것만 보여준다(전부 기록되는데 밖에서만 안 보였다). 콘솔을 미리
+# 검사하는 건 tee 가 대상 하나를 못 열면 1 을 돌려주고, set -e 아래의 exec
+# 이라 기동이 통째로 죽기 때문이다.
 CONSOLE=/dev/console
 [ -w "$CONSOLE" ] 2>/dev/null || CONSOLE=/dev/null
 exec > >(tee /var/log/emr-userdata.log "$CONSOLE" | logger -t emr-userdata) 2>&1
