@@ -73,8 +73,13 @@ echo "▶ 경로 일치 (루트 $EMR_ROOT)"
 # 모델을 마운트하는데, 경로가 하나라도 없으면 도커는 에러를 내지 않고 빈 디렉터리를
 # root 소유로 만들어 준다. 그러면 스택은 멀쩡히 뜨고 리퍼도 뜨고 ASG도 정상으로
 # 보다가, 첫 요청에서 ModuleNotFoundError로 죽는다 — 그때까지 요금은 계속 나간다.
+# sam2_repo / lama_repo / lama_model 은 backend 컨테이너가 2단계에 쓴다.
+# 이 셋은 AMI 에 늦게 들어왔고(백엔드를 인스턴스에 올린 커밋), 빠지면 2단계
+# 첫 클릭에서 죽는다. userdata 에 부팅시 검사가 있지만 그건 다 구운 뒤라
+# 걸려도 베이크를 다시 해야 한다 — 스냅샷 전에 여기서 잡는다.
 for d in miniconda3 sam-3d-objects uLayout omni3d detectron2 \
-         pytorch3d_omni3d_build .cache/huggingface .cache/torch; do
+         pytorch3d_omni3d_build sam2_repo lama_repo lama_model \
+         .cache/huggingface .cache/torch; do
   [ -d "$EMR_ROOT/$d" ] && ok "$EMR_ROOT/$d" \
     || bad "$EMR_ROOT/$d 없음 — 도커가 빈 디렉터리로 때워서 첫 요청에서 죽는다"
 done
@@ -113,6 +118,27 @@ else
   fi
   unset _n _broken
 fi
+
+# SAM2(857MB) / LaMa(391MB). 위의 심링크 검사와 달리 이 둘은 S3 에서 **파일로**
+# 따로 내려와 매니페스트의 ckpt_dest 가 정한 자리에 놓인다. 디렉터리 존재만
+# 보면 안 되는 이유 — 내려받다 끊기면 빈 파일이나 잘린 파일이 그 자리에 남고,
+# 스택은 멀쩡히 뜬 뒤 2단계 첫 클릭에서 죽는다. 그래서 크기 하한으로 본다.
+while read -r _f _min _label; do
+  if [ ! -f "$_f" ]; then
+    bad "$_label 없음 — $_f (2단계가 통째로 죽는다)"
+  else
+    _sz=$(stat -c %s "$_f" 2>/dev/null || echo 0)
+    if [ "$_sz" -lt "$_min" ]; then
+      bad "$_label 가 잘렸다 — $((_sz/1024/1024))MB (최소 $((_min/1024/1024))MB)"
+    else
+      ok "$_label $((_sz/1024/1024))MB"
+    fi
+  fi
+done <<CKPT2
+$EMR_ROOT/sam2_repo/checkpoints/sam2.1_hiera_large.pt 838860800 SAM2 체크포인트
+$EMR_ROOT/lama_model/big-lama/models/best.ckpt 367001600 LaMa 체크포인트
+CKPT2
+unset _f _min _label _sz
 
 # 위까지는 체크포인트 **파일**이 제자리에 있는지만 봤다. 파일이 있어도 코드가
 # 다른 곳을 보고 있으면 똑같이 첫 추론에서 죽는다. 실제로 그랬다 —
