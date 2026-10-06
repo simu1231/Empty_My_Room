@@ -22,8 +22,13 @@ PIPELINE_CONFIG = os.path.join(CKPT_DIR, 'pipeline.yaml')
 WORKSPACE_DIR   = CKPT_DIR
 MIN_INPUT_SIZE  = 512
 MAX_INPUT_SIZE  = 1024
-ULAYOUT_SIDECAR_URL = 'http://localhost:8002/infer'
-ULAYOUT_RECTIFY_SIDECAR_URL = 'http://localhost:8002/rectify'
+# 사이드카 주소. 개발 PC에서는 같은 호스트에 떠 있어 localhost 가 맞지만,
+# 배포에서는 이 백엔드도 컨테이너라 localhost 는 **자기 자신**이다 — 그대로
+# 두면 3단계 rectify_textures 가 항상 503 이 된다. compose 가 서비스 이름으로
+# 넣어 준다(worker-scene 의 ULAYOUT_URL/OMNI3D_URL 과 같은 값, 같은 이유).
+ULAYOUT_URL = os.environ.get('ULAYOUT_URL', 'http://localhost:8002').rstrip('/')
+ULAYOUT_SIDECAR_URL = f'{ULAYOUT_URL}/infer'
+ULAYOUT_RECTIFY_SIDECAR_URL = f'{ULAYOUT_URL}/rectify'
 
 
 def _flatten_room_mesh(vertices_np: np.ndarray, snap_strength: float = 0.9, snap_zone: float = 0.28) -> np.ndarray:

@@ -1,10 +1,13 @@
+import os
 import requests
 from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
-OMNI3D_SIDECAR_URL = 'http://localhost:8003/estimate'
+# 사이드카 주소. localhost 를 박아두면 안 되는 이유는 room.py 의 같은 주석에.
+OMNI3D_SIDECAR_URL = os.environ.get(
+    'OMNI3D_URL', 'http://localhost:8003').rstrip('/') + '/estimate'
 
 
 @router.post("/estimate")

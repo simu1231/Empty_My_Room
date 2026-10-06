@@ -88,9 +88,19 @@ async def remove_furniture(
 
     print(f"[⏱ 처리시간] 인페인팅 전체: {_lama_time + _sd_time:.2f}초")
 
-    os.makedirs(os.path.dirname(EMPTY_ROOM_SAVE_PATH), exist_ok=True)
-    Image.fromarray(final_result).save(EMPTY_ROOM_SAVE_PATH, quality=95)
-    print(f"[DEBUG] 빈 방 이미지 저장: {EMPTY_ROOM_SAVE_PATH}")
+    # 디버깅용 사본이다. **서버는 이 파일을 다시 읽지 않는다** — 프런트가 아래
+    # result_b64 로 자기 File 을 만들어 다음 단계로 넘긴다.
+    # 배포에서는 백엔드 트리가 :ro 로 붙으므로 여기서 반드시 실패한다. 그걸로
+    # 인페인팅 전체를 500 으로 떨어뜨리면 2단계가 통째로 죽는다 — 저장만 포기한다.
+    # (쓰기 가능한 마운트로 푸는 길도 있지만, compose 의 볼륨은 YAML 앵커라
+    #  한 서비스만 덧붙일 수 없어 *model_mounts 를 통째로 복사해야 한다.
+    #  11줄짜리 마운트 목록이 두 벌이 되는 쪽이 훨씬 위험하다.)
+    try:
+        os.makedirs(os.path.dirname(EMPTY_ROOM_SAVE_PATH), exist_ok=True)
+        Image.fromarray(final_result).save(EMPTY_ROOM_SAVE_PATH, quality=95)
+        print(f"[DEBUG] 빈 방 이미지 저장: {EMPTY_ROOM_SAVE_PATH}")
+    except OSError as e:
+        print(f"[DEBUG] 빈 방 이미지 저장 생략(읽기 전용 마운트): {e}")
 
     return JSONResponse({
         "success": True,
