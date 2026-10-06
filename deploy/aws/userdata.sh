@@ -9,6 +9,9 @@
 # 살아있는 인스턴스가 제일 비싸기 때문이다 — 리퍼가 안 떠서 아무도 회수하지 않고,
 # ASG 헬스체크는 EC2 타입이라 "켜져 있음"만 보고 정상으로 판단한다. 그 상태로
 # g6.xlarge는 일 없이 시간당 $0.45, 한 달 $327을 먹는다.
+#
+# 이 파일은 16KB 를 넘으면 안 된다 — 주석도 센다. config.sh 의 같은 제목
+# 주석을 먼저 읽을 것. 구분선 꼬리 `──` 를 다시 늘이지 말 것.
 set -euxo pipefail
 # /dev/console 에도 흘린다. 워커는 SSH 키도 인바운드 규칙도 없고(큐에서 당겨
 # 쓰는 구조라 접속할 일이 없다) 실패하면 트랩이 인스턴스를 회수해서
@@ -35,7 +38,7 @@ S3_BUCKET=__S3_BUCKET__
 DDB_TABLE=__DDB_TABLE__
 RETIRE=/opt/emr/bin/self-retire.sh
 
-# ── 실패 트랩 ────────────────────────────────────────────────────────────
+# ── 실패 트랩 ──
 # 실패하면 조용히 남지 말고 요금을 끊는다. 배포가 실패하는 쪽이 요금이 새는
 # 쪽보다 낫다 — 실패는 ASG 활동 로그와 /var/log/emr-userdata.log 에 남는다.
 #
@@ -54,25 +57,26 @@ on_exit() {
 }
 trap on_exit EXIT
 
-# ── 저장소 ───────────────────────────────────────────────────────────────
+# ── 저장소 ──
 # 경로는 시작 템플릿이 주입한다. 예전엔 개발 PC 홈(/home/<사용자>/...)이 박혀
 # 있었는데, EC2 기본 사용자는 ubuntu라 그 경로가 없다 → cd 실패 → 위 트랩 직행.
 STEP="저장소 확인"
 [ -d "$REPO" ] || { echo "[userdata] $REPO 가 없다 — AMI가 잘못됐다"; exit 1; }
 cd "$REPO"
 
-# ── 모델 루트 확인 ───────────────────────────────────────────────────────
+# ── 모델 루트 확인 ──
 # compose가 이 경로들을 바인드 마운트한다. **없으면 도커가 조용히 빈 디렉터리를
 # root 소유로 만들어 준다.** 컨테이너는 정상적으로 뜨고, 리퍼도 뜨고, 겉보기엔
 # 다 성공한 뒤 첫 요청에서 ModuleNotFoundError로 죽는다. 여기서 먼저 깨뜨린다.
 STEP="모델 루트 확인"
 for d in "$EMR_ROOT/miniconda3" "$EMR_ROOT/sam-3d-objects" "$EMR_ROOT/uLayout" \
          "$EMR_ROOT/omni3d" "$EMR_ROOT/detectron2" "$EMR_ROOT/pytorch3d_omni3d_build" \
+         "$EMR_ROOT/sam2_repo" "$EMR_ROOT/lama_repo" "$EMR_ROOT/lama_model" \
          "$EMR_ROOT/.cache/huggingface"; do
   [ -d "$d" ] || { echo "[userdata] $d 가 없다 — AMI에 모델이 안 들어갔다"; exit 1; }
 done
 
-# ── 이미지 확인 ──────────────────────────────────────────────────────────
+# ── 이미지 확인 ──
 # `docker compose up -d`는 이미지가 없으면 **그 자리에서 빌드한다**. 부팅 중
 # 빌드는 수십 분이고, 그동안 요금은 계속 나간다. 그래서 먼저 태그가 실제로
 # 있는지 보고, 없으면 빌드 대신 크게 실패한다(=회수된다).
@@ -84,7 +88,7 @@ for img in "emr/api:$IMAGE_TAG" "emr/worker:$IMAGE_TAG" "emr/gpu:$IMAGE_TAG"; do
   }
 done
 
-# ── 환경변수 주입 ────────────────────────────────────────────────────────
+# ── 환경변수 주입 ──
 # 큐/버킷 이름은 환경변수로만 준다. 코드에는 기본값만 있고 어느 큐를 보는지는
 # 배포가 정한다. 덕분에 나중에 sam3d와 scene을 다른 인스턴스로 쪼갤 때 코드를
 # 한 줄도 안 고치고 컴포즈만 나누면 된다.
@@ -104,7 +108,7 @@ DRY_RUN=0
 ENV
 umask 022
 
-# ── 가디언 유예 조정 ────────────────────────────────────────────────────
+# ── 가디언 유예 조정 ──
 # GUARDIAN_GRACE_SEC 은 bake-ami.sh 가 emr-guardian.service 에 **구워 넣는다.**
 # 그래서 config.sh 만 고치면 이미 구운 AMI에는 안 먹는다(EMR_IMAGE_TAG 와 같은
 # 함정이다). 유예가 부팅 시간보다 짧으면 가디언이 멀쩡히 부팅 중인 워커를
@@ -123,7 +127,7 @@ systemctl daemon-reload
 # 네 번 재보니 부팅 경로에서 데우는 건 매번 손해였다(674 → 345초). 되살리고
 # 싶어지면 먼저 config.sh 의 EMR_WARM_TIMEOUT 자리에 남긴 측정표를 읽을 것.
 
-# ── 기동 ─────────────────────────────────────────────────────────────────
+# ── 기동 ──
 # --no-build 가 핵심이다. 컴포즈가 만에 하나 빌드하려 들면 부팅이 몇십 분짜리가
 # 된다. 빌드는 굽는 시점의 일이다.
 #
@@ -148,6 +152,7 @@ services:
   reaper:       {logging: *log, environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE"}}
   ulayout:      {logging: *log}
   omni3d:       {logging: *log}
+  backend:      {logging: *log}
 YML
 DC="docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml"
 DC="$DC -f deploy/docker-compose.aws.yml -f /run/emr-deploy-env.yml"
@@ -157,7 +162,7 @@ DC="$DC -f deploy/docker-compose.aws.yml -f /run/emr-deploy-env.yml"
 # 컴포즈가 :ro 로 붙이므로 기동 **전에** 만든다.
 mkdir -p /run/emr
 
-# ── 기동과 동시에 백그라운드 워밍 ────────────────────────────────────────
+# ── 기동과 동시에 백그라운드 워밍 ──
 # 부팅을 막지 않으면서 첫 요청(스모크 187초)만 데운다. 근거와 측정표는
 # config.sh 의 EMR_WARM_BG_DIRS 주석에 있다.
 #
@@ -246,7 +251,7 @@ fi
 STEP="컴포즈 기동"
 $DC up -d --no-build
 
-# ── 설정이 컨테이너까지 닿았는지 확인 ───────────────────────────────────
+# ── 설정이 컨테이너까지 닿았는지 확인 ──
 # 위 404 사태의 진짜 교훈은 "오버라이드를 빠뜨렸다"가 아니라 **빠뜨렸는지
 # 아무도 안 본다**는 쪽이다. 컨테이너는 멀쩡히 떴고 리퍼도 떴고 가디언도
 # 조용했다. 틀린 건 첫 작업이 들어온 뒤에야 드러났고, 그때는 이미 돈이 나갔다.
@@ -263,7 +268,7 @@ if [ "$EFF" != "$S3_BUCKET" ]; then
 fi
 echo "[userdata] 버킷 확인 — 워커가 $EFF 를 본다"
 
-# ── 리퍼 확인 ────────────────────────────────────────────────────────────
+# ── 리퍼 확인 ──
 # 여기까지 성공해도 리퍼 컨테이너가 안 떴으면 요금을 끊을 주체가 없다.
 # 가디언이 5분 뒤 잡긴 하지만, 아는 즉시 실패하는 편이 낫다.
 STEP="리퍼 확인"

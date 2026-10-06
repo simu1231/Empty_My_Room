@@ -25,7 +25,8 @@ echo "▶ 저장소 $REPO_ROOT / 루트 $EMR_ROOT / 태그 $EMR_IMAGE_TAG"
   echo "  저장소를 옮기거나 EMR_ROOT 를 맞추세요."; exit 1; }
 
 for d in miniconda3 sam-3d-objects uLayout omni3d detectron2 \
-         pytorch3d_omni3d_build .cache/huggingface; do
+         pytorch3d_omni3d_build sam2_repo lama_repo lama_model \
+         .cache/huggingface; do
   [ -d "$EMR_ROOT/$d" ] || { echo "✗ $EMR_ROOT/$d 가 없다 — 설치가 덜 끝났다"; exit 1; }
 done
 

@@ -253,8 +253,17 @@ export EMR_WARM_SKIP=${EMR_WARM_SKIP:-"models--lllyasviel--control_v11p_sd15_can
 # 디코더는 **넷 다** 적는다. 처음엔 메쉬 작업이니 mesh 디코더만 쓰겠거니 하고
 # gs/gs_4 를 뺐는데, inference_pipeline.py:141-154 가 파이프라인을 만들 때
 # 넷을 조건 없이 올린다 — 쓰든 안 쓰든 첫 요청에서 읽힌다. 합쳐 327MB 다.
+#
+# backend 서비스를 같은 인스턴스에 올리면서 SAM2/LaMa 가 들어왔다(①). 둘은
+# **제일 앞**이다 — 위의 "먼저 쓸 것을 나중에 데운다"와 반대로 보이지만 같은
+# 규칙이다. 그 규칙은 "쓰는 시점에 캐시에 남아 있게 하라"이고, 이 둘은 컴포즈
+# **기동 중에** 백엔드가 바로 읽는다(main.py 가 시작할 때 올린다). 워밍이
+# 기동과 겹쳐 도니까(userdata 의 warm-bg), 데우자마자 소비된다 — 살아남을
+# 걱정을 할 구간이 없다. 반대로 뒤에 두면 기동이 먼저 끝나버려 아무 쓸모가 없다.
 _SAM3D_CKPT=$EMR_ROOT/sam-3d-objects/checkpoints/hf/checkpoints
 export EMR_WARM_BG_DIRS=${EMR_WARM_BG_DIRS:-"\
+$EMR_ROOT/sam2_repo/checkpoints/sam2.1_hiera_large.pt \
+$EMR_ROOT/lama_model/big-lama/models/best.ckpt \
 $_SAM3D_CKPT/ss_decoder.ckpt \
 $_SAM3D_CKPT/slat_decoder_gs.ckpt \
 $_SAM3D_CKPT/slat_decoder_gs_4.ckpt \
@@ -262,11 +271,12 @@ $_SAM3D_CKPT/slat_decoder_mesh.ckpt \
 $EMR_ROOT/.cache/huggingface/hub/models--Ruicheng--moge-2-vitl \
 $_SAM3D_CKPT/ss_generator.ckpt"}
 #
-# 총량 상한. 위 여섯을 합치면 8.24GB 이고 상한은 9G 다 — 딱 맞추지 않는다.
-# 상한을 넘기는 파일은 건너뛰므로(break 가 아니라 continue), 8G 로 조여 놓으면
-# 제일 값나가는 ss_generator 가 통째로 빠지고 그 자리를 자잘한 게 메우는
-# 최악이 난다. 목록을 늘릴 때 이 숫자부터 다시 보라.
-export EMR_WARM_BG_MAX_BYTES=${EMR_WARM_BG_MAX_BYTES:-9G}
+# 총량 상한. 여덟을 합치면 9.49GB 다(기존 여섯 8.24 + SAM2 0.86 + LaMa 0.39).
+# 상한을 넘기는 파일은 건너뛰므로(break 가 아니라 continue), 딱 맞춰 조여 놓으면
+# 제일 값나가는 ss_generator(6.23GB)가 통째로 빠지고 그 자리를 자잘한 게 메우는
+# 최악이 난다. 9G 였던 걸 10G 로 올린다 — 올리지 않으면 앞에 1.25GB 가 끼면서
+# 바로 그 사고가 난다. 목록을 늘릴 때 이 숫자부터 다시 보라.
+export EMR_WARM_BG_MAX_BYTES=${EMR_WARM_BG_MAX_BYTES:-10G}
 #
 # 청크 크기(MiB). 목록이 파일 4개로 줄면서 새 문제가 생겼다 — xargs -P 64 는
 # **파일 단위**로 갈라지므로 4개짜리 목록에서는 4갈래밖에 안 돈다. 그런데
@@ -351,3 +361,21 @@ export EMR_VOLUME_THROUGHPUT=${EMR_VOLUME_THROUGHPUT:-250}
 # 배포 시점 설정이 AMI에 굳은 값에 지면 안 된다).
 export GUARDIAN_GRACE_SEC=${GUARDIAN_GRACE_SEC:-$(( 120 + 600 + 300 ))}
 export GUARDIAN_FAIL_MIN=${GUARDIAN_FAIL_MIN:-5}       # 리퍼 부재가 이만큼(분) 이어지면 회수
+
+# ── 유저데이터 16KB 한도 ──
+# EC2 유저데이터 한도는 base64 **전** 원본 16384 바이트다. userdata.sh 는
+# 주석까지 통째로 인스턴스로 올라가므로 주석 한 글자가 그대로 한도를 깎고,
+# 한글은 글자당 3바이트다.
+#
+# 실제로 한 번 넘겼다. 구분선을 `# ── 기동 ─────…` 처럼 74칸까지 늘여 긋던
+# 10줄이 장식만 1.9KB 를 먹었고(`─` 가 3바이트다), CloudWatch 로깅 오버레이가
+# 들어오면서 렌더 결과가 16,557 바이트가 됐다. 20-launch-template.sh 의
+# 사전 점검이 시작 템플릿 생성을 거부한다 — 부팅 때 죽는 것보다는 싸지만,
+# 원인이 "주석이 길어서"라는 걸 알아채는 데 시간이 걸린다.
+#
+# 고친 방법은 구분선 꼬리를 `──` 로 끊은 것뿐이다(의미는 하나도 안 버렸다).
+# 그러니 앞으로 긴 근거 주석을 새로 쓸 자리는 **여기**다. config.sh 는
+# 인스턴스로 가지 않는다 — 치환된 값만 간다.
+#
+# 현재 렌더 크기는 20-launch-template.sh 실행 시 출력된다. 15.8KB 쯤이고
+# 여유는 600바이트 안팎이다. 여유가 빠듯해지면 주석부터 이쪽으로 옮길 것.

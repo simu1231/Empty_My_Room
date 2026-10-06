@@ -136,8 +136,10 @@ done
 stream "sources" "sources.tar.gz" z "$EMR_ROOT"
 
 # ── 4. 체크포인트 ────────────────────────────────────────────────────────
-# 소스 tar에서 이름으로 빼둔 대용량 3개를 제자리에 돌려놓는다.
-echo "▶ 체크포인트 3개"
+# 소스 tar에서 이름으로 빼둔 대용량 파일들을 제자리에 돌려놓는다. 개수와 위치는
+# 매니페스트의 ckpt_dest 가 정하므로 여기 로직은 목록이 늘어도 그대로다.
+# (현재 5개: depth_pro / best_mp3d / cubercnn + SAM2 / LaMa)
+echo "▶ 체크포인트 복원"
 python3 -c "import json,sys;[print(k,v) for k,v in json.load(sys.stdin)['ckpt_dest'].items()]" < "$MAN" |
 while read -r name dest; do
   full=$EMR_ROOT/$dest

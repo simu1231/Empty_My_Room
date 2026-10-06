@@ -45,10 +45,21 @@ PREFIX=${EMR_AMI_PREFIX:-ami/v1}         # S3 키 접두사
 S3=s3://$S3_BUCKET/$PREFIX
 
 ENVS="sam3d uLayout omni3d"
-SRC_REPOS="sam-3d-objects uLayout omni3d detectron2 pytorch3d_omni3d_build"
+# sam2_repo / lama_repo / lama_model 은 2단계(가구 선택 → 빈방 만들기) 전용이라
+# 예전엔 AMI 밖이었다. backend 서비스를 GPU 인스턴스에 올리면서 들어왔다 —
+# 프런트의 utils/jobs.js 가 segment/inpaint/extract 를 큐가 아니라 백엔드로
+# 직접 보내므로, 이 가중치가 없으면 2단계가 통째로 동작하지 않는다.
+SRC_REPOS="sam-3d-objects uLayout omni3d detectron2 pytorch3d_omni3d_build \
+sam2_repo lama_repo lama_model"
 CKPTS="sam-3d-objects/checkpoints/depth_pro/depth_pro.pt
 uLayout/ckpt/best_mp3d.pth
-omni3d/checkpoints/indoor/cubercnn_DLA34_FPN.pth"
+omni3d/checkpoints/indoor/cubercnn_DLA34_FPN.pth
+sam2_repo/checkpoints/sam2.1_hiera_large.pt
+lama_model/big-lama/models/best.ckpt"
+
+# 다시 만들어 덮어쓸 S3 키 목록. 빈 값이 기본이다. 왜 필요한지는 uploaded()
+# 위의 주석에 — 한 줄로 줄이면 "이름이 같으면 내용이 달라도 건너뛴다"다.
+REPACK=${EMR_REPACK:-}
 
 # ── 스테이징 위치 ────────────────────────────────────────────────────────
 # WSL2에서 이게 함정이다. `df /` 는 여유 779GB라고 하지만 그 ext4는 C드라이브 위의
@@ -102,8 +113,12 @@ done
 echo "▶ 대상 $S3"
 echo "  원본 루트 $SRC_ROOT → 복원 루트 $EMR_ROOT"
 echo
-echo "  ⚠ 버킷에 '7일 후 삭제' 수명주기가 걸려 있습니다(모든 접두사)."
-echo "    올린 뒤 7일 안에 AMI를 구우세요. 지나면 이 스크립트를 다시 돌리면 됩니다."
+# 예전엔 모든 접두사에 7일 만료가 걸려 있어서 "7일 안에 구우세요"라고 적었다.
+# 지금은 15-resources.sh 가 input/ 와 result/ 에만 걸고 ami/ 는 만료가 없다.
+echo "  수명주기: input/ result/ 만 7일 만료. 이 접두사($PREFIX)는 만료되지 않습니다."
+if [ -n "$REPACK" ]; then
+  echo "  ⚠ EMR_REPACK=$REPACK — 해당 조각은 S3에 있어도 다시 만들어 덮어씁니다."
+fi
 echo
 
 # `pack-envs.sh check` 로 전제만 보고 끝낸다. 51GB 업로드는 몇 시간짜리라,
@@ -131,7 +146,22 @@ put() {       # put <로컬파일> <s3키>
   echo "    올림 $(( sz / 1048576 ))MB"
 }
 # 만드는 데 몇 분씩 걸리는 조각은 만들기 전에 S3를 먼저 본다.
-uploaded() { aws s3api head-object --bucket "$S3_BUCKET" --key "$PREFIX/$1" >/dev/null 2>&1; }
+#
+# **이 검사는 존재 여부만 본다.** put() 과 달리 크기를 비교할 수 없다 — 아직
+# 만들지 않은 tar 의 크기는 알 수 없기 때문이다. 그래서 **내용이 바뀌었는데
+# 이름이 같으면 조용히 건너뛴다.** 에러도 안 나고 "이미 올라가 있음"만 찍힌다.
+# 그 상태로 AMI 를 구우면 옛 내용이 그대로 들어가고, 그건 다 굽고 난 뒤
+# 첫 요청에서야 드러난다.
+#
+# 목록을 바꾼 날에는 반드시 EMR_REPACK 에 적는다. 공백으로 구분한 S3 키다.
+#   EMR_REPACK="sources.tar.gz hfcache.tar" bash pack-envs.sh
+# (REPACK 은 위 사전 점검에서 먼저 찍어야 해서 파일 앞쪽에서 잡는다.)
+uploaded() {
+  case " $REPACK " in
+    *" $1 "*) echo "    (EMR_REPACK 지정 — 다시 만들어 올린다)"; return 1 ;;
+  esac
+  aws s3api head-object --bucket "$S3_BUCKET" --key "$PREFIX/$1" >/dev/null 2>&1
+}
 
 # conda-pack 의 진행바는 터미널이 아니면 \r 대신 줄을 계속 덧붙여서, 로그로
 # 리다이렉트하면 수천 줄이 쌓이고 정작 봐야 할 메시지가 묻힌다. 로그로 돌릴
@@ -177,11 +207,19 @@ done
 #   .git           — 워커는 이력을 안 쓴다. sam-3d-objects만 269MB다.
 #   *.bak* *.experiment — 손으로 실험하다 남은 사본이다. 전에 .bak 파일이 저장소에
 #                  섞여 들어가 혼란을 준 적이 있다. AMI에는 넣지 않는다.
-echo "▶ 소스 트리 5개 포장"
+#   big-lama.zip   — lama_model/big-lama/ 로 이미 풀어 놓은 것의 원본 zip 이다.
+#                  363MB를 두 번 넣을 이유가 없다. 아무도 읽지 않는다.
+#
+# 이름으로 빼는 방식이라 **같은 이름의 다른 파일이 같이 빠진다.** 추가한 셋을
+# 여덟 트리 전체에서 세어 확인했다 — sam2.1_hiera_large.pt 1건, best.ckpt 1건,
+# big-lama.zip 1건으로 전부 의도한 파일이다. 목록을 늘릴 땐 이 확인을 다시 한다.
+echo "▶ 소스 트리 8개 포장"
 if uploaded "sources.tar.gz"; then echo "    (이미 올라가 있음, 건너뜀)"; else
   tar --exclude=.git --exclude=__pycache__ --exclude='*.pyc' \
       --exclude='*.bak*' --exclude='*.experiment' \
       --exclude=depth_pro.pt --exclude=best_mp3d.pth --exclude=cubercnn_DLA34_FPN.pth \
+      --exclude=sam2.1_hiera_large.pt --exclude=best.ckpt \
+      --exclude=big-lama.zip \
       -czf "$STAGE/sources.tar.gz" -C "$SRC_ROOT" $SRC_REPOS
   put "$STAGE/sources.tar.gz" "sources.tar.gz"
   rm -f "$STAGE/sources.tar.gz"
@@ -190,7 +228,7 @@ fi
 # ── 3. 체크포인트 ────────────────────────────────────────────────────────
 # tar로 묶지 않는다. 이미 압축된 바이너리라 묶어도 안 작아지고, 따로 두면 중간에
 # 끊겼을 때 이미 받은 파일은 건너뛸 수 있다. 복원 위치는 매니페스트에 적는다.
-echo "▶ 체크포인트 3개"
+echo "▶ 체크포인트 5개 (SAM2 857MB / LaMa 391MB 포함)"
 while read -r c; do
   echo "  $c"
   put "$SRC_ROOT/$c" "ckpt/$(basename "$c")"
@@ -202,9 +240,18 @@ done <<< "$CKPTS"
 # blobs/ 와 snapshots/ 의 하드링크·심링크 구조가 그대로 보존돼야 한다.
 # token 파일은 뺀다. 인스턴스에 HF 토큰이 있을 이유가 없고, AMI를 공유하는 순간
 # 같이 나간다.
-echo "▶ HF 캐시 (27.8GB, 압축 안 함 — 몇 분 걸립니다)"
+#
+# zero123plus-v1.2(5.2GB)와 TripoSR(1.6GB)은 뺀다. 둘 다 이 서비스가 부르지
+# 않는다 — 메시는 SAM3D 가 만든다. 개발 PC의 원본은 그대로 두고 AMI 에만 안
+# 넣는다(사용자 결정). 업로드·다운로드·스냅샷에서 각각 6.8GB 가 빠진다.
+# SD 인페인팅(4.0GB)과 canny ControlNet(1.4GB)은 **남긴다** — inpaint 라우터가
+# LaMa 결과를 다듬는 데 실제로 쓴다.
+echo "▶ HF 캐시 (약 21GB, 압축 안 함 — 몇 분 걸립니다)"
 if uploaded "hfcache.tar"; then echo "    (이미 올라가 있음, 건너뜀)"; else
-  tar --exclude=token -cf "$STAGE/hfcache.tar" -C "$SRC_ROOT/.cache" huggingface
+  tar --exclude=token \
+      --exclude='models--sudo-ai--zero123plus*' \
+      --exclude='models--stabilityai--TripoSR' \
+      -cf "$STAGE/hfcache.tar" -C "$SRC_ROOT/.cache" huggingface
   put "$STAGE/hfcache.tar" "hfcache.tar"
   rm -f "$STAGE/hfcache.tar"
 fi
@@ -232,7 +279,8 @@ def sha(p):
                        capture_output=True, text=True)
     return r.stdout.strip() or None
 
-repos = ["sam-3d-objects", "uLayout", "omni3d", "detectron2", "pytorch3d_omni3d_build"]
+repos = ["sam-3d-objects", "uLayout", "omni3d", "detectron2", "pytorch3d_omni3d_build",
+         "sam2_repo", "lama_repo", "lama_model"]
 
 # HF 저장소 목록은 **출처 기록용**이다(캐시를 그대로 올리므로 복원에는 안 쓴다).
 # 나중에 "이 AMI에 어느 리비전이 들었나"를 물을 때 이것만 보면 된다.
@@ -257,6 +305,8 @@ json.dump({
         "depth_pro.pt": "sam-3d-objects/checkpoints/depth_pro/depth_pro.pt",
         "best_mp3d.pth": "uLayout/ckpt/best_mp3d.pth",
         "cubercnn_DLA34_FPN.pth": "omni3d/checkpoints/indoor/cubercnn_DLA34_FPN.pth",
+        "sam2.1_hiera_large.pt": "sam2_repo/checkpoints/sam2.1_hiera_large.pt",
+        "best.ckpt": "lama_model/big-lama/models/best.ckpt",
     },
     "source_commits": {r: sha(os.path.join(src_root, r)) for r in repos},
     "hf": hf,
