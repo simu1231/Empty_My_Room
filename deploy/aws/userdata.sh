@@ -149,10 +149,10 @@ x-log: &log
 services:
   worker-sam3d: {logging: *log, environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE"}}
   worker-scene: {logging: *log, environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE"}}
-  reaper:       {logging: *log, environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE"}}
+  reaper:       {logging: *log, environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE", EXPECT_WORKERS: "__EXPECT_WORKERS__"}}
   ulayout:      {logging: *log}
   omni3d:       {logging: *log}
-  backend:      {logging: *log}
+  backend:      {logging: *log, environment: {EMR_BACKEND_STATE_FILE: "__BACKEND_STATE__", EMR_BACKEND_BUSY_SEC: "__BACKEND_BUSY_SEC__"}}
 YML
 DC="docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml"
 DC="$DC -f deploy/docker-compose.aws.yml -f /run/emr-deploy-env.yml"

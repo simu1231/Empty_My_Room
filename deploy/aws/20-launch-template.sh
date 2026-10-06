@@ -48,6 +48,21 @@ else
   exit 1
 fi
 
+# 세션 알림은 스위치 하나로 양쪽을 동시에 렌더한다 — 한쪽만 켜지는 사고를
+# 구조적으로 막는다. 왜 그게 위험한지는 config.sh 의 EMR_BACKEND_SESSION 주석에.
+# 끈 경우 상태 파일 경로를 빈 문자열로 넣는다. session_state.py 는 빈 값을
+# "꺼짐"으로 읽으므로 자리표시자 하나가 켜짐/꺼짐을 둘 다 표현한다.
+EXPECT_WORKERS="$Q_SAM3D,$Q_SCENE"
+BACKEND_STATE=""
+if [ "${EMR_BACKEND_SESSION:-0}" = "1" ]; then
+  EXPECT_WORKERS="$EXPECT_WORKERS,backend"
+  BACKEND_STATE="/state/backend.state"
+  echo "▶ 세션 알림 켬 — 리퍼가 backend.state 도 본다"
+  echo "    꼬리 요금: 마지막 요청 + ${EMR_BACKEND_BUSY_SEC}초 + ${IDLE_EXIT_SEC:-120}초"
+else
+  echo "▶ 세션 알림 끔 — 2단계 중에도 ${IDLE_EXIT_SEC:-120}초면 회수된다"
+fi
+
 echo "▶ 유저데이터 생성 (설정값을 치환해 굽는다)"
 sed -e "s|__REGION__|${AWS_REGION}|g" \
     -e "s|__LOG_GROUP__|${LOG_GROUP}|g" \
@@ -56,6 +71,9 @@ sed -e "s|__REGION__|${AWS_REGION}|g" \
     -e "s|__Q_SAM3D__|${Q_SAM3D}|g" \
     -e "s|__Q_SCENE__|${Q_SCENE}|g" \
     -e "s|__IDLE_EXIT_SEC__|${IDLE_EXIT_SEC:-120}|g" \
+    -e "s|__EXPECT_WORKERS__|${EXPECT_WORKERS}|g" \
+    -e "s|__BACKEND_STATE__|${BACKEND_STATE}|g" \
+    -e "s|__BACKEND_BUSY_SEC__|${EMR_BACKEND_BUSY_SEC}|g" \
     -e "s|__REPO_DIR__|${EMR_REPO_DIR}|g" \
     -e "s|__EMR_ROOT__|${EMR_ROOT}|g" \
     -e "s|__IMAGE_TAG__|${EMR_IMAGE_TAG}|g" \

@@ -44,6 +44,19 @@ STATE_DIR = os.getenv("STATE_DIR", "/state")
 EXPECT = [q.strip() for q in os.getenv("EXPECT_WORKERS", "emr-sam3d,emr-scene").split(",") if q.strip()]
 QUEUES = [q.strip() for q in os.getenv("WATCH_QUEUES",   "emr-sam3d,emr-scene").split(",") if q.strip()]
 
+# 그중 **있으면 듣고 없으면 넘어가는** 쪽. 대화형 백엔드가 여기 들어간다.
+#
+# 큐 워커와 비대칭인 이유. 큐 워커의 상태 파일이 없거나 멎었다는 건 "작업을
+# 쥔 채 멎었을 수 있다"는 뜻이라 보류가 안전하다. 백엔드의 상태 파일은 그게
+# 아니라 "사용자가 화면 앞에 있나"라는 **덤 정보**다. 없으면 모르는 것이고,
+# 모르는 상태는 이 기능이 생기기 전과 똑같다 — 그때로 돌아가면 된다.
+#
+# 이 구분이 없으면 돈이 샌다. 상태 파일은 named volume 에 남으므로, 백엔드가
+# 한 번 쓰고 죽으면 파일은 "응답없음"으로 남고 리퍼는 영원히 보류한다. 가디언도
+# 못 잡는다 — 가디언이 보는 건 "리퍼가 살아있나"뿐이고 리퍼는 멀쩡히 살아서
+# 보류하고 있기 때문이다. 빈 g6.xlarge 가 시간당 $0.45 로 계속 돈다.
+OPTIONAL = set(q.strip() for q in os.getenv("OPTIONAL_WORKERS", "backend").split(",") if q.strip())
+
 IDLE_EXIT_SEC = int(os.getenv("IDLE_EXIT_SEC", "120"))
 POLL_SEC      = int(os.getenv("REAPER_POLL_SEC", "15"))
 # 상태 파일이 이만큼 안 갱신되면 그 워커는 "죽었거나 멎었다"로 본다. 워커는 롱폴링
@@ -109,7 +122,17 @@ def read_states():
             out[q] = None
         except Exception as e:
             print(f"[reaper] {q} 상태 읽기 실패(보류로 처리): {e}")
-            out[q] = (True, 0, 0.0)   # 못 읽으면 바쁜 것으로 간주 — 안전한 쪽
+            # 못 읽으면 바쁜 것으로 간주한다 — 필수 워커에게는 안전한 쪽이다.
+            # 나이는 **실제 mtime** 으로 준다. 예전엔 0.0 을 박았는데, 그건
+            # "방금 갱신됨"이라는 거짓말이라 OPTIONAL 쪽에서 영원한 보류가
+            # 된다(아래 fresh_busy 가 나이를 본다). 필수 워커는 어차피
+            # busy 로도 stale 로도 보류라 결과가 같다.
+            try:
+                age = now - os.path.getmtime(path)
+            except OSError:
+                out[q] = None
+                continue
+            out[q] = (True, 0, age)
     return out
 
 
@@ -181,9 +204,15 @@ def main():
             continue
 
         states = read_states()
-        missing = [q for q, v in states.items() if v is None]
-        stale   = [q for q, v in states.items() if v and v[2] > STALE_SEC]
-        busy    = [q for q, v in states.items() if v and v[0]]
+        # OPTIONAL 은 "바쁘다"로만 센다. 없거나 멎은 건 보류 사유가 아니다
+        # (위 OPTIONAL 주석 참고 — 보류로 치면 빈 인스턴스가 영원히 돈다).
+        missing = [q for q, v in states.items() if v is None and q not in OPTIONAL]
+        stale   = [q for q, v in states.items()
+                   if v and v[2] > STALE_SEC and q not in OPTIONAL]
+        # OPTIONAL 은 **신선한** busy 만 센다. 백엔드가 busy=True 를 쓴 직후
+        # 죽으면 그 파일이 영영 남는다 — 나이를 안 보면 그걸로 보류가 굳는다.
+        busy    = [q for q, v in states.items()
+                   if v and v[0] and (q not in OPTIONAL or v[2] <= STALE_SEC)]
 
         if missing or stale or busy:
             if idle_since is not None:
