@@ -163,24 +163,55 @@ aws ec2 authorize-security-group-ingress --group-id "$SG" \
   || echo "  SSH 허용 이미 있음: $SSH_CIDR"
 
 # 공인 IP가 붙는 서브넷만 쓴다(SSH로 들어가야 하므로).
-SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC" \
-            "Name=map-public-ip-on-launch,Values=true" \
-            --query 'Subnets[].[SubnetId,AvailabilityZone]' --output text)
+# EMR_BUILDER_SUBNET 을 주면 그 하나만 쓴다. 위 142줄 오류 메시지가 이 변수를
+# 안내하면서 정작 읽지는 않고 있었다. AZ 를 고정하고 싶을 때 쓴다.
+if [ -n "${EMR_BUILDER_SUBNET:-}" ]; then
+  SUBNETS=$(aws ec2 describe-subnets --subnet-ids "$EMR_BUILDER_SUBNET" \
+              --query 'Subnets[].[SubnetId,AvailabilityZone]' --output text)
+else
+  SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC" \
+              "Name=map-public-ip-on-launch,Values=true" \
+              --query 'Subnets[].[SubnetId,AvailabilityZone]' --output text)
+fi
 [ -n "$SUBNETS" ] || { echo "✗ 퍼블릭 서브넷이 없습니다"; exit 1; }
 echo "  후보 AZ: $(echo "$SUBNETS" | awk '{printf "%s ", $2}')"
+
+# MaxPrice 를 안 준다 = 온디맨드 가격까지 허용. 낮게 박으면 "싸게 뜨는" 게 아니라
+# **아예 안 뜬다**(스팟은 어차피 시장가로 과금된다).
+#
+# 빌더만은 온디맨드로 돌릴 길을 열어둔다. 워커 ASG 와 사정이 다르다 —
+# 워커는 회수되면 다음 놈이 큐에서 집어가지만, 빌더는 ASG 밖의 일회성
+# 장비라 받아줄 사람이 없다. 회수되는 순간 S3 에서 48GB 복원한 게 통째로
+# 날아가고 1~2시간을 다시 기다린다. 실제로 2026-10-06 에 띄운 지 8분 만에
+# instance-terminated-no-capacity 로 잃었고, 그때 2b/2c 는 애초에 거부당해
+# 2a 한 곳에만 떠 있던 상태였다. 아끼는 건 시간당 $0.51 인데 거는 건 두 시간이다.
+
+MKT='{"MarketType":"spot","SpotOptions":{"SpotInstanceType":"one-time","InstanceInterruptionBehavior":"terminate"}}'
+MKT_LABEL="스팟"
+MKT_FEE="스팟 g6.xlarge 약 \$0.48/h — 4시간이면 \$2 안팎 (중간 회수 위험 있음)"
+# ASG 밖이라 '아무도 회수 안 한다'고 적어뒀었는데 틀린 말이었다. ASG 는 안
+# 건드려도 AWS 가 스팟 용량을 회수한다. 2026-10-06 에 8분 만에 당했다.
+MKT_WARN="스팟입니다 — AWS 가 용량 회수로 언제든 내릴 수 있고, 그러면 복원을 처음부터 다시 합니다."
+if [ "${EMR_BUILDER_MARKET:-spot}" = "ondemand" ]; then
+  # 빈 MKT 는 아래 run-instances 에서 --instance-market-options 자체를 빼는 신호다.
+  MKT=""
+  MKT_LABEL="온디맨드"
+  MKT_FEE="온디맨드 g6.xlarge \$0.99/h — 4시간이면 \$4 안팎 (회수 없음)"
+  MKT_WARN="온디맨드라 회수되지 않습니다. 대신 끄기 전까지 계속 과금됩니다."
+fi
 
 # ── 5. 확인 ──────────────────────────────────────────────────────────────
 cat <<PLAN
 
 ────────────────────────────────────────────────────────────
-  띄울 것          스팟 인스턴스 1대 ($(echo $TYPES | tr ' ' '/') 중 뜨는 것)
+  띄울 것          $MKT_LABEL 인스턴스 1대 ($(echo $TYPES | tr ' ' '/') 중 뜨는 것)
   루트 볼륨        ${EMR_VOLUME_GB}GB gp3 ${EMR_VOLUME_THROUGHPUT}MB/s (종료 시 삭제)
   기반 AMI         $BASE_AMI
   역할             $PROFILE_NAME
   SSH              $SSH_CIDR 에서만
-  대략 요금        스팟 g6.xlarge 약 \$0.3/h + EBS — 3시간이면 \$1 안팎
+  대략 요금        $MKT_FEE
 ────────────────────────────────────────────────────────────
-  이 인스턴스는 ASG 밖이라 아무도 회수하지 않습니다.
+  $MKT_WARN
   끝나면 반드시:  bash $0 terminate
 ────────────────────────────────────────────────────────────
 
@@ -195,10 +226,6 @@ fi
 # **스냅샷 크기가 곧 EMR_VOLUME_GB의 하한**이라 여기서 150을 벗어나면 나중에
 # 20-launch-template.sh 가 거부한다.
 BDM="[{\"DeviceName\":\"$ROOT_DEV\",\"Ebs\":{\"VolumeSize\":$EMR_VOLUME_GB,\"VolumeType\":\"gp3\",\"Throughput\":$EMR_VOLUME_THROUGHPUT,\"DeleteOnTermination\":true}}]"
-# MaxPrice 를 안 준다 = 온디맨드 가격까지 허용. 낮게 박으면 "싸게 뜨는" 게 아니라
-# **아예 안 뜬다**(스팟은 어차피 시장가로 과금된다).
-MKT='{"MarketType":"spot","SpotOptions":{"SpotInstanceType":"one-time","InstanceInterruptionBehavior":"terminate"}}'
-
 IID=""
 for t in $TYPES; do
   while read -r subnet az; do
@@ -209,7 +236,7 @@ for t in $TYPES; do
         --key-name "$KEY_NAME" --subnet-id "$subnet" --security-group-ids "$SG" \
         --iam-instance-profile "Name=$PROFILE_NAME" \
         --block-device-mappings "$BDM" \
-        --instance-market-options "$MKT" \
+        ${MKT:+--instance-market-options "$MKT"} \
         --metadata-options 'HttpTokens=required,HttpPutResponseHopLimit=2' \
         --tag-specifications \
           "ResourceType=instance,Tags=[{Key=Name,Value=$BUILDER_NAME},{Key=Project,Value=emr}]" \
