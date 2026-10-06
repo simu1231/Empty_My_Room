@@ -72,21 +72,57 @@ async def lifespan(app: FastAPI):
         sweeper = asyncio.create_task(_sweep_loop(app.state.residency))
         print(f"TTL 안전망 {app.state.residency.ttl_sec:.0f}초 (점검 {SWEEP_SEC:.0f}초 간격)")
 
+    # 세션 상태 알림. 기본은 꺼져 있다 — 왜 꺼 두는지는 session_state.py 머리말에.
+    from services.session_state import SessionState, WRITE_SEC
+    app.state.session = SessionState()
+
+    async def _state_loop(st):
+        while True:
+            st.write()
+            await asyncio.sleep(WRITE_SEC)
+
+    stater = None
+    if app.state.session.enabled:
+        stater = asyncio.create_task(_state_loop(app.state.session))
+        print(f"세션 상태 알림 → {app.state.session.path} "
+              f"(활동 유효 {app.state.session.busy_sec:.0f}초, {WRITE_SEC:.0f}초 간격)")
+
     print("서버 준비 완료!")
     yield
-    if sweeper is not None:
-        sweeper.cancel()
+    for t in (sweeper, stater):
+        if t is not None:
+            t.cancel()
     print("서버 종료")
 
 app = FastAPI(title="SAM3D Interior API", lifespan=lifespan)
 
+# 허용 출처. 기본값은 지금까지와 같은 "*" 라 동작이 달라지지 않는다.
+# 환경변수로 뺀 이유는 좁히고 싶어서가 아니라 **좁힐 때 재굽기를 안 하기
+# 위해서**다. userdata.sh 는 저장소를 다시 받지 않는다(git pull 이 없다) —
+# 이 파일은 bootstrap-ami.sh 의 clone 시점에 AMI 안으로 굳는다. 값이 코드에
+# 박혀 있으면 출처 한 줄을 고치는 데 AMI 를 다시 구워야 한다.
+# 좁힐 때: 시작 템플릿에서 EMR_CORS_ORIGINS="https://내도메인" 을 넣는다.
+_origins = [o.strip() for o in os.environ.get('EMR_CORS_ORIGINS', '*').split(',') if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 모든 요청을 "활동"으로 센다. 어느 엔드포인트가 세션을 뜻하는지 고르지
+# 않는 이유는, 고르는 순간 새 엔드포인트가 생길 때마다 여기를 같이 고쳐야
+# 하고 빠뜨리면 세션 한가운데서 인스턴스가 내려가기 때문이다. 헬스체크는
+# 뺀다 — 도커 헬스체크가 10초마다 때리므로 넣으면 영원히 busy 가 된다.
+@app.middleware("http")
+async def _mark_activity(request, call_next):
+    st = getattr(app.state, 'session', None)
+    if st is not None and request.url.path not in ('/health', '/'):
+        st.touch()
+    return await call_next(request)
+
 
 from routers import segment, extract, sam3d, inpaint, room, omni3d
 app.include_router(segment.router, prefix="/api/segment", tags=["Segment"])
@@ -109,4 +145,10 @@ def health():
         "sam3d":   "loaded" if getattr(app.state, 'sam3d',   None) else "not_loaded",
         "residency": getattr(app.state, 'residency', None).status()
                      if getattr(app.state, 'residency', None) else None,
+        # 세션 알림이 켜져 있는지. 배포에서 "리퍼가 왜 안 내려가나 / 왜 세션
+        # 중에 내려갔나"를 물을 때 제일 먼저 볼 값이라 밖으로 뺀다.
+        "session": ({"state_file": app.state.session.path,
+                     "busy_sec": app.state.session.busy_sec}
+                    if getattr(app.state, 'session', None)
+                    and app.state.session.enabled else None),
     }
