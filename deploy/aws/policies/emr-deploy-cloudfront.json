@@ -1,0 +1,66 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DiscoverOnly",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:ListDistributions",
+        "cloudfront:ListOriginAccessControls",
+        "cloudfront:ListCachePolicies",
+        "cloudfront:ListOriginRequestPolicies"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CreateTaggedDistributionOnly",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateDistribution",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": { "aws:RequestTag/Project": "emr" }
+      }
+    },
+    {
+      "Sid": "TagOwnDistribution",
+      "Effect": "Allow",
+      "Action": "cloudfront:TagResource",
+      "Resource": "arn:aws:cloudfront::__ACCOUNT__:distribution/*",
+      "Condition": {
+        "StringEquals": { "aws:RequestTag/Project": "emr" }
+      }
+    },
+    {
+      "Sid": "ManageProjectDistributionOnly",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetDistribution",
+        "cloudfront:GetDistributionConfig",
+        "cloudfront:UpdateDistribution",
+        "cloudfront:DeleteDistribution",
+        "cloudfront:CreateInvalidation",
+        "cloudfront:GetInvalidation",
+        "cloudfront:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:cloudfront::__ACCOUNT__:distribution/*",
+      "Condition": {
+        "StringEquals": { "aws:ResourceTag/Project": "emr" }
+      }
+    },
+    {
+      "Sid": "CreateOac",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateOriginAccessControl",
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReadOac",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetOriginAccessControl",
+        "cloudfront:GetOriginAccessControlConfig"
+      ],
+      "Resource": "arn:aws:cloudfront::__ACCOUNT__:origin-access-control/*"
+    }
+  ]
+}
