@@ -131,8 +131,24 @@ def probe(ip: str) -> dict | None:
 
 
 def ready(health: dict | None) -> bool:
-    """SAM2 가 올라왔으면 받을 수 있다 — compose 헬스체크와 같은 기준이다."""
-    return bool(health) and health.get("sam2") == "loaded"
+    """백엔드가 요청을 받을 수 있는 상태인가. compose 헬스체크와 같은 기준이다.
+
+    **sam2 를 보면 안 된다.** sam2/lama 는 residency 가 유휴 600초에 반납하는
+    모델이라, 멀쩡히 살아 있는 백엔드가 그 순간 "준비 안 됨"으로 뒤집힌다.
+    그런데 그 둘을 다시 올리는 유일한 길이 /api/segment/mask 요청이고
+    (segment.py 의 res.use('sam2') -> residency.ensure), 그 요청을 여기서
+    막는다. 재로드를 트리거하는 유일한 요청을 재로드가 안 됐다는 이유로
+    막으니, 한번 빠지면 브라우저가 몇 번을 재시도해도 영원히 못 나온다.
+
+    2026-10-08 에 실제로 걸렸다. IDLE_EXIT_SEC 을 120 -> 900 으로 늘리면서
+    인스턴스가 유휴 600초를 처음으로 넘겨 살아남았고, 그때 드러났다.
+    900 이 버그를 만든 게 아니라 가려져 있던 걸 꺼냈을 뿐이다.
+
+    extract 를 본다. lifespan 에서 sam2/lama **다음에** 올라가고
+    (sam3d/backend/main.py 의 ExtractService), residency 의 반납 대상이
+    아니라서, "기동이 끝났고 아직 살아 있다"를 정확히 뜻하는 유일한 값이다.
+    """
+    return bool(health) and health.get("extract") == "loaded"
 
 
 def forward(method: str, path: str, *, content: bytes, headers: dict,

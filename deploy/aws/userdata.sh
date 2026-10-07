@@ -154,7 +154,18 @@ services:
   reaper:       {logging: *log, environment: {S3_BUCKET: "$S3_BUCKET", DDB_TABLE: "$DDB_TABLE", EXPECT_WORKERS: "__EXPECT_WORKERS__"}}
   ulayout:      {logging: *log}
   omni3d:       {logging: *log}
-  backend:      {logging: *log, environment: {EMR_BACKEND_STATE_FILE: "__BACKEND_STATE__", EMR_BACKEND_BUSY_SEC: "__BACKEND_BUSY_SEC__"}}
+  backend:
+    logging: *log
+    environment:
+      EMR_BACKEND_STATE_FILE: "__BACKEND_STATE__"
+      EMR_BACKEND_BUSY_SEC: "__BACKEND_BUSY_SEC__"
+    # 헬스체크 덮어쓰기. gpu.yml 은 AMI 에 굳어 있어 저장소 수정이 이미 구운
+    # AMI 에 닿지 않는다. 재빌드 대신 여기서 덮는다(다음 AMI 부터는 같은 값).
+    # sam2 가 아니라 extract 를 보는 근거는 gpu.yml 주석에.
+    # 이 heredoc 은 따옴표 없이 열려 쓰는 시점에 전개된다 — 절대경로를 박는다.
+    healthcheck:
+      test: ["CMD", "$EMR_ROOT/miniconda3/envs/sam3d/bin/python", "-c",
+             "import urllib.request,json,sys; d=json.load(urllib.request.urlopen('http://localhost:8001/health',timeout=5)); sys.exit(0 if d.get('extract')=='loaded' else 1)"]
 YML
 DC="docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml"
 DC="$DC -f deploy/docker-compose.aws.yml -f /run/emr-deploy-env.yml"

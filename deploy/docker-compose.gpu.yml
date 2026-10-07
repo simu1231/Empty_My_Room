@@ -153,10 +153,15 @@ services:
     ports:
       - "8001:8001"
     # 이미지에 curl 이 없다. 사이드카 둘과 같은 방식으로 python 으로 짠다.
-    # sam2 가 올라왔는지까지 본다 — 포트만 열리고 모델이 없으면 첫 클릭이 죽는다.
+    # extract 를 본다. sam2 가 아니다 — sam2 는 residency 가 유휴 600초에
+    # 반납하므로, sam2 를 기준으로 삼으면 멀쩡한 컨테이너가 그때 unhealthy 로
+    # 뒤집힌다. extract 는 기동 순서상 sam2/lama 보다 뒤에 올라가고 반납되지
+    # 않아서, "포트만 열린 상태"를 거르는 원래 목적은 그대로 달성한다.
+    # API 의 gpuproxy.ready() 와 같은 기준이어야 한다 — 다르면 한쪽만 통과하는
+    # 상태가 생기고, 그게 2026-10-08 교착의 모양이었다.
     healthcheck:
       test: ["CMD", "${EMR_ROOT:-${HOME}}/miniconda3/envs/sam3d/bin/python", "-c",
-             "import urllib.request,json,sys; d=json.load(urllib.request.urlopen('http://localhost:8001/health',timeout=5)); sys.exit(0 if d.get('sam2')=='loaded' else 1)"]
+             "import urllib.request,json,sys; d=json.load(urllib.request.urlopen('http://localhost:8001/health',timeout=5)); sys.exit(0 if d.get('extract')=='loaded' else 1)"]
       interval: 10s
       timeout: 10s
       retries: 40
