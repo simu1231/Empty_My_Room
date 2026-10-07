@@ -568,3 +568,12 @@ export EMR_CF_ORP_ALLVIEWER_NOHOST=${EMR_CF_ORP_ALLVIEWER_NOHOST:-b689b0a8-53d0-
 # 읽어 채운다.
 export EMR_API_ORIGIN_DNS=${EMR_API_ORIGIN_DNS:-}
 export EMR_CF_DIST_ID=${EMR_CF_DIST_ID:-}
+
+# CloudFront 엣지가 오리진을 부를 때 쓰는 IP 대역. AWS 가 관리하므로 엣지가
+# 늘거나 줄어도 우리가 손댈 게 없다. API 의 8000 을 이것만 허용하면 CloudFront
+# 를 우회해 /api/prewarm 을 직접 때려 **GPU 를 깨우는** 길이 막힌다.
+#
+# IPv6 판(pl-07ac407da2b364d6c, 35개)은 쓰지 않는다. 인스턴스에도 서브넷에도
+# IPv6 가 없어 쓸 일이 없고, 둘 다 넣으면 46+35+1=82 로 보안그룹 규칙
+# 할당량(L-0EA8095F, 60)을 넘겨 거부된다.
+export EMR_CF_PREFIX_LIST=${EMR_CF_PREFIX_LIST:-pl-22a6434b}

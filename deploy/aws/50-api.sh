@@ -120,12 +120,19 @@ if [ "$SG_ID" = "None" ] || [ -z "$SG_ID" ]; then
 else
   echo "  기존 사용: $SG_ID"
 fi
-# 22 는 내 IP 만. 8000 은 전체 — 프런트(브라우저)가 직접 부르는 주소라
-# 소스를 좁힐 수 없다. TLS/도메인 단계에서 443 으로 옮기고 여기를 닫는다.
+# 22 는 내 IP 만.
 run_sg aws ec2 authorize-security-group-ingress --group-id "$SG_ID" \
       --protocol tcp --port 22 --cidr "$SSH_CIDR"
+
+# 8000 은 **CloudFront 엣지만**. 예전에는 브라우저가 이 포트를 직접 불러서
+# 0.0.0.0/0 말고는 방법이 없었는데, 단계 6 에서 CloudFront 가 앞에 서면서
+# 이 포트를 부르는 건 엣지뿐이 되었다. 열어 둘 이유가 사라졌다.
+#
+# 여기를 같이 고치지 않으면, API 를 재생성할 때마다 전체 공개로 되돌아간다 —
+# 보안그룹은 재사용되므로 평소에는 안 드러나고, SG 를 새로 만드는 날에만
+# 조용히 열린다. 그런 건 반드시 잊어버린다.
 run_sg aws ec2 authorize-security-group-ingress --group-id "$SG_ID" \
-      --protocol tcp --port "$API_PORT" --cidr 0.0.0.0/0
+      --ip-permissions "IpProtocol=tcp,FromPort=${API_PORT},ToPort=${API_PORT},PrefixListIds=[{PrefixListId=$EMR_CF_PREFIX_LIST,Description='CloudFront origin-facing only'}]"
 
 # ── 워커 → API 연결 통로 ────────────────────────────────────────────────
 # API 서버가 GPU 워커의 :8001 로 요청을 중계한다(gpuproxy.py). 그러려면 워커
@@ -191,7 +198,7 @@ cat <<SUMMARY
   타입           $API_INSTANCE_TYPE (arm64, 온디맨드)
   AMI            $API_AMI_ID
   서브넷         $API_SUBNET_ID
-  보안그룹       $SG_ID  (22←$SSH_CIDR, $API_PORT←0.0.0.0/0)
+  보안그룹       $SG_ID  (22←$SSH_CIDR, $API_PORT←$EMR_CF_PREFIX_LIST)
   프로파일       $API_PROFILE_NAME
   루트 볼륨      ${API_VOLUME_GB}GB gp3 (DeleteOnTermination=true)
   저장소         $API_REPO_URL @ $API_GIT_REF
@@ -235,7 +242,8 @@ cat <<DONE
 
 빌드(git clone + docker build)에 2~4분 걸린다. 그 전까지 /health 는 응답하지 않는다.
 
-  확인:  curl http://$IP:$API_PORT/health
+  확인:  8000 은 CloudFront 엣지만 열려 있다. 직접 curl 은 막힌다 —
+         https://<배포도메인>/api/gpu/status 로 확인하라 (SSH 는 열려 있다)
   로그:  ssh -i ~/.ssh/$API_KEY_NAME.pem ec2-user@$IP \\
            'sudo journalctl -u emr-api -n 50; sudo tail -50 /var/log/emr-api-userdata.log'
   종료:  aws ec2 terminate-instances --instance-ids $IID
