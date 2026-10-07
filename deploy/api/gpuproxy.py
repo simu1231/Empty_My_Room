@@ -23,6 +23,7 @@ ec2:DescribeInstances 로 ASG 이름 태그를 보고 고른다. DynamoDB 자가
 쪽)에서 한다. 그래서 필터를 느슨하게 쓰면 **남의 인스턴스를 프록시 대상으로
 고르는** 사고가 난다 — ASG 이름과 Project 태그를 **둘 다** 본다.
 """
+import base64
 import os
 import threading
 import time
@@ -104,6 +105,10 @@ def worker_ip() -> str | None:
         ip = None
     with _lock:
         _cache = (now + (HIT_TTL if ip else MISS_TTL), ip)
+        # 워커가 사라졌다 — 다음에 뜨는 놈은 새 프로세스라 다시 워밍이 필요하다.
+        # IP 는 재사용될 수 있으므로 "본 적 있는 IP"를 영구히 들고 있으면 안 된다.
+        if ip is None:
+            _warmed.clear()
     return ip
 
 
@@ -125,7 +130,9 @@ def probe(ip: str) -> dict | None:
         r = httpx.get(f"http://{ip}:{GPU_PORT}/health", timeout=2.0)
         if r.status_code != 200:
             return None
-        return r.json()
+        health = r.json()
+        maybe_warm(ip, health)
+        return health
     except Exception:
         return None
 
@@ -149,6 +156,64 @@ def ready(health: dict | None) -> bool:
     아니라서, "기동이 끝났고 아직 살아 있다"를 정확히 뜻하는 유일한 값이다.
     """
     return bool(health) and health.get("extract") == "loaded"
+
+
+# ── 첫 추론 워밍업 ──────────────────────────────────────────────────────
+# SAM2 의 첫 추론은 CUDA 커널 컴파일 때문에 35.27초가 걸린다(2026-10-08 실측).
+# 모델 로딩(1.9초)과는 다른 비용이고, **프로세스당 한 번**만 낸다 — TTL 로
+# 모델을 내렸다 다시 올려도 다시 내지 않는다(같은 날 2차 측정 2.17초).
+#
+# 그 한 번을 사용자가 내면 첫 클릭이 35초다. UPSTREAM_TIMEOUT(25초)보다 길어서
+# 503 으로 끝나고, 사용자 눈에는 "마스크 로딩 중에서 안 끝남"으로 보인다.
+# 그래서 워커가 준비되는 순간 우리가 대신 한 번 낸다.
+#
+# 올바른 자리는 백엔드의 lifespan(sd_warm 옆)이다. 거기는 AMI 안이라 고치려면
+# 재빌드가 필요해서 여기에 둔다. 다음 AMI 를 구울 때 옮기고 이건 걷어낸다.
+WARM = os.getenv("EMR_GPU_WARM", "1") != "0"
+WARM_TIMEOUT = float(os.getenv("EMR_GPU_WARM_TIMEOUT", "180"))
+
+# 64x64 PNG. SAM2 가 내부에서 1024 로 리사이즈하므로 크기는 중요하지 않다.
+# 이미지를 코드에 박는 이유는 API 이미지에 PIL 이 없어서다 — 의존성을 하나
+# 늘리느니 166바이트를 박는 게 싸다.
+_WARM_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAbUlEQVR42u3ZsQ3A"
+    "IAwEQIIYjSJjeSwKhmMCChcRIrrvLflkd/9ERLk5tVweAAAAAAAAAAAAgHNp2YF3"
+    "zq93Gr17IQAAAAAAAAAAAAAAAAAAAAAAAAAAAACAfdIFR6p9cAEAAAAAAAAAAIBf"
+    "AxZrRAZEbRuF9wAAAABJRU5ErkJggg==")
+
+_warmed: set[str] = set()
+
+
+def _warm(ip: str):
+    t0 = time.time()
+    try:
+        # 전용 타임아웃이다. 공용 클라이언트의 25초를 쓰면 워밍업 자신이 25초에
+        # 끊겨 목적을 못 이룬다. 사용자 요청 경로의 25초는 건드리지 않는다.
+        r = httpx.post(f"http://{ip}:{GPU_PORT}/api/segment/mask",
+                       files={"image": ("warm.png", _WARM_PNG, "image/png")},
+                       data={"points": "[[32, 32]]"},
+                       timeout=WARM_TIMEOUT)
+        print(f"[gpuproxy] 워밍업 {ip} → {r.status_code} ({time.time()-t0:.1f}초)")
+    except Exception as e:
+        # 실패해도 아무것도 하지 않는다. 워밍업은 **빠르게 하는 것**이지
+        # 가능하게 하는 게 아니다 — 실패하면 첫 클릭이 전처럼 느릴 뿐이고,
+        # 그건 이 코드가 없던 때와 같은 상태다.
+        print(f"[gpuproxy] 워밍업 {ip} 실패({type(e).__name__}: {e}) — 무시한다")
+
+
+def maybe_warm(ip: str, health: dict | None):
+    """워커가 처음 준비된 순간 딱 한 번, 백그라운드로 더미 추론을 보낸다.
+
+    호출자(probe)는 결과를 기다리지 않는다. 폴링 경로에 있는 함수라 여기서
+    붙들면 /api/gpu/status 가 통째로 35초 느려진다.
+    """
+    if not WARM or not ready(health):
+        return
+    with _lock:
+        if ip in _warmed:
+            return
+        _warmed.add(ip)
+    threading.Thread(target=_warm, args=(ip,), daemon=True).start()
 
 
 def forward(method: str, path: str, *, content: bytes, headers: dict,
