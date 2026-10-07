@@ -134,6 +134,22 @@ services:
       OMNI3D_URL: http://omni3d:8003
       # SAM2/LaMa 안전망 TTL. 기본값과 같지만 여기 적어 두면 재굽기 없이 조정된다.
       EMR_SEG_TTL_SEC: ${EMR_SEG_TTL_SEC:-600}
+      # ── SD 가중치 ──────────────────────────────────────────────────────
+      # fp16 safetensors 트리. tools/convert_sd_fp16.py 가 개발 PC 에서 만들고,
+      # pack-envs.sh 가 hfcache.tar 에 담아 AMI 로 보낸다. 이 값이 없으면
+      # sd_service.py 가 예전처럼 HF 저장소 ID(fp32 pickle)를 읽는다.
+      EMR_SD_PATH: ${EMR_SD_PATH:-${EMR_ROOT:-${HOME}}/.cache/huggingface/emr-sd-fp16}
+      # 선반입. 개발 PC 는 NVMe + 따뜻한 캐시라 로드가 5.3초라서 기본 꺼짐이고,
+      # AWS 워커는 userdata 가 1 로 켠다(20-launch-template.sh).
+      EMR_SD_WARM: ${EMR_SD_WARM:-0}
+      # 통독 후 페이지 캐시를 버릴지. **단계 4 측정으로 정한다** —
+      # 왜 추측으로 정하면 안 되는지는 sd_warm.py 머리말에.
+      EMR_SD_WARM_DROP: ${EMR_SD_WARM_DROP:-0}
+      # 허브 메타데이터 왕복을 없앤다. 가중치는 전부 로컬에 있는데도
+      # from_pretrained 가 매번 huggingface.co 를 찔러 본다 — 네트워크가 느리거나
+      # 막히면 그 대기가 로드 시간에 그대로 더해진다.
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
     ports:
       - "8001:8001"
     # 이미지에 curl 이 없다. 사이드카 둘과 같은 방식으로 python 으로 짠다.

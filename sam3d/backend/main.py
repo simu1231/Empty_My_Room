@@ -40,6 +40,12 @@ async def lifespan(app: FastAPI):
     # 67초까지 튀는 걸 실측했다. inpaint 라우터가 필요할 때 로드하고 끝나면 해제한다.
     app.state.sd = None
 
+    # 다만 **디스크 읽기**는 미리 해 둔다. GPU 에 올리지 않으므로 VRAM 과
+    # 무관하고, 첫 인페인팅의 553초(실측)를 세그먼트 작업 시간에 묻는다.
+    # 왜 553초인지, 왜 캐시 해제 여부를 측정으로 정하는지는 sd_warm.py 머리말에.
+    from services import sd_warm
+    sd_warm.start(app)
+
     # Extract 서비스 로드
     try:
         from services.extract_service import ExtractService
@@ -140,9 +146,18 @@ def health():
     return {
         "sam2":    "loaded" if getattr(app.state, 'sam2',    None) else "not_loaded",
         "lama":    "loaded" if getattr(app.state, 'lama',    None) else "not_loaded",
-        "sd":      "loaded" if getattr(app.state, 'sd',      None) else "not_loaded",
         "extract": "loaded" if getattr(app.state, 'extract', None) else "not_loaded",
-        "sam3d":   "loaded" if getattr(app.state, 'sam3d',   None) else "not_loaded",
+        # SD 와 SAM3D 는 app.state 에 올리지 않는다 — 요청마다 만들고 버린다.
+        # 전에는 두 키가 "loaded"/"not_loaded" 로 나왔는데 설정되는 곳이 없어
+        # **영구히 not_loaded** 였다. 상태를 묻는 사람을 속이므로 말을 바꾼다.
+        "sd":      "per_request",
+        "sam3d":   "per_request",
+        # SD 가중치 선반입 상태. API 프록시가 인페인팅 요청을 흘려보낼지
+        # 503(준비중)으로 돌릴지 판단하는 값이다.
+        #   None  : 선반입 안 함(해당 없음) — 흘려보낸다
+        #   False : 진행 중 — 503 으로 돌린다
+        #   True  : 완료 — 흘려보낸다
+        "sd_warm": getattr(app.state, 'sd_warm', None),
         "residency": getattr(app.state, 'residency', None).status()
                      if getattr(app.state, 'residency', None) else None,
         # 세션 알림이 켜져 있는지. 배포에서 "리퍼가 왜 안 내려가나 / 왜 세션

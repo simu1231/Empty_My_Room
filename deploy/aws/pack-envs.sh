@@ -244,13 +244,35 @@ done <<< "$CKPTS"
 # zero123plus-v1.2(5.2GB)와 TripoSR(1.6GB)은 뺀다. 둘 다 이 서비스가 부르지
 # 않는다 — 메시는 SAM3D 가 만든다. 개발 PC의 원본은 그대로 두고 AMI 에만 안
 # 넣는다(사용자 결정). 업로드·다운로드·스냅샷에서 각각 6.8GB 가 빠진다.
-# SD 인페인팅(4.0GB)과 canny ControlNet(1.4GB)은 **남긴다** — inpaint 라우터가
-# LaMa 결과를 다듬는 데 실제로 쓴다.
-echo "▶ HF 캐시 (약 21GB, 압축 안 함 — 몇 분 걸립니다)"
+# SD 인페인팅과 canny ControlNet 은 **쓴다** — inpaint 라우터가 LaMa 결과를
+# 다듬는 데 실제로 부른다. 다만 담는 건 원본이 아니라 fp16 변환본이다.
+#
+# emr-sd-fp16/ 은 tools/convert_sd_fp16.py 가 개발 PC 에서 만든 2.7GB
+# safetensors 트리다. huggingface/ 아래에 있으니 이 tar 에 자동으로 들어간다.
+# 대신 변환의 입력이었던 fp32 pickle 원본 5.3GB 를 뺀다 — 둘 다 담으면 tar 가
+# 2.7GB 커지기만 하고, 인스턴스에서 읽히는 쪽은 어차피 fp16 하나다.
+# 개발 PC 의 원본은 그대로 둔다(재변환과 폴백에 필요하다).
+#
+# 빼기 전에 변환본이 실제로 있는지 본다. 없는데 원본만 빼면 인스턴스가
+# SD 가중치 없이 떠서 첫 인페인팅에서야 터진다 — 그걸 AMI 굽고 난 뒤에
+# 알게 되는 건 $2 짜리 실수다.
+SD_FP16="$SRC_ROOT/.cache/huggingface/emr-sd-fp16"
+SD_EXCLUDE=()
+if [ -f "$SD_FP16/sd-inpainting/model_index.json" ]; then
+  SD_EXCLUDE=(--exclude='models--runwayml--stable-diffusion-inpainting'
+              --exclude='models--lllyasviel--control_v11p_sd15_canny')
+  echo "    SD fp16 변환본 확인 — fp32 원본 5.3GB 제외"
+else
+  echo "    ⚠ $SD_FP16 없음 — fp32 원본을 그대로 담는다(5.3GB 더 큼)"
+  echo "      먼저 돌리세요: python3 tools/convert_sd_fp16.py"
+fi
+
+echo "▶ HF 캐시 (약 18GB, 압축 안 함 — 몇 분 걸립니다)"
 if uploaded "hfcache.tar"; then echo "    (이미 올라가 있음, 건너뜀)"; else
   tar --exclude=token \
       --exclude='models--sudo-ai--zero123plus*' \
       --exclude='models--stabilityai--TripoSR' \
+      "${SD_EXCLUDE[@]}" \
       -cf "$STAGE/hfcache.tar" -C "$SRC_ROOT/.cache" huggingface
   put "$STAGE/hfcache.tar" "hfcache.tar"
   rm -f "$STAGE/hfcache.tar"

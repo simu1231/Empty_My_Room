@@ -77,6 +77,8 @@ sed -e "s|__REGION__|${AWS_REGION}|g" \
     -e "s|__REPO_DIR__|${EMR_REPO_DIR}|g" \
     -e "s|__EMR_ROOT__|${EMR_ROOT}|g" \
     -e "s|__IMAGE_TAG__|${EMR_IMAGE_TAG}|g" \
+    -e "s|__SD_WARM__|${EMR_SD_WARM}|g" \
+    -e "s|__SD_WARM_DROP__|${EMR_SD_WARM_DROP}|g" \
     -e "s|__WARM_JOBS__|${EMR_WARM_JOBS}|g" \
     -e "s|__WARM_SKIP__|${EMR_WARM_SKIP}|g" \
     -e "s|__WARM_BG_DIRS__|${EMR_WARM_BG_DIRS}|g" \
@@ -88,7 +90,7 @@ sed -e "s|__REGION__|${AWS_REGION}|g" \
 # 치환이 빠지면 인스턴스가 "__IMAGE_TAG__" 라는 태그의 이미지를 찾다 죽는다.
 # 부팅 때 죽으면 회수는 되지만(요금은 안 새지만) 원인을 찾으러 인스턴스 로그를
 # 뒤져야 한다. 여기서 막는 편이 훨씬 싸다.
-if grep -n '__[A-Z_]*__' /tmp/emr-userdata.rendered.sh; then
+if grep -n '__[A-Z0-9_]*__' /tmp/emr-userdata.rendered.sh; then
   echo "✗ 치환되지 않은 자리표시자가 남았습니다(위 줄) — config.sh 를 확인하세요."
   exit 1
 fi

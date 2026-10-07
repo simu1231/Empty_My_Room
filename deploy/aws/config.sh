@@ -363,6 +363,29 @@ export EMR_VOLUME_GB=${EMR_VOLUME_GB:-150}
 # 시간만큼 비례 과금). 첫 실부팅 로그의 [warm] 줄을 보고 조정한다.
 export EMR_VOLUME_THROUGHPUT=${EMR_VOLUME_THROUGHPUT:-250}
 
+# ── SD 가중치 선반입 ────────────────────────────────────────────────────
+# 첫 인페인팅의 SD 로드가 인스턴스에서 553초 걸렸다. 같은 가중치를 개발 PC 에서
+# 읽으면 5.3초다 — 100배 차이는 역직렬화가 아니라 **디스크 읽기**에서 난다.
+# 그래서 가중치 파일을 세그먼트 작업이 도는 동안 미리 통독해 둔다. GPU 에
+# 올리지 않으므로 VRAM 과 무관하고, 들키는 비용은 RAM 과 디스크 대역폭뿐이다.
+export EMR_SD_WARM=${EMR_SD_WARM:-1}
+
+# 통독한 페이지를 캐시에 남길지 버릴지.
+#
+#   0 = 남긴다. 페이지 캐시가 따뜻해져서 실제 로드가 메모리에서 끝난다.
+#       대신 RAM 2.7GB 를 쓴다 — SAM3D 콜드 RSS 가 15.2GB 인 32GB 머신에서
+#       이게 안전한지는 아직 모른다.
+#   1 = 버린다(posix_fadvise DONTNEED). 선반입의 효과는 "EBS 블록을 S3 에서
+#       끌어와 볼륨에 실체화"하는 것뿐이고 RAM 비용은 0 이다.
+#
+# **둘 중 뭐가 맞는지는 측정으로 정한다.** 증거가 양쪽으로 갈린다 —
+# 실측 11.7MB/s 대 프로비저닝 250MB/s 는 EBS 지연 로딩을 가리키지만,
+# sam3d 1230초 조사는 "실체화된 볼륨도 캐시만 비우면 1201초"라고 결론 났다.
+# 단계 4 에서 sd_warm.measure() 를 한 번 돌려 정한다(약 $0.12).
+# 그 전까지는 0 이다 — 캐시를 남겨서 손해 보는 건 RAM 2.7GB 지만, 버려서
+# 틀리면 553초가 그대로 돌아온다.
+export EMR_SD_WARM_DROP=${EMR_SD_WARM_DROP:-0}
+
 # ── 가디언(요금 폭주 차단) ──────────────────────────────────────────────
 # 리퍼는 컴포즈 스택 안의 컨테이너다. 그래서 컴포즈가 안 뜨면 리퍼도 없고,
 # ASG 헬스체크는 EC2(켜져 있는지)만 보므로 인스턴스가 일 없이 계속 과금된다.
@@ -467,6 +490,16 @@ export API_INSTANCE_TYPE=${API_INSTANCE_TYPE:-t4g.small}
 # 큐에 남아 다음 워커가 집어가지만, API 가 없으면 큐에 넣을 사람이 없다.
 export API_VOLUME_GB=${API_VOLUME_GB:-8}
 export API_PORT=${API_PORT:-8000}
+
+# API → GPU 워커 중계(gpuproxy.py). 워커 백엔드가 듣는 포트이고, 보안그룹에서
+# emr-api-sg 에만 연다. 8002/8003(uLayout/Omni3D)은 **열지 않는다** — 백엔드가
+# 컨테이너 네트워크 안에서 부르는 포트지 바깥에서 부를 포트가 아니다.
+export GPU_PORT=${GPU_PORT:-8001}
+
+# /api/prewarm 의 IP 당 호출 간격. 인증이 없는 엔드포인트가 ASG 를 건드리므로
+# 들어오는 쪽에서도 한 번 센다. capacity.py 의 30초 창은 전역이라 호출 자체를
+# 막지는 못한다 — 막히는 건 AWS 호출이지 이 서버의 일이 아니다.
+export PREWARM_RATE=${PREWARM_RATE:-30}
 
 # AMI/서브넷은 비워 두면 50-api.sh 가 조회해서 채운다. ssm:GetParameter 가
 # AccessDenied 라 AL2023 공식 파라미터 경로를 못 쓴다 — describe-images 로
