@@ -186,6 +186,30 @@ echo "  후보 AZ: $(echo "$SUBNETS" | awk '{printf "%s ", $2}')"
 # instance-terminated-no-capacity 로 잃었고, 그때 2b/2c 는 애초에 거부당해
 # 2a 한 곳에만 떠 있던 상태였다. 아끼는 건 시간당 $0.51 인데 거는 건 두 시간이다.
 
+# ── 자동 종료 안전장치 ───────────────────────────────────────────────────
+# 빌더는 ASG 밖이라 **아무도 회수해주지 않는다.** 지금까지 이 스크립트는
+# "끝나면 반드시 terminate 를 돌릴 것"이라는 사람의 기억에만 기대고 있었고,
+# 그 기억은 실제로 한 번 틀렸다 — 폴링이 끝난 줄 알고 자리를 떴다가 16시간을
+# 켜 둬서 $1.51 예상이 $19.39 가 됐다.
+#
+# 그래서 두 겹으로 막는다.
+#   (1) --instance-initiated-shutdown-behavior terminate
+#       인스턴스 안에서 shutdown 을 걸면 stop 이 아니라 **종료**된다.
+#       이게 없으면 shutdown 은 stopped 로 멈출 뿐이고, EBS 150GB 요금은
+#       계속 나간다(월 $13.68). 겉보기엔 꺼진 것 같아서 더 위험하다.
+#   (2) 빌더 안에서 `sudo shutdown -h +$EMR_BUILDER_DEADLINE_MIN`
+#       아래 안내문 1-b 에 적어 둔다. 접속하자마자 **제일 먼저** 건다.
+#
+# 워커라면 이렇게 못 한다. ASG 가 shutdown 을 unhealthy 로 읽고 교체
+# 인스턴스를 띄워서, 끄려다 오히려 새로 켜는 꼴이 된다(self-retire.sh 참고).
+# 빌더는 ASG 밖이라 shutdown 이 그대로 먹는다.
+#
+# 360분의 근거: 예상 최대 4시간(복원 1~2h + bake 20m + smoke/verify + 스냅샷
+# 대기) 에 여유 2시간. **정각에 터지면 하던 작업을 잃는다.** 길어질 것 같으면
+# 빌더 안에서 `sudo shutdown -c` 로 끄고 다시 건다 — 끄기만 하고 다시 안
+# 거는 게 제일 흔한 실수다.
+BUILDER_DEADLINE_MIN=${EMR_BUILDER_DEADLINE_MIN:-360}
+
 MKT='{"MarketType":"spot","SpotOptions":{"SpotInstanceType":"one-time","InstanceInterruptionBehavior":"terminate"}}'
 MKT_LABEL="스팟"
 MKT_FEE="스팟 g6.xlarge 약 \$0.48/h — 4시간이면 \$2 안팎 (중간 회수 위험 있음)"
@@ -212,6 +236,7 @@ cat <<PLAN
   대략 요금        $MKT_FEE
 ────────────────────────────────────────────────────────────
   $MKT_WARN
+  자동 종료        인스턴스 안에서 shutdown -h +${BUILDER_DEADLINE_MIN}분 (아래 1-b)
   끝나면 반드시:  bash $0 terminate
 ────────────────────────────────────────────────────────────
 
@@ -238,6 +263,7 @@ for t in $TYPES; do
         --block-device-mappings "$BDM" \
         ${MKT:+--instance-market-options "$MKT"} \
         --metadata-options 'HttpTokens=required,HttpPutResponseHopLimit=2' \
+        --instance-initiated-shutdown-behavior terminate \
         --tag-specifications \
           "ResourceType=instance,Tags=[{Key=Name,Value=$BUILDER_NAME},{Key=Project,Value=emr}]" \
           "ResourceType=volume,Tags=[{Key=Project,Value=emr}]" \
@@ -266,6 +292,13 @@ cat <<NEXT
 
   1) 접속 (sshd가 뜰 때까지 20~30초 걸릴 수 있습니다)
        ssh -i $KEY_FILE ubuntu@$IP
+
+  1-b) **접속하자마자 제일 먼저** 자동 종료를 겁니다. 다른 걸 먼저 하면
+       거는 걸 잊습니다 — 잊은 채로 자면 하룻밤에 \$24 입니다.
+       sudo shutdown -h +$BUILDER_DEADLINE_MIN
+     (이 인스턴스는 shutdown-behavior=terminate 로 떴습니다. 멈추는 게
+      아니라 종료되고 EBS 150GB 도 같이 사라집니다.)
+     남은 시간 확인·연장:  sudo shutdown -c && sudo shutdown -h +120
 
   2) **반드시 tmux 안에서** 부트스트랩을 돌립니다. 1~2시간 걸리는데,
      그냥 돌리면 SSH가 한 번 끊길 때 같이 죽습니다.
