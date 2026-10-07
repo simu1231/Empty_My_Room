@@ -9,7 +9,10 @@ WORKDIR /app
 COPY api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY api/main.py api/capacity.py ./
+# 파일을 하나씩 적는다. api/ 통째로 복사하면 __pycache__ 나 로컬 실험 파일이
+# 같이 들어간다. 대신 **새 모듈을 만들 때 여기 추가하는 걸 잊으면** 이미지에
+# 안 들어가고, 컨테이너가 ImportError 로 죽는다.
+COPY api/main.py api/capacity.py api/gpuproxy.py api/colors.py ./
 # 워커와 **같은** 검증 코드. 복사본이 아니라 같은 파일을 넣는다.
 COPY worker/jobspec.py ./
 

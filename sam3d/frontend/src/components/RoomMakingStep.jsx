@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
-import { API } from '../utils/api'
+import { API, gpuFetch } from '../utils/api'
 import { callModel, progressText } from '../utils/jobs'
 import toast from 'react-hot-toast'
 
@@ -34,11 +34,11 @@ export default function RoomMakingStep() {
       // CPU 연산이라 상시 서버에서 바로 처리한다 — 이 둘까지 큐에 넣으면
       // GPU가 깨어날 때까지 색상 미리보기도 못 보여주게 된다.
       const [colorRes, layoutRes, rectifyRes] = await Promise.allSettled([
-        fetch(`${API.generate3d.replace('generate3d', 'extract-colors')}`, { method: 'POST', body: colorForm }),
+        fetch(API.extractColors, { method: 'POST', body: colorForm }),
         callModel('roomLayout', layoutForm, {
           onProgress: (p) => setLoading(true, `방 치수 추정 — ${progressText(p)}`),
         }),
-        fetch(API.rectifyTextures, { method: 'POST', body: rectifyForm }),
+        gpuFetch(API.rectifyTextures, { method: 'POST', body: rectifyForm }),
       ])
 
       if (colorRes.status !== 'fulfilled') throw new Error('색상 분석 요청 실패')

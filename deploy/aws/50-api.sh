@@ -110,6 +110,34 @@ run aws ec2 authorize-security-group-ingress --group-id "$SG_ID" \
 run aws ec2 authorize-security-group-ingress --group-id "$SG_ID" \
       --protocol tcp --port "$API_PORT" --cidr 0.0.0.0/0
 
+# ── 워커 → API 연결 통로 ────────────────────────────────────────────────
+# API 서버가 GPU 워커의 :8001 로 요청을 중계한다(gpuproxy.py). 그러려면 워커
+# 보안그룹이 8001 을 열어야 하는데, **CIDR 이 아니라 SG 참조로** 연다.
+#
+# 왜 SG 참조인가: 워커는 스케일투제로라 뜰 때마다 IP 가 바뀐다. CIDR 로 열면
+# 그 IP 를 매번 갱신하거나, 귀찮아서 0.0.0.0/0 으로 열게 된다. SG 참조는
+# "emr-api-sg 가 붙은 인스턴스"를 가리키므로 IP 가 바뀌어도 그대로 맞는다.
+#
+# 8002(uLayout)/8003(Omni3D)은 **열지 않는다.** 백엔드가 컨테이너 네트워크
+# 안에서 부르는 포트지 바깥에서 부를 포트가 아니다.
+if [ -n "${EMR_SG_ID:-}" ]; then
+  echo "▶ 워커 보안그룹에 8001 허용 (출발지: $SG_ID)"
+  # run() 을 쓰지 않는다 — 실패를 "이미 있음"으로 삼켜야 해서 종료코드를 직접
+  # 다룬다. 대신 DRY_RUN 분기를 여기서 똑같이 쓴다.
+  [ "$DRY_RUN" = "0" ] || echo "    [계획] authorize-security-group-ingress $EMR_SG_ID tcp/${GPU_PORT} ← $SG_ID"
+  [ "$DRY_RUN" = "0" ] && \
+  aws ec2 authorize-security-group-ingress \
+    --group-id "$EMR_SG_ID" \
+    # 설명은 ASCII 만 된다. 한글을 넣으면 InvalidParameterValue 로 거부된다
+    # (허용 집합: a-zA-Z0-9. _-:/()#,@[]+=&;{}!$*).
+    --ip-permissions "IpProtocol=tcp,FromPort=${GPU_PORT},ToPort=${GPU_PORT},UserIdGroupPairs=[{GroupId=$SG_ID,Description='emr-api-sg proxy to backend 8001'}]" \
+    >/dev/null 2>&1 && echo "  추가됨" || echo "  (이미 있음)"
+else
+  echo "⚠ EMR_SG_ID 가 없어 워커 8001 규칙을 건너뜁니다."
+  echo "  이 상태로 두면 API 가 워커를 찾아도 연결이 타임아웃됩니다:"
+  echo "    EMR_SG_ID=sg-xxxx bash $0"
+fi
+
 # ── 유저데이터 ──
 # config.sh 의 값을 치환해 넣는다. 워커와 같은 방식이고, 같은 16KB 한도를 받는다
 # (run-instances 도 한도가 같다). 지금은 4.3KB 라 여유가 넉넉하다.
@@ -126,10 +154,13 @@ sed -e "s|__REPO_URL__|$API_REPO_URL|g" \
     -e "s|__ASG_SPOT__|$ASG_SPOT|g" \
     -e "s|__CORS_ORIGINS__|$CORS_ORIGINS|g" \
     -e "s|__NUDGE__|$CAPACITY_NUDGE_INTERVAL|g" \
+    -e "s|__PROJECT__|${PROJECT:-emr}|g" \
+    -e "s|__GPU_PORT__|${GPU_PORT:-8001}|g" \
+    -e "s|__PREWARM_RATE__|${PREWARM_RATE:-30}|g" \
     ./api-userdata.sh > /tmp/emr-api-userdata.rendered.sh
-grep -q '__[A-Z_]*__' /tmp/emr-api-userdata.rendered.sh && {
+grep -q '__[A-Z0-9_]*__' /tmp/emr-api-userdata.rendered.sh && {
   echo "✗ 치환되지 않은 자리표시자가 남았습니다:"
-  grep -o '__[A-Z_]*__' /tmp/emr-api-userdata.rendered.sh | sort -u; exit 1; }
+  grep -o '__[A-Z0-9_]*__' /tmp/emr-api-userdata.rendered.sh | sort -u; exit 1; }
 bash -n /tmp/emr-api-userdata.rendered.sh || { echo "✗ 렌더된 유저데이터 문법 오류"; exit 1; }
 RAW=$(wc -c < /tmp/emr-api-userdata.rendered.sh)
 [ "$RAW" -le 16384 ] || { echo "✗ 유저데이터 ${RAW} 바이트 — 16384 한도 초과"; exit 1; }

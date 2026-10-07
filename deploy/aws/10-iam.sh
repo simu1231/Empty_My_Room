@@ -156,6 +156,12 @@ cat > /tmp/emr-api-policy.json <<JSON
       "Resource": "*"
     },
     {
+      "Sid": "FindGpuWorker",
+      "Effect": "Allow",
+      "Action": "ec2:DescribeInstances",
+      "Resource": "*"
+    },
+    {
       "Sid": "SetCapacityOnSpotGroupOnly",
       "Effect": "Allow",
       "Action": "autoscaling:SetDesiredCapacity",
@@ -167,6 +173,17 @@ cat > /tmp/emr-api-policy.json <<JSON
 JSON
 # API에 TerminateInstanceInAutoScalingGroup 을 주지 않는 게 요점이다.
 # API는 용량을 '올리기만' 한다. 내리는 건 작업 중인지 아는 리퍼만 한다.
+#
+# FindGpuWorker 의 Resource:"*" 는 넓어 보이지만 좁힐 방법이 없다.
+# ec2:DescribeInstances 는 **자원 수준 권한도 태그 조건 키도 지원하지 않는다**
+# (AWS 서비스 권한 참조의 Describe* 계열 공통 제약이다). Condition 으로
+# Project=emr 을 걸면 평가할 대상이 없어서 **모든 호출이 거부된다** — 좁히려다
+# 기능이 통째로 죽는다.
+#
+# 그래서 좁히기는 애플리케이션 쪽(gpuproxy.py)에서 한다. 거기서 ASG 이름과
+# Project 태그를 **둘 다** 본다. 읽기 전용이고 RunInstances/TerminateInstances
+# 는 여전히 없으므로, 최악의 경우 새는 건 '이 계정에 어떤 인스턴스가 있는지'
+# 라는 메타데이터뿐이다.
 
 aws iam put-role-policy --role-name "$API_ROLE" \
   --policy-name "${API_ROLE}-policy" \

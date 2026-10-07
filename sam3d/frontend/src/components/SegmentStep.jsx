@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { useStore } from '../store/useStore'
 import toast from 'react-hot-toast'
-import { API } from '../utils/api'
+import { API, gpuFetch } from '../utils/api'
 
 const LABEL_COLORS = [
   'rgba(255,80,80,0.45)', 'rgba(80,160,255,0.45)', 'rgba(80,255,120,0.45)',
@@ -111,7 +111,7 @@ export default function SegmentStep() {
       const form = new FormData()
       form.append('image', file)
       form.append('points', JSON.stringify(labelPoints.map(p => [p.x, p.y])))
-      const res = await fetch(API.segment, { method: 'POST', body: form })
+      const res = await gpuFetch(API.segment, { method: 'POST', body: form })
       const data = await res.json()
       if (data.success) {
         setMaskPreviews(prev => ({ ...prev, [label]: data.mask_b64 }))
@@ -184,7 +184,7 @@ export default function SegmentStep() {
       form1.append('image', originalFile)
       form1.append('points', JSON.stringify(clickPoints.map(p => [p.x, p.y])))
       form1.append('labels', JSON.stringify(clickPoints.map(p => p.label)))
-      const res1 = await fetch(API.segment, { method: 'POST', body: form1 })
+      const res1 = await gpuFetch(API.segment, { method: 'POST', body: form1 })
       const data1 = await res1.json()
       if (!data1.success) throw new Error('마스크 생성 실패')
       maskB64    = data1.mask_b64
@@ -203,7 +203,7 @@ export default function SegmentStep() {
     form2.append('image', resizedFile)
     form2.append('mask', maskFile)
 
-    const res2 = await fetch(API.inpaint, {
+    const res2 = await gpuFetch(API.inpaint, {
       method: 'POST',
       body: form2,
     })
@@ -222,7 +222,7 @@ export default function SegmentStep() {
     form3.append('points', JSON.stringify(clickPoints.map(p => [p.x, p.y])))
     form3.append('labels', JSON.stringify(clickPoints.map(p => p.label || '기타')))
 
-    const res3 = await fetch(API.extract, {
+    const res3 = await gpuFetch(API.extract, {
       method: 'POST',
       body: form3,
     })
@@ -243,6 +243,8 @@ export default function SegmentStep() {
     //
     // await 하지 않고 실패도 삼킨다 — 메모리 회수는 다음 단계로 넘어가는 것보다
     // 급하지 않고, 실패해도 안전망이 결국 회수한다.
+    // 해제는 정리 요청이다. GPU 가 없으면 해제할 것도 없으므로 gpuFetch 의
+    // 재시도(최대 10분)에 태우지 않는다 — 떠나는 화면이 GPU 를 깨우면 안 된다.
     fetch(API.segmentRelease, { method: 'POST' }).catch(() => {})
 
     toast.success(`완료! 빈방 생성 + 가구 ${data3.furniture.length}개 추출 🎉`)

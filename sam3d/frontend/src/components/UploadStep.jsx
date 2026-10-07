@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { useStore } from '../store/useStore'
+import { prewarmGpu } from '../utils/api'
 
 const DB_NAME = 'EmptyMyRoomDesigns', DB_VER = 1, STORE = 'designs'
 function openDB() {
@@ -53,6 +54,10 @@ export default function UploadStep() {
 
   const onDrop = useCallback((files) => {
     if (!files.length) return
+    // 사진이 들어온 순간 GPU 를 깨운다. 다음 화면에서 사용자가 가구를 찍는
+    // 수십 초가 부팅과 겹치면 체감 대기가 그만큼 사라진다. 실패는 무시하고,
+    // 이미 떠 있으면 서버가 알아서 아무것도 안 한다(capacity.py 의 30초 창).
+    prewarmGpu()
     setOriginalImage(files[0])
     setStep('segment')
   }, [setOriginalImage, setStep])

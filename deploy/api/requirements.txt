@@ -2,3 +2,9 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-multipart==0.0.20
 boto3==1.35.90
+# GPU 워커로 요청을 중계한다(gpuproxy.py). requests 가 아니라 httpx 인 이유는
+# 커넥션 풀을 명시적으로 들고 있을 수 있고, 연결/전체 타임아웃을 따로 줄 수
+# 있어서다 — "연결은 3초, 응답은 25초"를 requests 로는 깔끔히 못 쓴다.
+httpx==0.28.1
+# 색/텍스처 추출(colors.py). numpy 는 일부러 안 넣는다 — 이유는 colors.py 에.
+pillow==11.1.0

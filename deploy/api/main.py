@@ -8,6 +8,12 @@ GPU 워커가 0대일 때도 이 서버만은 항상 떠 있어야 한다. 사�
   1. 접수  : 이미지를 S3에 올리고 SQS에 메시지를 넣은 뒤 job_id를 즉시 반환
   2. 조회  : DynamoDB에서 작업 상태를 읽어 프런트엔드에 알려줌
   3. 전달  : 완료된 결과의 presigned URL 발급
+  4. 중계  : 2단계(대화형 세그먼트/인페인팅) 요청을 GPU 워커 :8001 로 넘김
+  5. 대역  : GPU 가 아직 없거나 준비 중이면 붙들지 않고 503 + Retry-After
+
+4·5 가 뒤에 붙은 이유는 B'(CloudFront 단일 출처) 때문이다. 브라우저가 GPU
+워커의 바뀌는 IP 를 직접 부르던 구조를 여기로 모으면, 워커의 8001 을
+0.0.0.0/0 에 열 필요가 없어지고 CORS 도 통째로 사라진다(같은 출처가 된다).
 
 추론은 절대 여기서 하지 않는다. torch를 import하는 순간 이미지가 수 GB로
 불어나고, 상시 가동이라 그 비용이 매달 그대로 나간다.
@@ -22,10 +28,13 @@ from botocore.config import Config
 from fastapi import FastAPI, HTTPException, Request
 
 import capacity
+import colors
+import gpuproxy
 # 워커와 **같은** 검증 파일. Dockerfile 이 worker/jobspec.py 를 복사해 넣는다.
 import jobspec
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
 
 # ── 설정 ──────────────────────────────────────────────────────────────
 # AWS_ENDPOINT_URL이 있으면 LocalStack(로컬), 없으면 실제 AWS를 본다.
@@ -210,3 +219,183 @@ def get_job(job_id: str):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ── 4. GPU 중계 ───────────────────────────────────────────────────────
+# 1단계(메쉬/레이아웃)는 큐를 거치지만, 2단계는 대화형이라 큐에 넣을 수 없다.
+# 사용자가 마스크를 찍을 때마다 왕복 1~2초 안에 답이 와야 하기 때문이다.
+# 그래서 2단계만 여기서 **동기 중계**한다.
+#
+# 핵심 규약: **GPU 가 없다고 요청을 붙들지 않는다.** 워커 부팅은 7분쯤
+# 걸리는데 그동안 연결을 잡고 있으면 CloudFront(오리진 응답 30초)가 먼저
+# 끊어 버리고, 프런트는 원인을 알 수 없는 502 를 본다. 대신 즉시 503 과
+# Retry-After 를 주고 프런트가 되묻게 한다. 기다림이 **보이는** 기다림이 된다.
+
+# 상태별 재시도 간격. 부팅은 길게(어차피 몇 분), 모델 적재는 중간,
+# 상류 타임아웃은 짧게 — 이미 25초를 쓴 뒤라 사용자는 충분히 기다렸다.
+RETRY_BOOT   = 20
+RETRY_MODELS = 15
+RETRY_BUSY   = 10
+
+# 0대 → 첫 요청 처리 가능까지의 실측 근사치. 프런트가 진행 막대를 그리는 데만
+# 쓴다. 틀려도 동작에는 영향이 없지만, 너무 짧게 잡으면 "곧 된다"고 해 놓고
+# 안 되는 게 반복돼서 사용자가 새로고침한다.
+ETA_BOOT   = 420
+ETA_MODELS = 180
+ETA_SD     = 120
+
+# SD 선반입 중에도 막아야 하는 경로. 인페인팅만 SD 를 쓴다 — 세그먼트는
+# SAM2 만 있으면 되므로 선반입이 끝나기 전에도 받아야 한다. 여기를 넓게
+# 잡으면 선반입의 의미가 사라진다(세그먼트부터 막혀서 결국 기다린다).
+SD_PATHS = ("inpaint",)
+
+
+def _gpu_blocked(path: str) -> JSONResponse | None:
+    """
+    GPU 가 받을 수 없는 상태면 503 응답을, 받을 수 있으면 None 을 돌려준다.
+
+    네 가지 상태를 구분한다. 프런트는 phase 를 그대로 문구로 쓴다 —
+    "준비 중"이라고만 하면 7분을 설명할 수 없다.
+    """
+    ip = gpuproxy.worker_ip()
+    if ip is None:
+        # 0대. 여기서 깨우는 게 중요하다 — 큐를 거치지 않는 경로라 아무도
+        # 안 깨운다. 중복 호출은 capacity.py 가 30초 창으로 막는다.
+        capacity.request_capacity()
+        return JSONResponse(status_code=503,
+                            headers={"Retry-After": str(RETRY_BOOT)},
+                            content={"state": "starting", "phase": "instance_boot",
+                                     "eta_sec": ETA_BOOT,
+                                     "message": "GPU 서버를 켜는 중입니다"})
+
+    health = gpuproxy.probe(ip)
+    if not gpuproxy.ready(health):
+        return JSONResponse(status_code=503,
+                            headers={"Retry-After": str(RETRY_MODELS)},
+                            content={"state": "starting", "phase": "models",
+                                     "eta_sec": ETA_MODELS,
+                                     "message": "모델을 불러오는 중입니다"})
+
+    # sd_warm: None=선반입 안 함 / False=진행 중 / True=완료.
+    # None 이면 막지 않는다 — 선반입이 꺼진 환경(개발 PC)에서 인페인팅이
+    # 영영 503 이 되면 안 된다.
+    if any(p in path for p in SD_PATHS) and health.get("sd_warm") is False:
+        return JSONResponse(status_code=503,
+                            headers={"Retry-After": str(RETRY_MODELS)},
+                            content={"state": "starting", "phase": "sd",
+                                     "eta_sec": ETA_SD,
+                                     "message": "인페인팅 모델을 준비하는 중입니다"})
+    return None
+
+
+@app.get("/api/gpu/status")
+def gpu_status():
+    """
+    프런트가 진행 상태를 그리려고 부른다. 200 으로만 답한다 —
+    이건 "준비됐나?"를 **묻는** 요청이지 처리를 요구하는 요청이 아니다.
+    여기까지 503 으로 답하면 프런트가 재시도 루프를 두 겹으로 돌게 된다.
+    """
+    ip = gpuproxy.worker_ip()
+    if ip is None:
+        return {"state": "stopped", "phase": "none", "eta_sec": ETA_BOOT}
+    health = gpuproxy.probe(ip)
+    if not gpuproxy.ready(health):
+        return {"state": "starting", "phase": "models", "eta_sec": ETA_MODELS}
+    return {"state": "ready", "phase": "ready", "eta_sec": 0,
+            "sd_warm": health.get("sd_warm")}
+
+
+@app.api_route("/api/gpu/{path:path}",
+               methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+async def gpu_proxy(path: str, request: Request):
+    blocked = _gpu_blocked(path)
+    if blocked is not None:
+        return blocked
+
+    body = await request.body()
+    try:
+        r = gpuproxy.forward(request.method, path, content=body,
+                             headers=dict(request.headers),
+                             params=request.query_params)
+    except Exception as e:
+        # 여기 걸리는 건 둘 중 하나다. (a) 25초를 넘겼다 — 첫 SD 로드처럼
+        # 원래 오래 걸리는 작업이거나, (b) 방금까지 있던 워커가 사라졌다
+        # (스팟 회수). 둘 다 "다시 물어보라"가 맞는 답이고, 504 로 주면
+        # CloudFront 가 자기 타임아웃과 섞어서 구분이 안 된다.
+        gpuproxy.invalidate()
+        print(f"[gpu] 중계 실패 {request.method} /{path}: {type(e).__name__}: {e}")
+        return JSONResponse(status_code=503,
+                            headers={"Retry-After": str(RETRY_BUSY)},
+                            content={"state": "busy", "phase": "upstream",
+                                     "eta_sec": RETRY_BUSY,
+                                     "message": "GPU 서버가 아직 응답하지 않습니다"})
+
+    # 상류 헤더를 그대로 흘리면 안 되는 것들이 있다. hop-by-hop 헤더는
+    # 이 연결에서만 의미가 있고, content-length 는 Response 가 다시 센다.
+    drop = {"content-length", "transfer-encoding", "connection",
+            "keep-alive", "content-encoding"}
+    return Response(content=r.content, status_code=r.status_code,
+                    headers={k: v for k, v in r.headers.items()
+                             if k.lower() not in drop},
+                    media_type=r.headers.get("content-type"))
+
+
+# ── 5. 선반입 ─────────────────────────────────────────────────────────
+# 사용자가 사진을 **고른** 순간 GPU 를 깨운다. 그 뒤 사용자는 가구를 클릭해
+# 마스크를 찍느라 최소 수십 초를 쓰는데, 그 시간이 부팅과 겹친다.
+#
+# 추가 GPU 가 뜰 위험은 없다. capacity.request_capacity() 는 desired>0 이고
+# 살아 있는 인스턴스가 있으면 **그대로 반환한다** — 증설은 알람의 몫이다.
+PREWARM_RATE_SEC = int(os.getenv("PREWARM_RATE", "30"))
+_prewarm_seen: dict[str, float] = {}
+
+
+@app.post("/api/prewarm")
+def prewarm(request: Request):
+    """
+    202 로만 답한다. 성공/실패가 아니라 "접수했다"가 정확한 의미다 —
+    실제로 깨어나는지는 /api/gpu/status 가 알려준다.
+
+    IP 당 제한을 두는 이유: 이 엔드포인트는 인증이 없고 ASG 를 건드린다.
+    누가 초당 수백 번 부르면 DescribeAutoScalingGroups 가 요청 제한에 걸려
+    **정상 접수 경로까지 같이 막힌다.** capacity.py 의 30초 창은 전역이라
+    호출 자체는 막지 못한다 — 들어오는 쪽에서도 한 겹 더 센다.
+    """
+    now = time.time()
+    who = request.client.host if request.client else "?"
+    # 메모리 누수 방지. 방문자가 많아도 창이 지난 항목은 바로 버린다.
+    for k in [k for k, t in _prewarm_seen.items() if now - t > PREWARM_RATE_SEC]:
+        _prewarm_seen.pop(k, None)
+    if now - _prewarm_seen.get(who, 0.0) < PREWARM_RATE_SEC:
+        return JSONResponse(status_code=202,
+                            content={"state": "throttled", "eta_sec": ETA_BOOT})
+    _prewarm_seen[who] = now
+
+    capacity.request_capacity()
+    ip = gpuproxy.worker_ip()
+    return JSONResponse(status_code=202,
+                        content={"state": "ready" if ip else "starting",
+                                 "eta_sec": 0 if ip else ETA_BOOT})
+
+
+# ── 6. 색 추출 (GPU 불필요) ───────────────────────────────────────────
+@app.post("/api/extract-colors")
+async def extract_colors(request: Request):
+    """
+    GPU 백엔드에 있던 것을 그대로 옮겨 왔다. 왜 옮겼는지는 colors.py 머리말에.
+    프런트는 /api/gpu/extract-colors 가 아니라 여기를 부른다 — 이 요청 때문에
+    GPU 가 깨어나면 안 되기 때문이다.
+    """
+    form = await request.form()
+    up = form.get("image")
+    if not isinstance(up, StarletteUploadFile):
+        raise HTTPException(400, "image 파일이 필요합니다")
+    data = await up.read()
+    if not data:
+        raise HTTPException(400, "빈 이미지입니다")
+    try:
+        return colors.extract(data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, f"이미지를 읽을 수 없습니다: {type(e).__name__}")

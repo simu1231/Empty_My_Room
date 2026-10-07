@@ -16,8 +16,10 @@
  */
 import { API_BASE } from './api'
 
-// 접수 서버(CPU 상시). 추론 서버와 다른 주소다.
-export const JOB_API_BASE = import.meta.env.VITE_JOB_API_URL || 'http://127.0.0.1:8000'
+// 접수 서버(CPU 상시). CloudFront 가 /api/* 를 이 서버로 보내므로 프런트에서는
+// 같은 출처의 상대경로면 된다 — 주소를 빌드 시점에 박아 둘 이유가 없어졌다.
+// 로컬에서 바로 띄운 API 를 쓰려면 VITE_JOB_API_URL 로 덮는다.
+export const JOB_API_BASE = import.meta.env.VITE_JOB_API_URL || ''
 
 // 큐 경로를 쓸지, 기존 동기 API를 그대로 쓸지. 로컬에서 실제 모델을 돌릴 때는
 // 꺼두고(기본), 배포 환경에서만 켠다. 3단계에서 워커에 실제 모델이 들어간 뒤

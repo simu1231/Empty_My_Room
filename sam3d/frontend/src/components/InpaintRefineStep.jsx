@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { useStore } from '../store/useStore'
-import { API } from '../utils/api'
+import { API, gpuFetch } from '../utils/api'
 import toast from 'react-hot-toast'
 
 export default function InpaintRefineStep() {
@@ -63,7 +63,7 @@ export default function InpaintRefineStep() {
       const form = new FormData()
       form.append('image', file)
       form.append('points', JSON.stringify(pts.map(p => [p.x, p.y])))
-      const res = await fetch(API.segment, { method: 'POST', body: form })
+      const res = await gpuFetch(API.segment, { method: 'POST', body: form })
       const data = await res.json()
       if (data.success) setMaskB64(data.mask_b64)
       else toast.error('마스크 생성 실패: ' + (data.error || '알 수 없는 오류'))
@@ -95,7 +95,7 @@ export default function InpaintRefineStep() {
       const form = new FormData()
       form.append('image', currentFile)
       form.append('mask', maskFile)
-      const res = await fetch(API.inpaint, { method: 'POST', body: form })
+      const res = await gpuFetch(API.inpaint, { method: 'POST', body: form })
       const data = await res.json()
       if (!data.success) throw new Error(data.error || '인페인팅 실패')
 
