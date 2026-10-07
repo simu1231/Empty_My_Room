@@ -18,6 +18,23 @@ run() {  # DRY_RUN 일 때는 실행하지 않고 보여만 준다
   if [ "$DRY_RUN" = "0" ]; then "$@"; else echo "    [계획] $*"; fi
 }
 
+# 보안그룹 규칙 전용. run() 과 갈라놓은 이유는 **재실행 때문**이다.
+# authorize-security-group-ingress 는 같은 규칙을 두 번 넣으면
+# InvalidPermission.Duplicate 로 실패하고, set -e 가 스크립트를 거기서 죽인다.
+# 그래서 이 파일은 보안그룹이 없는 **첫 실행에서만** 통과했다. API 인스턴스를
+# 교체할 때마다(코드만 바꿔 다시 띄우는 게 정상 운영이다) 같은 SG 를 재사용하므로
+# 두 번째부터는 항상 여기서 멈춘다 — 아래 워커 8001 블록이 이미 같은 이유로
+# 중복을 삼키고 있는데, 이 두 줄만 빠져 있었다.
+run_sg() {
+  if [ "$DRY_RUN" != "0" ]; then echo "    [계획] $*"; return 0; fi
+  local err
+  err=$("$@" 2>&1 >/dev/null) && return 0
+  case "$err" in
+    *InvalidPermission.Duplicate*) echo "  (이미 있음)"; return 0 ;;
+    *) echo "$err" >&2; return 1 ;;
+  esac
+}
+
 echo "▶ 사전 점검"
 
 # 인스턴스 프로파일. 10-iam.sh 가 만든다. 없으면 여기서 멈춘다 —
@@ -105,9 +122,9 @@ else
 fi
 # 22 는 내 IP 만. 8000 은 전체 — 프런트(브라우저)가 직접 부르는 주소라
 # 소스를 좁힐 수 없다. TLS/도메인 단계에서 443 으로 옮기고 여기를 닫는다.
-run aws ec2 authorize-security-group-ingress --group-id "$SG_ID" \
+run_sg aws ec2 authorize-security-group-ingress --group-id "$SG_ID" \
       --protocol tcp --port 22 --cidr "$SSH_CIDR"
-run aws ec2 authorize-security-group-ingress --group-id "$SG_ID" \
+run_sg aws ec2 authorize-security-group-ingress --group-id "$SG_ID" \
       --protocol tcp --port "$API_PORT" --cidr 0.0.0.0/0
 
 # ── 워커 → API 연결 통로 ────────────────────────────────────────────────
@@ -122,16 +139,16 @@ run aws ec2 authorize-security-group-ingress --group-id "$SG_ID" \
 # 안에서 부르는 포트지 바깥에서 부를 포트가 아니다.
 if [ -n "${EMR_SG_ID:-}" ]; then
   echo "▶ 워커 보안그룹에 8001 허용 (출발지: $SG_ID)"
-  # run() 을 쓰지 않는다 — 실패를 "이미 있음"으로 삼켜야 해서 종료코드를 직접
-  # 다룬다. 대신 DRY_RUN 분기를 여기서 똑같이 쓴다.
-  [ "$DRY_RUN" = "0" ] || echo "    [계획] authorize-security-group-ingress $EMR_SG_ID tcp/${GPU_PORT} ← $SG_ID"
-  [ "$DRY_RUN" = "0" ] && \
-  aws ec2 authorize-security-group-ingress \
-    --group-id "$EMR_SG_ID" \
-    # 설명은 ASCII 만 된다. 한글을 넣으면 InvalidParameterValue 로 거부된다
-    # (허용 집합: a-zA-Z0-9. _-:/()#,@[]+=&;{}!$*).
-    --ip-permissions "IpProtocol=tcp,FromPort=${GPU_PORT},ToPort=${GPU_PORT},UserIdGroupPairs=[{GroupId=$SG_ID,Description='emr-api-sg proxy to backend 8001'}]" \
-    >/dev/null 2>&1 && echo "  추가됨" || echo "  (이미 있음)"
+  # 규칙 설명은 ASCII 만 된다. 한글을 넣으면 InvalidParameterValue 로 거부된다
+  # (허용 집합: a-zA-Z0-9. _-:/()#,@[]+=&;{}!$*).
+  #
+  # 주석을 명령 **위**에 둔다. 줄 이음(\) 다음 줄이 # 으로 시작하면 쉘이 거기서
+  # 명령을 끊어버려서, --ip-permissions 가 통째로 사라진 채
+  # `aws ... --group-id X` 만 실행된다. MissingParameter 로 떨어지는데 뒤에 붙은
+  # `|| echo "(이미 있음)"` 까지 같이 떨어져 나가서 에러가 그대로 새어 나온다.
+  IP_PERM="IpProtocol=tcp,FromPort=${GPU_PORT},ToPort=${GPU_PORT},UserIdGroupPairs=[{GroupId=$SG_ID,Description='emr-api-sg proxy to backend 8001'}]"
+  run_sg aws ec2 authorize-security-group-ingress \
+    --group-id "$EMR_SG_ID" --ip-permissions "$IP_PERM"
 else
   echo "⚠ EMR_SG_ID 가 없어 워커 8001 규칙을 건너뜁니다."
   echo "  이 상태로 두면 API 가 워커를 찾아도 연결이 타임아웃됩니다:"
