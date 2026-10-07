@@ -428,3 +428,67 @@ export EMR_BACKEND_BUSY_SEC=${EMR_BACKEND_BUSY_SEC:-300}
 #
 # 현재 렌더 크기는 20-launch-template.sh 실행 시 출력된다. 15.8KB 쯤이고
 # 여유는 600바이트 안팎이다. 여유가 빠듯해지면 주석부터 이쪽으로 옮길 것.
+
+# ── API 서버 (t4g.small 상시 1대) ───────────────────────────────────────
+# GPU 워커와 완전히 다른 생물이다. 아래 넷을 구분해 두지 않으면 50-api.sh 가
+# GPU 쪽 설정을 잘못 물려받는다.
+#
+#   GPU 워커                         API 서버
+#   ─────────────────────────────    ─────────────────────────────
+#   x86_64 (g6/g5)                   arm64 (Graviton, t4g)
+#   ASG + 시작 템플릿, 0~1대          run-instances 로 1대 고정
+#   AMI 에 전부 구워 넣음(80GB)       기동 시 git clone + docker build
+#   인바운드 0개, 키 없음             22(내 IP만) + 8000(공개)
+#
+# 세 번째 줄이 핵심이다. 워커는 모델 80GB 를 부팅마다 받을 수 없어 AMI 를 굽지만,
+# API 는 의존성이 4개(fastapi/uvicorn/python-multipart/boto3)뿐이라 빌드가 1~2분이다.
+# AMI 를 굽는 비용(스냅샷 보관 월 $5~6)이 얻는 것보다 크다.
+#
+# ECR 은 쓰지 않는다. emr-deploy 에 ecr:* 권한이 아예 없고(DescribeRepositories
+# 가 AccessDenied), 저장소가 공개라 인스턴스에서 자격증명 없이 clone 이 된다.
+# 권한을 넓히지 않고 끝나는 쪽을 택한다.
+#
+# **GPU AMI 안의 emr/api 이미지는 여기서 못 쓴다.** x86_64 로 구워져 있어서
+# t4g 에서는 exec format error 로 죽는다. 같은 Dockerfile 로 arm64 에서 다시
+# 빌드하는 것이고, python:3.11-slim 도 네 의존성의 휠도 전부 aarch64 가 있다
+# (watchfiles 만 cp310-abi3 인데 abi3 라 3.11 에서 그대로 쓰인다).
+# 즉 t4g 위에서 Rust/C 컴파일이 일어나지 않는다 — 2 vCPU 로도 빌드가 끝난다.
+export API_NAME=${PROJECT:-emr}-api
+export API_SG_NAME=${API_SG_NAME:-${PROJECT:-emr}-api-sg}
+export API_PROFILE_NAME=${API_PROFILE_NAME:-${PROJECT:-emr}-api-profile}
+export API_INSTANCE_TYPE=${API_INSTANCE_TYPE:-t4g.small}
+
+# t4g.small(2GB) 이 하한이다. micro(1GB) 는 pip 설치 중 터질 수 있고, API 가
+# 못 뜨면 capacity.py 가 안 돌아 GPU 가 영영 0대로 남는다 — $2 아끼려다
+# 서비스 전체가 멈춘다.
+#
+# 스팟은 쓰지 않는다. 시간당 $0.0208 → $0.005 로 월 $12 가 줄지만, API 는
+# 상시 가동이고 회수당하면 접수 창구가 통째로 닫힌다. 워커는 회수돼도 메시지가
+# 큐에 남아 다음 워커가 집어가지만, API 가 없으면 큐에 넣을 사람이 없다.
+export API_VOLUME_GB=${API_VOLUME_GB:-8}
+export API_PORT=${API_PORT:-8000}
+
+# AMI/서브넷은 비워 두면 50-api.sh 가 조회해서 채운다. ssm:GetParameter 가
+# AccessDenied 라 AL2023 공식 파라미터 경로를 못 쓴다 — describe-images 로
+# 이름 패턴을 직접 뒤진다.
+export API_AMI_PATTERN=${API_AMI_PATTERN:-al2023-ami-2023.*-kernel-6.1-arm64}
+export API_AMI_ID=${API_AMI_ID:-}
+export API_SUBNET_ID=${API_SUBNET_ID:-}
+
+# 워커와 달리 들어가 볼 수 있어야 한다. 워커는 실패하면 트랩이 회수해 버리니
+# 들어갈 일이 없지만, API 는 실패해도 살아 있어야 고칠 수 있다(아래 참고).
+# 빌더 키를 재사용한다 — ~/.ssh/emr-builder-key.pem 이 이미 있다.
+export API_KEY_NAME=${API_KEY_NAME:-emr-builder-key}
+export API_SSH_CIDR=${API_SSH_CIDR:-}     # 비면 checkip.amazonaws.com 으로 /32
+
+export API_REPO_URL=${API_REPO_URL:-https://github.com/simu1231/Empty_My_Room.git}
+export API_GIT_REF=${API_GIT_REF:-main}
+
+# **배포 전에 반드시 좁힌다.** api/main.py 의 기본값이 "*" 라서 지금은 아무
+# 사이트나 이 API 를 부를 수 있다. 프런트 도메인이 정해지기 전이라 임시로 둔다.
+# 좁히는 자리는 여기 한 곳이고, 값은 .env 를 통해 컨테이너로 들어간다.
+export CORS_ORIGINS=${CORS_ORIGINS:-*}
+
+# capacity.py 의 중복 호출 억제 간격. 사진 1장이 7건(sam3d 3 + scene 4)을
+# 연달아 만들어도 SetDesiredCapacity 는 한 번만 부른다.
+export CAPACITY_NUDGE_INTERVAL=${CAPACITY_NUDGE_INTERVAL:-30}
