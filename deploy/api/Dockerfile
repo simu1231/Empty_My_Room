@@ -16,5 +16,12 @@ COPY api/main.py api/capacity.py api/gpuproxy.py api/colors.py ./
 # 워커와 **같은** 검증 코드. 복사본이 아니라 같은 파일을 넣는다.
 COPY worker/jobspec.py ./
 
+# print() 가 블록 버퍼에 갇혀 docker logs 에 안 나온다. 2026-10-08 에 워밍업이
+# 멀쩡히 돌았는데 API 로그엔 한 줄도 없어 워커 로그로 교차 확인해야 했고,
+# 503 두 건 중 "[gpu] 중계 실패" 는 한 줄만 보였다. uvicorn 의 접속 로그는
+# logging(stderr) 이라 멀쩡해서, 이 차이가 조사를 더 헷갈리게 만든다.
+# COPY 뒤에 두는 이유는 캐시다 — 앞에 두면 pip install 레이어가 무효화된다.
+ENV PYTHONUNBUFFERED=1
+
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
