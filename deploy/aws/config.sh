@@ -125,7 +125,26 @@ export OD_FALLBACK_MIN=5
 # g6e.xlarge(RAM 32GB)는 RAM 만 보면 통과지만 뺐다. vCPU 가 4라 2xlarge 와
 # 섞어도 05-preflight.sh 의 최악값은 어차피 8 로 고정되어 실익이 없고,
 # 셋 중 제일 비싸다.
-export INSTANCE_TYPES="g6.2xlarge g5.2xlarge g6e.2xlarge"
+#
+# ── g6e.2xlarge 를 뺐다 (2026-10-07 실측) ───────────────────────────────
+# "후보가 많을수록 안전하다"가 여기서는 거꾸로였다. ap-northeast-2 의 제공
+# 현황이 타입마다 다르다:
+#
+#   AZ   g6.2xlarge  g5.2xlarge  g6e.2xlarge
+#   2a       O           O            O
+#   2b       X           X            O      ← g6e 만 있는 유일한 AZ
+#   2c       O           O            X
+#   2d       O           O            X
+#
+# ASG 는 AZ 와 타입을 독립적으로 고르므로 2b+g6, 2d+g6e 같은 **존재하지 않는
+# 조합**을 집어 든다. 그때 돌아오는 건 "용량 없음"이 아니라
+# InvalidFleetConfiguration 이고, 활동 기록에 Failed 로 남은 뒤 약 1분을
+# 버리고 다시 고른다. 사용자에게는 그냥 "GPU 가 안 뜬다"로 보인다.
+#
+# g6e 를 빼면 남는 두 타입의 제공 AZ 가 {2a,2c,2d} 로 완전히 겹쳐서, 어떤
+# 조합을 골라도 유효하다. 대신 2b 를 서브넷에서 빼야 한다 — 아래 30-asg.sh
+# 가 INSTANCE_TYPES 로부터 그 교집합을 직접 계산하므로 손으로 맞출 일은 없다.
+export INSTANCE_TYPES="g6.2xlarge g5.2xlarge"
 
 # ── AMI / 이미지 ────────────────────────────────────────────────────────
 # conda 환경 · 모델 소스 · 가중치 · 저장소가 인스턴스에서 모두 이 아래 모인다.

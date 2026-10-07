@@ -20,6 +20,34 @@ cd "$(dirname "$0")" && source ./config.sh
 
 : "${EMR_SUBNETS:?서브넷을 지정하세요(쉼표 구분): EMR_SUBNETS=subnet-a,subnet-b,subnet-c $0}"
 
+# 주어진 서브넷 중 **INSTANCE_TYPES 를 전부 파는 AZ** 만 남긴다.
+#
+# ASG 는 AZ 와 타입을 따로 고르기 때문에, 한 타입이라도 안 파는 AZ 를 넣어
+# 두면 존재하지 않는 조합을 집어 들고 InvalidFleetConfiguration 으로 실패한다.
+# 이건 "용량 없음"과 달리 기다린다고 해결되지 않는데, 활동 기록을 들여다보기
+# 전까지는 똑같이 "GPU 가 안 뜬다"로만 보인다. 그래서 손으로 맞추지 않고
+# 매번 계산한다 — 타입을 바꾸면 서브넷도 따라 바뀐다.
+filter_subnets(){
+  local keep="" sn az ok t
+  for sn in ${EMR_SUBNETS//,/ }; do
+    az=$(aws ec2 describe-subnets --subnet-ids "$sn"            --query 'Subnets[0].AvailabilityZone' --output text)
+    ok=1
+    for t in $INSTANCE_TYPES; do
+      aws ec2 describe-instance-type-offerings --location-type availability-zone         --filters "Name=instance-type,Values=$t" "Name=location,Values=$az"         --query 'InstanceTypeOfferings[0].Location' --output text | grep -q "$az" || { ok=0; break; }
+    done
+    if [ "$ok" = 1 ]; then keep="$keep,$sn"; else
+      echo "  제외 $sn ($az) — $t 를 팔지 않는다" >&2
+    fi
+  done
+  echo "${keep#,}"
+}
+EMR_SUBNETS=$(filter_subnets)
+[ -n "$EMR_SUBNETS" ] || {
+  echo "✗ INSTANCE_TYPES 를 전부 파는 AZ 가 하나도 없다: $INSTANCE_TYPES" >&2
+  echo "  타입을 줄이거나 서브넷을 넓혀라." >&2
+  exit 1; }
+echo "  사용할 서브넷: $EMR_SUBNETS"
+
 # 후보 인스턴스 타입을 Overrides JSON으로 만든다.
 OVERRIDES=$(for t in $INSTANCE_TYPES; do printf '{"InstanceType":"%s"},' "$t"; done | sed 's/,$//')
 
