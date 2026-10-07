@@ -525,3 +525,46 @@ export CORS_ORIGINS=${CORS_ORIGINS:-*}
 # capacity.py 의 중복 호출 억제 간격. 사진 1장이 7건(sam3d 3 + scene 4)을
 # 연달아 만들어도 SetDesiredCapacity 는 한 번만 부른다.
 export CAPACITY_NUDGE_INTERVAL=${CAPACITY_NUDGE_INTERVAL:-30}
+
+# ── 프런트 배포 (단계 6: S3 + CloudFront) ───────────────────────────────
+# 정적 사이트 버킷. 잡 버킷과 **나눠 둔다** — 잡 버킷은 CloudFront 가 읽을
+# 이유가 없고, 수명주기 규칙(input/ result/ 7일)도 사이트 파일에 걸리면 안 된다.
+# 이름 규칙은 S3_BUCKET 과 같은 계정 해시를 재사용한다. 계정 ID 를 저장소에
+# 남기지 않으면서 전역 유일성을 얻는 같은 이유다.
+# S3_BUCKET 이 추측값(EMR_BUCKET_GUESSED=1)이면 접미사도 가짜다 — emr-jobs 에서
+# ${S3_BUCKET##*-} 를 떼면 "jobs" 가 나와 emr-site-jobs 라는 엉뚱한 버킷을
+# 조용히 만들게 된다. 잡 버킷은 없으면 NoSuchBucket 으로라도 터지지만, 사이트
+# 버킷은 **새로 만드는 것**이라 안 터지고 그냥 잘못된 이름이 생긴다. 막는다.
+if [ -z "${EMR_SITE_BUCKET:-}" ]; then
+  if [ "${EMR_BUCKET_GUESSED:-0}" = "1" ]; then
+    echo "⚠ S3_BUCKET 이 추측값이라 EMR_SITE_BUCKET 을 정할 수 없다 ($S3_BUCKET)" >&2
+    echo "  aws CLI 와 자격증명을 확인하거나 EMR_SITE_BUCKET 을 직접 지정하라" >&2
+  else
+    export EMR_SITE_BUCKET="emr-site-${S3_BUCKET##*-}"
+  fi
+fi
+
+# CloudFront 는 전역 서비스라 리전이 없다. 배포를 찾는 열쇠로 Comment 를 쓴다
+# — ListDistributions 는 태그를 돌려주지 않아서, 태그로 찾으려면 배포마다
+# ListTagsForResource 를 또 불러야 한다. Comment 는 목록에 바로 들어 있다.
+export EMR_CF_COMMENT=${EMR_CF_COMMENT:-${PROJECT:-emr}-site}
+export EMR_CF_OAC_NAME=${EMR_CF_OAC_NAME:-${PROJECT:-emr}-site-oac}
+
+# AWS 관리형 정책 ID. 이름이 아니라 ID 로 박아 둔다 — 전 계정 공통 고정값이고,
+# 이름으로 찾으려면 list-cache-policies 권한이 매번 필요하다.
+#   CachingOptimized            정적 파일용. 압축 켜고 쿼리스트링 무시.
+#   CachingDisabled             API 용. 캐시 금지.
+#   AllViewerExceptHostHeader   API 용. Host 를 뺀 나머지를 그대로 넘긴다.
+#     Host 를 빼는 이유: 그대로 넘기면 오리진이 CloudFront 도메인을 Host 로
+#     받는데, EC2 오리진은 자기 이름을 모르므로 맞춰줄 게 없다. 빼면
+#     CloudFront 가 오리진 도메인으로 채워 준다.
+export EMR_CF_CACHE_OPTIMIZED=${EMR_CF_CACHE_OPTIMIZED:-658327ea-f89d-4fab-a63d-7e88639e58f6}
+export EMR_CF_CACHE_DISABLED=${EMR_CF_CACHE_DISABLED:-4135ea2d-6df8-44a3-9df3-4b5a84be39ad}
+export EMR_CF_ORP_ALLVIEWER_NOHOST=${EMR_CF_ORP_ALLVIEWER_NOHOST:-b689b0a8-53d0-40ab-baf2-68738e2966ac}
+
+# API 오리진. CloudFront 오리진은 IP 를 받지 않고 도메인만 받는다. EC2 의
+# 공개 DNS 는 공인 IP 에서 파생되므로 인스턴스를 교체하면 주소가 바뀐다 —
+# 그래서 EIP 를 붙여 고정한다. 비워 두면 60-cloudfront.sh 가 API 인스턴스에서
+# 읽어 채운다.
+export EMR_API_ORIGIN_DNS=${EMR_API_ORIGIN_DNS:-}
+export EMR_CF_DIST_ID=${EMR_CF_DIST_ID:-}
