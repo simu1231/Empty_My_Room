@@ -126,8 +126,14 @@ services:
       STATE_DIR: /state
       EXPECT_WORKERS: ${Q_SAM3D:-emr-sam3d},${Q_SCENE:-emr-scene}
       WATCH_QUEUES: ${Q_SAM3D:-emr-sam3d},${Q_SCENE:-emr-scene}
-      # 비용 모델 결과: 20세션/일 기준 유휴 900초면 월 $148, 120초면 $65다.
-      # 부팅 3분을 어차피 감수하는 구성이므로 유휴를 길게 둘 이유가 없다.
+      # 값은 여기가 아니라 .env 에서 온다(userdata 가 부팅마다 쓴다). 기본값을
+      # 바꾸려면 deploy/aws/config.sh 의 IDLE_EXIT_SEC 를 고치고 LT 를 새로
+      # 렌더해라 — AMI 재빌드는 필요 없다.
+      #
+      # 여기 있던 비용 모델("부팅 3분을 어차피 감수하므로 유휴를 길게 둘 이유가
+      # 없다")은 **전제가 틀렸다**. 실측 부팅은 390초다. 유휴가 부팅보다 짧으면
+      # 잠깐 손을 놓은 사이 회수되고 다시 6분 반을 기다리게 된다. 2026-10-07 에
+      # 그 고리에 걸려 기본값을 900 으로 올렸다. 근거는 config.sh 쪽 주석에 있다.
       IDLE_EXIT_SEC: ${IDLE_EXIT_SEC:-120}
       DRY_RUN: "0"
     depends_on: !reset []
