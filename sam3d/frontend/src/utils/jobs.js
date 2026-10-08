@@ -55,7 +55,13 @@ export async function submitJob(jobType, form, { signal } = {}) {
  * GPU가 깨어나길 기다리는 5분 동안은 굳이 1초마다 두드릴 필요가 없다.
  * 요청 수가 곧 API 서버 비용이다.
  */
-export async function pollJob(jobId, { onProgress, signal, timeoutMs = 15 * 60 * 1000 } = {}) {
+// 포기까지 20분. 15분이었는데, 2026-10-08 콜드 sam3d_mesh 한 건이 1013초
+// 걸려서(워커 로그 job 672aaa09) 900초 상한에 113초 모자라 브라우저가 먼저
+// 끊었다 — 서버는 멀쩡히 끝냈는데 사용자에겐 영원한 실패로 보였다.
+// 워밍 목록을 고쳐(config.sh 의 slat_generator) 콜드를 400초대로 줄일 참이지만,
+// 상한은 그 추정에 기대지 않고 최악을 덮어 둔다. 늘려도 손해가 없는 값이다 —
+// 작업이 끝나면 즉시 반환하므로, 이 숫자는 "고장났다고 선언하는 시점"일 뿐이다.
+export async function pollJob(jobId, { onProgress, signal, timeoutMs = 20 * 60 * 1000 } = {}) {
   const started = Date.now()
   let interval = 1000
   for (;;) {

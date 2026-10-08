@@ -283,13 +283,23 @@ export EMR_WARM_SKIP=${EMR_WARM_SKIP:-"models--lllyasviel--control_v11p_sd15_can
 #
 # 넣는 것 — worker-sam3d 의 **첫 요청 경로**뿐이다. 근거는 체크포인트의
 # pipeline.yaml 과 콜드 로드 로그에서 읽는 순서 그대로다.
-# 빼는 것 — conda env 전부(위 ②), slat_generator.ckpt(4.68GB, 예산 초과),
-# uLayout·omni3d(②번 수정으로 기동 때 스스로 데운다), depth_pro(1.8GB,
-# 파이프라인은 MoGe 를 쓴다), sam-3d-objects 소스 트리.
+# 빼는 것 — conda env 전부(위 ②), uLayout·omni3d(②번 수정으로 기동 때 스스로
+# 데운다), depth_pro(1.8GB, 파이프라인은 MoGe 를 쓴다), sam-3d-objects 소스 트리.
+#
+# slat_generator.ckpt 는 "예산 초과"를 이유로 여기 빠져 있었다. 그 판단의 값을
+# 2026-10-08 실측으로 치렀다(job 672aaa09, /emr/worker):
+#   ss_generator   6.23GB  데움   →   7초   (약 900 MB/s, 페이지 캐시)
+#   slat_generator 4.57GB  안 데움 → 610초  (약 7.7 MB/s, 지연 로딩 1갈래)
+# 같은 디렉터리의 같은 종류 파일이고 차이는 워밍뿐이다. 파이프라인 로드가
+# 905초가 됐고 작업 전체가 1013초로 끝나, 브라우저 폴링 상한 900초를 넘겼다.
+# 예산을 아끼는 쪽이 아니라 예산을 올리는 쪽이 옳았다 — 아래 MAX_BYTES 참고.
 #
 # **순서가 곧 우선순위이자 데우는 순서**다. 작은 것부터 적는다 — 추론이
 # 제일 먼저 읽는 ss_generator 를 제일 **나중에** 데워야 살아남을 확률이 높다.
-# (앞의 1.7GB 는 작아서 6.2GB 를 데우는 동안 밀려날 일이 없다.)
+# (ss_generator 앞의 누적은 7.80GiB 다. 합계 14.03GiB 를 호스트 RAM 32GiB 인
+#  g6.2xlarge 에 올리므로 서로 밀어낼 여유는 아직 있다 — 목록을 더 늘리면
+#  이 여유부터 사라진다. 로드 순서가 ss → slat 이라 slat 을 ss 보다 **먼저**
+#  적는다. 나중에 데운 쪽이 캐시에 더 오래 남는다.)
 # 디코더는 **넷 다** 적는다. 처음엔 메쉬 작업이니 mesh 디코더만 쓰겠거니 하고
 # gs/gs_4 를 뺐는데, inference_pipeline.py:141-154 가 파이프라인을 만들 때
 # 넷을 조건 없이 올린다 — 쓰든 안 쓰든 첫 요청에서 읽힌다. 합쳐 327MB 다.
@@ -309,14 +319,21 @@ $_SAM3D_CKPT/slat_decoder_gs.ckpt \
 $_SAM3D_CKPT/slat_decoder_gs_4.ckpt \
 $_SAM3D_CKPT/slat_decoder_mesh.ckpt \
 $EMR_ROOT/.cache/huggingface/hub/models--Ruicheng--moge-2-vitl \
+$_SAM3D_CKPT/slat_generator.ckpt \
 $_SAM3D_CKPT/ss_generator.ckpt"}
 #
-# 총량 상한. 여덟을 합치면 9.49GB 다(기존 여섯 8.24 + SAM2 0.86 + LaMa 0.39).
+# 총량 상한. 아홉을 합치면 14.03GiB 다(실측, du -L -sb 합 15,062,917,448B):
+#   sam2 0.836 + lama 0.382 + ss_decoder 0.137 + slat_decoder_gs 0.160 +
+#   slat_decoder_gs_4 0.159 + slat_decoder_mesh 0.339 + moge 1.215 +
+#   slat_generator 4.570 + ss_generator 6.231
 # 상한을 넘기는 파일은 건너뛰므로(break 가 아니라 continue), 딱 맞춰 조여 놓으면
 # 제일 값나가는 ss_generator(6.23GB)가 통째로 빠지고 그 자리를 자잘한 게 메우는
-# 최악이 난다. 9G 였던 걸 10G 로 올린다 — 올리지 않으면 앞에 1.25GB 가 끼면서
-# 바로 그 사고가 난다. 목록을 늘릴 때 이 숫자부터 다시 보라.
-export EMR_WARM_BG_MAX_BYTES=${EMR_WARM_BG_MAX_BYTES:-10G}
+# 최악이 난다. 10G 로는 바로 그 사고가 난다 — slat_generator 를 목록에 넣으면
+# 그 앞까지 누적이 7.80GiB 라, 10GiB 예산으로는 ss_generator 가 통째로 빠지고
+# 7초였던 로드가 610초짜리가 된다. 고치려던 것보다 더 나빠진다.
+# 15G(16,106,127,360B)면 여유가 0.97GiB(6.5%)다. 목록을 늘릴 때 이 숫자부터
+# 다시 보라 — numfmt --from=iec 라 G 는 GiB 다(bake-ami.sh 2.5).
+export EMR_WARM_BG_MAX_BYTES=${EMR_WARM_BG_MAX_BYTES:-15G}
 #
 # 청크 크기(MiB). 목록이 파일 4개로 줄면서 새 문제가 생겼다 — xargs -P 64 는
 # **파일 단위**로 갈라지므로 4개짜리 목록에서는 4갈래밖에 안 돈다. 그런데
