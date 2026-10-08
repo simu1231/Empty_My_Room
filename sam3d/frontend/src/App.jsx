@@ -5,6 +5,7 @@ import SegmentStep from './components/SegmentStep'
 import RoomMakingStep from './components/RoomMakingStep'
 import Interior3DStep from './components/Interior3DStep'
 import { Toaster } from 'react-hot-toast'
+import { prewarmGpu } from './utils/api'
 import './App.css'
 
 function App() {
@@ -15,7 +16,11 @@ function App() {
     return (
       <>
         <Toaster position="top-center" />
-        <LandingPage onStart={() => setStep('upload')} />
+        {/* 사진 드롭이 아니라 여기서 깨운다. 파일을 고르는 10~60초가
+            618초짜리 부팅과 겹친다. 랜딩 진입이 아니라 클릭을 신호로
+            삼는 게 중요하다 — 크롤러와 구경꾼까지 GPU 를 켜면
+            방문당 최소 15분치(IDLE_EXIT_SEC) 요금이 붙는다. */}
+        <LandingPage onStart={() => { prewarmGpu(); setStep('upload') }} />
       </>
     )
   }
