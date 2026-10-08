@@ -1,0 +1,50 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DomainLookupAndRegister",
+      "Effect": "Allow",
+      "Action": [
+        "route53domains:CheckDomainAvailability",
+        "route53domains:ListPrices",
+        "route53domains:ListDomains",
+        "route53domains:GetDomainDetail",
+        "route53domains:GetOperationDetail",
+        "route53domains:RegisterDomain",
+        "route53domains:UpdateDomainContactPrivacy",
+        "route53domains:UpdateDomainNameservers",
+        "route53domains:ListOperations",
+        "route53domains:ListTagsForDomain"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "HostedZoneAndRecords",
+      "Effect": "Allow",
+      "Action": [
+        "route53:ListHostedZones",
+        "route53:ListHostedZonesByName",
+        "route53:GetHostedZone",
+        "route53:CreateHostedZone",
+        "route53:ChangeResourceRecordSets",
+        "route53:ListResourceRecordSets",
+        "route53:GetChange",
+        "route53:ListTagsForResource",
+        "route53:ChangeTagsForResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CertificateForCloudFront",
+      "Effect": "Allow",
+      "Action": [
+        "acm:RequestCertificate",
+        "acm:DescribeCertificate",
+        "acm:ListCertificates",
+        "acm:ListTagsForCertificate",
+        "acm:AddTagsToCertificate"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
