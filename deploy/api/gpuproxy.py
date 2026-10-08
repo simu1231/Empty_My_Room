@@ -68,6 +68,21 @@ _cache: tuple[float, str | None] = (0.0, None)   # (만료시각, private IP)
 _ec2 = None
 _client: httpx.Client | None = None
 
+# 한 번이라도 ready 를 돌려준 적 있는 IP. worker_ip() 가 0대를 보면 비운다.
+# "지금 준비됐나"가 아니라 "기동은 끝난 놈인가"를 뜻한다 — 그 둘을 가르는
+# 게 이 파일의 요점이다. _warmed 와 따로 두는 이유는 _warmed 가
+# EMR_GPU_WARM=0 이면 아예 안 채워져서 신호로 못 쓰기 때문이다.
+_ready_seen: set[str] = set()
+
+# probe() 가 왜 실패했는지. 호출자가 "부팅 중"과 "추론 중"을 가르는 데 쓴다.
+#   DOWN    : 연결 자체가 안 된다 — 포트가 아직 안 열렸다(기동 중)
+#   TIMEOUT : 연결은 되는데 2초 안에 답이 없다 — 살아 있고 바쁘다
+# 이 구분이 없던 동안은 둘 다 None 이라, 추론 중인 워커가 "모델 로딩 중"
+# 으로 보고됐다. 그 503 이 요청을 막으면 워커는 영영 안 한가해진다.
+PROBE_OK      = "ok"
+PROBE_DOWN    = "down"
+PROBE_TIMEOUT = "timeout"
+
 
 def _ec2_client():
     global _ec2
@@ -123,6 +138,7 @@ def worker_ip() -> str | None:
         # IP 는 재사용될 수 있으므로 "본 적 있는 IP"를 영구히 들고 있으면 안 된다.
         if ip is None:
             _warmed.clear()
+            _ready_seen.clear()
     return ip
 
 
@@ -133,22 +149,46 @@ def invalidate():
         _cache = (0.0, None)
 
 
-def probe(ip: str) -> dict | None:
+def probe_ex(ip: str) -> tuple[dict | None, str]:
     """
-    워커 :8001/health. 뜨는 중이면 연결 자체가 거부되므로 None 이다.
+    워커 :8001/health 를 찌르고 (health, 실패사유) 를 돌려준다.
 
     짧게 끊는다(2초). 이 호출은 "준비됐나?"를 묻는 폴링 경로에 있어서,
     여기서 오래 붙들면 준비 안 된 상태를 확인하는 데 매번 그만큼 걸린다.
+
+    그런데 2초는 **추론 중인 백엔드가 답하기엔 짧다.** SAM2 첫 추론이
+    35초고, 그동안 GIL 을 쥐고 있어 /health 가 창을 놓친다. 그래서 실패를
+    뭉개지 않고 사유를 같이 돌려준다 — 기동 중이면 포트가 닫혀 있어
+    **연결 거부**로 즉시 떨어지고, 바쁜 거면 **읽기 타임아웃**이다.
     """
     try:
         r = httpx.get(f"http://{ip}:{GPU_PORT}/health", timeout=2.0)
         if r.status_code != 200:
-            return None
+            return None, PROBE_DOWN
         health = r.json()
+        if ready(health):
+            with _lock:
+                _ready_seen.add(ip)
         maybe_warm(ip, health)
-        return health
+        return health, PROBE_OK
+    except httpx.ConnectTimeout:
+        # 연결조차 못 맺었다. 살아 있는 백엔드라면 커널이 SYN 을 바로 받는다.
+        return None, PROBE_DOWN
+    except (httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout):
+        return None, PROBE_TIMEOUT
     except Exception:
-        return None
+        return None, PROBE_DOWN
+
+
+def probe(ip: str) -> dict | None:
+    """사유가 필요 없는 호출부를 위한 얇은 래퍼."""
+    return probe_ex(ip)[0]
+
+
+def was_ready(ip: str) -> bool:
+    """이 IP 가 이번 생애에 한 번이라도 준비됐던 적이 있나."""
+    with _lock:
+        return ip in _ready_seen
 
 
 def ready(health: dict | None) -> bool:

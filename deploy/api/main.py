@@ -268,8 +268,20 @@ def _gpu_blocked(path: str) -> JSONResponse | None:
                                      "eta_sec": ETA_BOOT,
                                      "message": "GPU 서버를 켜는 중입니다"})
 
-    health = gpuproxy.probe(ip)
+    health, why = gpuproxy.probe_ex(ip)
     if not gpuproxy.ready(health):
+        # 한 번 준비됐던 워커가 2초 안에 답을 못 하는 것은 **추론 중**이라는
+        # 뜻이지 기동 중이라는 뜻이 아니다. 여기서 막으면 영영 안 풀린다 —
+        # 워커를 비워 줄 유일한 길이 이 요청이 끝나는 것인데, 그 요청을
+        # 막으니 재시도가 600초를 태우고 프런트가 "HTTP 503" 을 던졌다
+        # (2026-10-08 실측: status 는 ready 인데 같은 순간 mask 가 2.058초
+        #  = probe 타임아웃 2.0초에 맞춰 503).
+        #
+        # 그대로 흘려보낸다. 바쁜 워커는 결국 답하고, 정말 안 되면
+        # UPSTREAM_TIMEOUT(50초)이 받아서 phase="upstream" 으로 바뀐다 —
+        # 그게 이 상황의 정직한 이름이다.
+        if why == gpuproxy.PROBE_TIMEOUT and gpuproxy.was_ready(ip):
+            return None
         return JSONResponse(status_code=503,
                             headers={"Retry-After": str(RETRY_MODELS)},
                             content={"state": "starting", "phase": "models",
@@ -298,8 +310,12 @@ def gpu_status():
     ip = gpuproxy.worker_ip()
     if ip is None:
         return {"state": "stopped", "phase": "none", "eta_sec": ETA_BOOT}
-    health = gpuproxy.probe(ip)
+    health, why = gpuproxy.probe_ex(ip)
     if not gpuproxy.ready(health):
+        # _gpu_blocked 와 같은 기준으로 읽는다. 여기서만 "모델 로딩 중"이라고
+        # 하면 진행 막대와 실제 동작이 어긋난다.
+        if why == gpuproxy.PROBE_TIMEOUT and gpuproxy.was_ready(ip):
+            return {"state": "busy", "phase": "ready", "eta_sec": 0}
         return {"state": "starting", "phase": "models", "eta_sec": ETA_MODELS}
     return {"state": "ready", "phase": "ready", "eta_sec": 0,
             "sd_warm": health.get("sd_warm")}
