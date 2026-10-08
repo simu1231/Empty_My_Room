@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { useStore } from '../store/useStore'
 import toast from 'react-hot-toast'
-import { API, gpuFetch } from '../utils/api'
+import { API, gpuFetch, readJson } from '../utils/api'
 
 const LABEL_COLORS = [
   'rgba(255,80,80,0.45)', 'rgba(80,160,255,0.45)', 'rgba(80,255,120,0.45)',
@@ -112,12 +112,19 @@ export default function SegmentStep() {
       form.append('image', file)
       form.append('points', JSON.stringify(labelPoints.map(p => [p.x, p.y])))
       const res = await gpuFetch(API.segment, { method: 'POST', body: form })
-      const data = await res.json()
+      const data = await readJson(res, '마스크 생성')
       if (data.success) {
         setMaskPreviews(prev => ({ ...prev, [label]: data.mask_b64 }))
         setResizedImageB64(prev => prev ?? data.resized_image_b64) // 처음 한 번만 저장
+      } else {
+        throw new Error(data.error || '마스크를 만들지 못했습니다')
       }
-    } catch (_) {}
+    } catch (e) {
+      // 예전에는 catch (_) {} 였다. 그러면 마스크가 안 그려지는 것 말고는
+      // 아무 신호가 없어서, 주소가 틀렸는지 모델이 실패했는지 구분이 안 됐다.
+      console.error('[마스크]', e)
+      toast.error(`마스크 생성 실패: ${e.message}`)
+    }
     setMaskLoading(false)
   }, [])
 

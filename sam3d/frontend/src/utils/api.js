@@ -101,6 +101,30 @@ export async function gpuFetch(url, init = {}, { onStatus, signal } = {}) {
   }
 }
 
+/**
+ * 응답을 JSON 으로 읽는다. 단, 그게 정말 JSON 일 때만.
+ *
+ * 이게 필요한 이유. 개발 서버에 프록시가 빠져 있으면 /api/... 가 SPA 폴백에
+ * 걸려 **200 + text/html** 로 돌아온다. res.ok 도 true 라 호출부는 성공으로
+ * 보고, res.json() 이 "Unexpected token '<'" 로 터진다. 어느 주소가 어디로
+ * 샜는지가 그 메시지에는 없다. 그래서 여기서 주소와 실제 Content-Type 을
+ * 붙여 던진다 — 조용한 실패를 읽히는 실패로 바꾸는 게 목적이다.
+ */
+export async function readJson(res, what = '요청') {
+  const ctype = res.headers.get('Content-Type') || ''
+  if (!ctype.includes('application/json')) {
+    const head = (await res.text()).slice(0, 120).replace(/\s+/g, ' ')
+    throw new Error(
+      `${what}: JSON 이 아닌 응답 (HTTP ${res.status}, ${ctype || '타입 없음'}) ` +
+      `← ${res.url}\n${head}`)
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(`${what}: HTTP ${res.status} ${body.detail || body.error || ''}`)
+  }
+  return res.json()
+}
+
 /** GPU 준비 상태를 사람이 읽는 문구로. 콜드스타트를 오류로 오해하지 않게 한다. */
 export function readyText({ phase, eta_sec, waitedSec = 0 } = {}) {
   const left = Math.max(0, (eta_sec || 0) - waitedSec)
