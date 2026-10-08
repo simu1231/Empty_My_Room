@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { useStore } from '../store/useStore'
-import { API, gpuFetch } from '../utils/api'
+import { API, gpuFetch, readyText } from '../utils/api'
 import toast from 'react-hot-toast'
 
 export default function InpaintRefineStep() {
@@ -10,6 +10,8 @@ export default function InpaintRefineStep() {
   const [points, setPoints] = useState([])
   const [maskB64, setMaskB64] = useState(null)
   const [maskLoading, setMaskLoading] = useState(false)
+  // GPU 콜드스타트 동안 gpuFetch 가 재시도하는 중임을 배지에 보여준다.
+  const [gpuMsg, setGpuMsg] = useState(null)
   const [inpainting, setInpainting] = useState(false)
   const [currentFile, setCurrentFile] = useState(emptyRoomFile)
   const [currentUrl, setCurrentUrl] = useState(emptyRoomUrl)
@@ -63,13 +65,15 @@ export default function InpaintRefineStep() {
       const form = new FormData()
       form.append('image', file)
       form.append('points', JSON.stringify(pts.map(p => [p.x, p.y])))
-      const res = await gpuFetch(API.segment, { method: 'POST', body: form })
+      const res = await gpuFetch(API.segment, { method: 'POST', body: form },
+                                 { onStatus: (st) => setGpuMsg(readyText(st)) })
       const data = await res.json()
       if (data.success) setMaskB64(data.mask_b64)
       else toast.error('마스크 생성 실패: ' + (data.error || '알 수 없는 오류'))
     } catch (e) {
       toast.error('마스크 요청 실패: 서버에 연결할 수 없습니다')
     } finally {
+      setGpuMsg(null)
       setMaskLoading(false)
     }
   }, [])
@@ -95,7 +99,8 @@ export default function InpaintRefineStep() {
       const form = new FormData()
       form.append('image', currentFile)
       form.append('mask', maskFile)
-      const res = await gpuFetch(API.inpaint, { method: 'POST', body: form })
+      const res = await gpuFetch(API.inpaint, { method: 'POST', body: form },
+                                 { onStatus: (st) => setLoading(true, readyText(st)) })
       const data = await res.json()
       if (!data.success) throw new Error(data.error || '인페인팅 실패')
 
@@ -141,7 +146,7 @@ export default function InpaintRefineStep() {
           />
           {maskLoading && (
             <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.7)', color: '#3498db', padding: '4px 10px', borderRadius: '12px', fontSize: '12px' }}>
-              분석중...
+              {gpuMsg || '분석중...'}
             </div>
           )}
         </div>

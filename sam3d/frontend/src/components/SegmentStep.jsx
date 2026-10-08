@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { useStore } from '../store/useStore'
 import toast from 'react-hot-toast'
-import { API, gpuFetch, readJson } from '../utils/api'
+import { API, gpuFetch, readJson, readyText } from '../utils/api'
 
 const LABEL_COLORS = [
   'rgba(255,80,80,0.45)', 'rgba(80,160,255,0.45)', 'rgba(80,255,120,0.45)',
@@ -24,6 +24,9 @@ export default function SegmentStep() {
   const [maskPreviews, setMaskPreviews] = useState({}) // label → base64 mask
   const [resizedImageB64, setResizedImageB64] = useState(null) // 첫 미리보기에서 저장한 리사이즈 이미지
   const [maskLoading, setMaskLoading] = useState(false)
+  // GPU 가 0대면 gpuFetch 가 조용히 재시도한다. 그 동안 화면이 멈춘 것처럼
+  // 보이면 사용자는 고장으로 읽는다. 진행 상황을 여기에 담아 보여준다.
+  const [gpuMsg, setGpuMsg] = useState(null)
   const debounceRef = useRef(null)
 
   const getCurrentLabel = () => {
@@ -111,7 +114,8 @@ export default function SegmentStep() {
       const form = new FormData()
       form.append('image', file)
       form.append('points', JSON.stringify(labelPoints.map(p => [p.x, p.y])))
-      const res = await gpuFetch(API.segment, { method: 'POST', body: form })
+      const res = await gpuFetch(API.segment, { method: 'POST', body: form },
+                                 { onStatus: (st) => setGpuMsg(readyText(st)) })
       const data = await readJson(res, '마스크 생성')
       if (data.success) {
         setMaskPreviews(prev => ({ ...prev, [label]: data.mask_b64 }))
@@ -125,6 +129,7 @@ export default function SegmentStep() {
       console.error('[마스크]', e)
       toast.error(`마스크 생성 실패: ${e.message}`)
     }
+    setGpuMsg(null)
     setMaskLoading(false)
   }, [])
 
@@ -191,7 +196,8 @@ export default function SegmentStep() {
       form1.append('image', originalFile)
       form1.append('points', JSON.stringify(clickPoints.map(p => [p.x, p.y])))
       form1.append('labels', JSON.stringify(clickPoints.map(p => p.label)))
-      const res1 = await gpuFetch(API.segment, { method: 'POST', body: form1 })
+      const res1 = await gpuFetch(API.segment, { method: 'POST', body: form1 },
+                                  { onStatus: (st) => setLoading(true, readyText(st)) })
       const data1 = await res1.json()
       if (!data1.success) throw new Error('마스크 생성 실패')
       maskB64    = data1.mask_b64
@@ -213,7 +219,7 @@ export default function SegmentStep() {
     const res2 = await gpuFetch(API.inpaint, {
       method: 'POST',
       body: form2,
-    })
+    }, { onStatus: (st) => setLoading(true, readyText(st)) })
     const data2 = await res2.json()
     if (!data2.success) throw new Error('가구 제거 실패')
 
@@ -232,7 +238,7 @@ export default function SegmentStep() {
     const res3 = await gpuFetch(API.extract, {
       method: 'POST',
       body: form3,
-    })
+    }, { onStatus: (st) => setLoading(true, readyText(st)) })
     const data3 = await res3.json()
     if (!data3.success) throw new Error('가구 추출 실패')
 
@@ -326,7 +332,7 @@ export default function SegmentStep() {
           />
           {maskLoading && (
             <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', color: '#3498db', padding: '4px 10px', borderRadius: '12px', fontSize: '12px' }}>
-              마스크 분석중...
+              {gpuMsg || '마스크 분석중...'}
             </div>
           )}
         </div>
