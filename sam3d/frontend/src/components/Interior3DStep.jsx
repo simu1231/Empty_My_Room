@@ -49,7 +49,7 @@ function MiniMeshViewer({ data }) {
         material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
       } else {
         geometry.setAttribute('color', new THREE.BufferAttribute(data.colors.slice(), 3))
-        material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.0 })
+        material = new THREE.MeshStandardMaterial({ vertexColors: true, color: new THREE.Color(0.65, 0.65, 0.65), side: THREE.DoubleSide, roughness: 0.9, metalness: 0.0 })
       }
  
       geometry.computeVertexNormals()
@@ -666,7 +666,7 @@ function RoomViewer({ roomSize, roomColors, roomTextures, roomBoxTextures, roomM
           material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
         } else {
           geometry.setAttribute('color', new THREE.BufferAttribute(data.colors.slice(), 3))
-          material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.0 })
+          material = new THREE.MeshStandardMaterial({ vertexColors: true, color: new THREE.Color(0.65, 0.65, 0.65), side: THREE.DoubleSide, roughness: 0.9, metalness: 0.0 })
         }
  
         geometry.computeVertexNormals()
