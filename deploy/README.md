@@ -61,6 +61,21 @@ React ──► API 서버 ──► SQS ──► GPU Worker ──► S3
 호출부 코드는 동일하다(`callModel()`). 3단계에서 워커에 실제 모델이 들어가기
 전까지 로컬 개발이 깨지지 않게 하기 위한 것이다.
 
+> **배포 빌드의 값은 `sam3d/frontend/.env.production` 한 줄이다.**
+>
+> ```
+> VITE_USE_JOB_QUEUE=1
+> ```
+>
+> 이 파일은 `.gitignore`(`.env.*`)에 걸려 **저장소에 없다.** 새 PC 에서
+> `npm run build` 를 하면 이 값이 비어 있어 **큐가 아니라 `legacy` 경로
+> (`/api/sam3d/mesh` 등)로 빌드된다** — 오류 없이 빌드되고, 호출은 큐를 우회해
+> GPU 백엔드로 직접 간다(`sam3d/frontend/src/utils/jobs.js` 의 `USE_JOB_QUEUE`).
+> 빌드 전에 파일을 만들고, 빌드 뒤 `grep -o 'api/jobs' dist/assets/*.js` 가
+> 나오는지 확인할 것(2026-10-17 두 번 빌드해서 비교: `=1` 이면 2회, 아니면 0회).
+> `api/sam3d/mesh` 문자열은 **두 빌드 모두에 남으므로** 그걸로는 구분되지 않는다.
+> 이 파일에는 `VITE_USE_JOB_QUEUE` 말고 다른 값이 없다(2026-10-17 기준).
+
 **계약.** 워커가 S3에 올리는 결과 JSON은 기존 동기 API의 응답과 같은 모양이다.
 그래서 결과를 받은 뒤의 프런트엔드 코드는 한 줄도 바뀌지 않았다.
 
