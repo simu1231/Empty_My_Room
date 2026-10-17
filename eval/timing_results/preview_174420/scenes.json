@@ -1,0 +1,136 @@
+{
+  "scenes": [
+    {
+      "id": "sceneA",
+      "path": "eval/timing/scenes/sceneA.jpg",
+      "orig_name": "알 수 없음 (첨부 시 1.jpg 로 전달됨)",
+      "size": [
+        7095,
+        3546
+      ],
+      "furniture": [
+        {
+          "name": "침대",
+          "points": [
+            [
+              3195,
+              2840
+            ],
+            [
+              2876,
+              2041
+            ]
+          ]
+        },
+        {
+          "name": "조명",
+          "points": [
+            [
+              5574,
+              302
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sceneB",
+      "path": "eval/timing/scenes/sceneB.jpg",
+      "orig_name": "알 수 없음 (첨부 시 2.jpg 로 전달됨)",
+      "size": [
+        4320,
+        2880
+      ],
+      "furniture": [
+        {
+          "name": "소파",
+          "points": [
+            [
+              1642,
+              2160
+            ],
+            [
+              2808,
+              1944
+            ]
+          ]
+        },
+        {
+          "name": "스탠드 조명",
+          "points": [
+            [
+              3802,
+              1102
+            ]
+          ]
+        },
+        {
+          "name": "액자",
+          "points": [
+            [
+              1728,
+              950
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sceneC",
+      "path": "eval/timing/scenes/sceneC.png",
+      "orig_name": "알 수 없음 (첨부 시 3.png 로 전달됨)",
+      "size": [
+        2044,
+        1364
+      ],
+      "furniture": [
+        {
+          "name": "침대",
+          "points": [
+            [
+              653,
+              1020
+            ],
+            [
+              612,
+              836
+            ]
+          ]
+        },
+        {
+          "name": "의자",
+          "points": [
+            [
+              1550,
+              898
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sceneD",
+      "path": "eval/timing/scenes/sceneD.jpg",
+      "orig_name": "알 수 없음 (첨부 시 4.jpg 로 전달됨)",
+      "size": [
+        768,
+        512
+      ],
+      "furniture": [
+        {
+          "name": "침대",
+          "points": [
+            [
+              400,
+              300
+            ],
+            [
+              320,
+              250
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

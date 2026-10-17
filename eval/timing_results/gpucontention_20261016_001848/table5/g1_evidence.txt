@@ -1,0 +1,39 @@
+# g1 강제 종료 전 증거 (수동 종료 직전 스냅샷)
+시각 01:45:25
+
+## g1 경과: 상주 모델 로드 완료 01:06:08 → 첫 실행(워밍업)이 아직 끝나지 않음
+
+## 측정 프로세스
+    PID STAT     ELAPSED %CPU   RSS NLWP
+  40431 Rl      01:12:52  108 6301492 118
+
+## GPU
+utilization.gpu [%], memory.used [MiB], clocks.current.sm [MHz], temperature.gpu, power.draw [W]
+100 %, 23969 MiB, 2745 MHz, 41, 91.02 W
+
+## dmesg make_resident / create_allocation 실패 (dmesg 타임스탬프 → 시계 시각)
+00:13:38  [ 7690.636091] misc dxg: dxgk: dxgkio_create_allocation: Ioctl failed: -75
+00:13:45  [ 7697.090918] misc dxg: dxgk: dxgkio_create_allocation: Ioctl failed: -75
+00:13:51  [ 7703.572559] misc dxg: dxgk: dxgkio_create_allocation: Ioctl failed: -75
+00:13:58  [ 7710.044633] misc dxg: dxgk: dxgkio_create_allocation: Ioctl failed: -75
+00:14:24  [ 7736.776016] misc dxg: dxgk: dxgkio_create_allocation: Ioctl failed: -75
+00:14:25  [ 7737.259198] misc dxg: dxgk: dxgkio_create_allocation: Ioctl failed: -75
+00:14:25  [ 7737.761456] misc dxg: dxgk: dxgkio_create_allocation: Ioctl failed: -75
+00:14:26  [ 7738.228142] misc dxg: dxgk: dxgkio_create_allocation: Ioctl failed: -75
+00:35:53  [ 9025.691668] misc dxg: dxgk: dxgkio_make_resident: Ioctl failed: -12
+00:38:09  [ 9161.048571] misc dxg: dxgk: dxgkio_make_resident: Ioctl failed: -12
+00:40:40  [ 9312.473329] misc dxg: dxgk: dxgkio_make_resident: Ioctl failed: -12
+00:42:54  [ 9446.538552] misc dxg: dxgk: dxgkio_make_resident: Ioctl failed: -12
+00:45:06  [ 9578.796956] misc dxg: dxgk: dxgkio_make_resident: Ioctl failed: -12
+00:50:42  [ 9914.220617] misc dxg: dxgk: dxgkio_make_resident: Ioctl failed: -12
+00:52:56  [10048.426968] misc dxg: dxgk: dxgkio_make_resident: Ioctl failed: -12
+01:06:26  [10858.648036] misc dxg: dxgk: dxgkio_make_resident: Ioctl failed: -12
+
+## Omni3D 서버 /health
+
+
+## run.log 끝
+[01:05:49] f2 it=10 measure: ok wall 39.7s (39.9s 경과) GPU 24063 MiB 
+[01:05:52]   정리 확인[f2] 시도 1: 할당 13121 MiB(기준 대비 +0), nvidia-smi 14070 MiB, 다른 측정 프로세스 없음 → 정상
+[01:05:52] ===== 조건 g1: c1 + Omni3D 연속 | 반복 워밍업 1+측정 10 | 시작 전 GPU 14070 MiB =====
+[01:06:08]   상주 sd 후 GPU 17183 MiB

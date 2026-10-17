@@ -1,0 +1,51 @@
+# 측정 환경 (측정 전)
+시각: 2026-10-14T17:45:46
+
+## GPU (nvidia-smi --query-gpu)
+name, memory.total [MiB], memory.used [MiB], memory.free [MiB], driver_version
+NVIDIA GeForce RTX 4090, 24564 MiB, 2488 MiB, 21651 MiB, 595.95
+
+## GPU 점유 프로세스 (WSL2 는 프로세스별 메모리를 N/A 로 준다)
+pid, process_name, used_gpu_memory [MiB]
+5014, [Not Found], [N/A]
+9150, [Not Found], [N/A]
+
+## nvidia-smi 전체
+Wed Oct 14 17:45:47 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 595.61                 Driver Version: 595.95         CUDA Version: 13.2     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 4090        On  |   00000000:01:00.0 Off |                  Off |
+| 31%   30C    P8              8W /  450W |    2488MiB /  24564MiB |      8%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A              26      G   /Xwayland                             N/A      |
+|    0   N/A  N/A            5014      C   /python3.10                           N/A      |
+|    0   N/A  N/A            9150      C   /python3.10                           N/A      |
++-----------------------------------------------------------------------------------------+
+
+## 소프트웨어
+Python: 3.11.15 (main, Mar 11 2026, 17:20:07) [GCC 14.3.0]
+플랫폼: Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
+PyTorch: 2.5.1+cu121
+CUDA(torch 빌드): 12.1
+cuDNN: 91900
+torch.cuda.is_available: True
+장치: NVIDIA GeForce RTX 4090
+torch mem_get_info: free=22988MiB total=24564MiB
+
+## 리스닝 포트 (8001 backend / 8002 uLayout / 8003 Omni3D)
+LISTEN 0      2048          0.0.0.0:8002       0.0.0.0:*    users:(("python",pid=5014,fd=23))    
+LISTEN 0      2048          0.0.0.0:8003       0.0.0.0:*    users:(("python",pid=9150,fd=23))
+
+git: ba507d6 (dirty: False)

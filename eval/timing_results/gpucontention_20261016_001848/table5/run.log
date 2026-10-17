@@ -1,0 +1,117 @@
+[00:24:16] 출력 /home/tmvlem5671/Empty_My_Room/eval/timing_results/gpucontention_20261016_001848/table5 / 조건 ['a'] / 사이드카 꺼짐 / dxg 누적 8
+[00:24:18] 입력 준비 완료: 소파 PNG 151704B, 액자 bbox(원본px) [1366.9, 464.1, 2096.7, 1434.4], SAM2 해제
+[00:24:48] SAM3D 로드 29.3s, 이 프로세스 할당 13121 MiB, GPU 14189 MiB
+[00:24:48] ===== 조건 a: SAM3D 단독 | 반복 워밍업 1+측정 5 | 시작 전 GPU 14189 MiB =====
+[00:25:15] a it=0 warmup: ok wall 26.7s (26.9s 경과) GPU 23795 MiB 
+[00:25:35] a it=1 measure: ok wall 20.1s (20.3s 경과) GPU 22938 MiB 
+[00:25:59] a it=2 measure: ok wall 24.3s (24.5s 경과) GPU 23922 MiB 
+[00:26:23] a it=3 measure: ok wall 23.2s (23.5s 경과) GPU 23062 MiB 
+[00:26:42] a it=4 measure: ok wall 19.1s (19.3s 경과) GPU 22952 MiB 
+[00:27:03] a it=5 measure: ok wall 20.5s (20.8s 경과) GPU 23054 MiB 
+[00:27:06]   정리 확인[a] 시도 1: 할당 13121 MiB(기준 대비 +0), nvidia-smi 14039 MiB, 다른 측정 프로세스 없음 → 정상
+[00:32:35] 출력 /home/tmvlem5671/Empty_My_Room/eval/timing_results/gpucontention_20261016_001848/table5 / 조건 ['b', 'c1', 'c2', 'd', 'e', 'f1', 'f2', 'g1', 'g2', 'b_end'] / 사이드카 켜짐 / dxg 누적 8
+[00:32:38] 입력 준비 완료: 소파 PNG 151704B, 액자 bbox(원본px) [1366.9, 464.1, 2096.7, 1434.4], SAM2 해제
+[00:33:03] SAM3D 로드 24.6s, 이 프로세스 할당 13121 MiB, GPU 15841 MiB
+[00:33:03] ===== 조건 b: + 사이드카 상주(유휴) | 반복 워밍업 1+측정 5 | 시작 전 GPU 15841 MiB =====
+[00:33:33] b it=0 warmup: ok wall 29.6s (29.8s 경과) GPU 14199 MiB 
+[00:33:56] b it=1 measure: ok wall 23.3s (23.5s 경과) GPU 15742 MiB 
+[00:34:16] b it=2 measure: ok wall 19.6s (19.8s 경과) GPU 14982 MiB 
+[00:34:37] b it=3 measure: ok wall 20.8s (20.9s 경과) GPU 14534 MiB 
+[00:34:57] b it=4 measure: ok wall 19.7s (19.9s 경과) GPU 23854 MiB 
+[00:35:17] b it=5 measure: ok wall 19.6s (19.8s 경과) GPU 23062 MiB 
+[00:35:20]   정리 확인[b] 시도 1: 할당 13121 MiB(기준 대비 +0), nvidia-smi 14166 MiB, 다른 측정 프로세스 없음 → 정상
+[00:35:20] ===== 조건 c1: + SD 상시 로드 | 반복 워밍업 1+측정 10 | 시작 전 GPU 14166 MiB =====
+[00:35:37]   상주 sd 후 GPU 16875 MiB
+[00:35:58] c1 it=0 warmup: ok wall 20.6s (21.0s 경과) GPU 17961 MiB 
+[00:36:22] c1 it=1 measure: ok wall 23.9s (24.2s 경과) GPU 18038 MiB 
+[00:36:57] c1 it=2 measure: ok wall 34.7s (35.0s 경과) GPU 18039 MiB 
+[00:37:31] c1 it=3 measure: ok wall 34.1s (34.5s 경과) GPU 17783 MiB 
+[00:37:52] c1 it=4 measure: ok wall 20.4s (20.7s 경과) GPU 18039 MiB 
+[00:38:13] c1 it=5 measure: ok wall 20.4s (20.7s 경과) GPU 17783 MiB 
+[00:38:37] c1 it=6 measure: ok wall 23.9s (24.2s 경과) GPU 18103 MiB 
+[00:39:00] c1 it=7 measure: ok wall 22.1s (22.5s 경과) GPU 17320 MiB 
+[00:39:21] c1 it=8 measure: ok wall 21.2s (21.6s 경과) GPU 16887 MiB 
+[00:39:42] c1 it=9 measure: ok wall 20.3s (20.6s 경과) GPU 18231 MiB 
+[00:40:03] c1 it=10 measure: ok wall 20.4s (20.8s 경과) GPU 18103 MiB 
+[00:40:06]   정리 확인[c1] 시도 1: 할당 13121 MiB(기준 대비 +0), nvidia-smi 14168 MiB, 다른 측정 프로세스 없음 → 정상
+[00:40:06] ===== 조건 c2: + SD·SAM2·LaMa 상시 로드 | 반복 워밍업 1+측정 10 | 시작 전 GPU 14168 MiB =====
+[00:40:23]   상주 sd,sam2,lama 후 GPU 18190 MiB
+[00:40:45] c2 it=0 warmup: ok wall 21.7s (22.1s 경과) GPU 17953 MiB 
+[00:41:09] c2 it=1 measure: ok wall 23.3s (23.8s 경과) GPU 18146 MiB 
+[00:41:31] c2 it=2 measure: ok wall 21.5s (21.9s 경과) GPU 18145 MiB 
+[00:41:53] c2 it=3 measure: ok wall 21.4s (21.8s 경과) GPU 18140 MiB 
+[00:42:15] c2 it=4 measure: ok wall 21.4s (21.9s 경과) GPU 18130 MiB 
+[00:42:37] c2 it=5 measure: ok wall 22.4s (22.9s 경과) GPU 18130 MiB 
+[00:42:59] c2 it=6 measure: ok wall 21.2s (21.6s 경과) GPU 17952 MiB 
+[00:43:24] c2 it=7 measure: ok wall 24.2s (24.7s 경과) GPU 18144 MiB 
+[00:43:46] c2 it=8 measure: ok wall 21.9s (22.4s 경과) GPU 18143 MiB 
+[00:44:08] c2 it=9 measure: ok wall 21.6s (22.1s 경과) GPU 18144 MiB 
+[00:44:31] c2 it=10 measure: ok wall 22.5s (22.9s 경과) GPU 18527 MiB 
+[00:44:35]   정리 확인[c2] 시도 1: 할당 13121 MiB(기준 대비 +0), nvidia-smi 14116 MiB, 다른 측정 프로세스 없음 → 정상
+[00:44:35] ===== 조건 d: + SD 필요 시 로드·해제(현행) | 반복 워밍업 1+측정 5 | 시작 전 GPU 14116 MiB =====
+[00:45:11] d it=0 warmup: ok wall 22.1s (36.6s 경과) GPU 13827 MiB 
+[00:45:45] d it=1 measure: ok wall 19.6s (34.3s 경과) GPU 23269 MiB 
+[00:46:18] d it=2 measure: ok wall 19.6s (33.0s 경과) GPU 23149 MiB 
+[00:46:52] d it=3 measure: ok wall 19.9s (34.0s 경과) GPU 23297 MiB 
+[00:47:28] d it=4 measure: ok wall 21.0s (35.4s 경과) GPU 23948 MiB 
+[00:48:00] d it=5 measure: ok wall 19.1s (32.5s 경과) GPU 23103 MiB 
+[00:48:03]   정리 확인[d] 시도 1: 할당 13121 MiB(기준 대비 +0), nvidia-smi 13797 MiB, 다른 측정 프로세스 없음 → 정상
+[00:48:03] ===== 조건 e: + Omni3D 1회 동시 호출 | 반복 워밍업 1+측정 5 | 시작 전 GPU 13797 MiB =====
+[00:48:24] e it=0 warmup: ok wall 20.0s (20.2s 경과) GPU 23783 MiB 
+[00:48:43] e it=1 measure: ok wall 19.3s (19.5s 경과) GPU 23860 MiB 
+[00:49:04] e it=2 measure: ok wall 20.7s (20.9s 경과) GPU 24077 MiB 
+[00:49:27] e it=3 measure: ok wall 23.2s (23.4s 경과) GPU 24004 MiB 
+[00:49:47] e it=4 measure: ok wall 19.1s (19.3s 경과) GPU 23569 MiB 
+[00:50:07] e it=5 measure: ok wall 19.8s (20.0s 경과) GPU 24007 MiB 
+[00:50:10]   정리 확인[e] 시도 1: 할당 13121 MiB(기준 대비 +0), nvidia-smi 14354 MiB, 다른 측정 프로세스 없음 → 정상
+[00:50:10] ===== 조건 f1: c1 + Omni3D 1회 | 반복 워밍업 1+측정 10 | 시작 전 GPU 14354 MiB =====
+[00:50:25]   상주 sd 후 GPU 17194 MiB
+[00:50:47] f1 it=0 warmup: ok wall 21.3s (21.7s 경과) GPU 17819 MiB 
+[00:51:12] f1 it=1 measure: ok wall 24.6s (25.0s 경과) GPU 17975 MiB 
+[00:51:33] f1 it=2 measure: ok wall 20.7s (21.1s 경과) GPU 18154 MiB 
+[00:51:54] f1 it=3 measure: ok wall 21.2s (21.6s 경과) GPU 17718 MiB 
+[00:52:17] f1 it=4 measure: ok wall 21.8s (22.3s 경과) GPU 17207 MiB 
+[00:52:39] f1 it=5 measure: ok wall 22.4s (22.8s 경과) GPU 17206 MiB 
+[00:53:01] f1 it=6 measure: ok wall 20.8s (21.1s 경과) GPU 17910 MiB 
+[00:53:25] f1 it=7 measure: ok wall 24.3s (24.7s 경과) GPU 18230 MiB 
+[00:53:47] f1 it=8 measure: ok wall 21.8s (22.3s 경과) GPU 17206 MiB 
+[00:54:09] f1 it=9 measure: ok wall 20.9s (21.3s 경과) GPU 17847 MiB 
+[00:54:30] f1 it=10 measure: ok wall 20.9s (21.3s 경과) GPU 17321 MiB 
+[00:54:33]   정리 확인[f1] 시도 1: 할당 13121 MiB(기준 대비 +0), nvidia-smi 14488 MiB, 다른 측정 프로세스 없음 → 정상
+[00:54:33] ===== 조건 f2: c2 + Omni3D 1회 | 반복 워밍업 1+측정 10 | 시작 전 GPU 14488 MiB =====
+[00:54:50]   상주 sd,sam2,lama 후 GPU 18495 MiB
+[00:55:37] f2 it=0 warmup: ok wall 46.6s (46.8s 경과) GPU 24051 MiB 
+[00:56:30] f2 it=1 measure: ok wall 52.7s (52.9s 경과) GPU 24011 MiB 
+[00:57:34] f2 it=2 measure: ok wall 63.6s (63.8s 경과) GPU 16947 MiB 
+[00:58:39] f2 it=3 measure: ok wall 65.2s (65.4s 경과) GPU 24119 MiB 
+[00:59:39] f2 it=4 measure: ok wall 59.4s (59.6s 경과) GPU 24051 MiB 
+[01:00:42] f2 it=5 measure: ok wall 63.0s (63.2s 경과) GPU 24118 MiB 
+[01:01:42] f2 it=6 measure: ok wall 59.6s (59.8s 경과) GPU 18310 MiB 
+[01:02:52] f2 it=7 measure: ok wall 69.7s (69.9s 경과) GPU 21726 MiB 
+[01:04:02] f2 it=8 measure: ok wall 70.5s (70.7s 경과) GPU 24104 MiB 
+[01:05:09] f2 it=9 measure: ok wall 66.4s (66.7s 경과) GPU 24117 MiB 
+[01:05:49] f2 it=10 measure: ok wall 39.7s (39.9s 경과) GPU 24063 MiB 
+[01:05:52]   정리 확인[f2] 시도 1: 할당 13121 MiB(기준 대비 +0), nvidia-smi 14070 MiB, 다른 측정 프로세스 없음 → 정상
+[01:05:52] ===== 조건 g1: c1 + Omni3D 연속 | 반복 워밍업 1+측정 10 | 시작 전 GPU 14070 MiB =====
+[01:06:08]   상주 sd 후 GPU 17183 MiB
+[01:49:44] 워치독 600초 / 출력 /home/tmvlem5671/Empty_My_Room/eval/timing_results/gpucontention_20261016_001848/table5 / 조건 ['g2'] / 사이드카 켜짐 / dxg 누적 {'make_resident': 8, 'create_allocation': 24}
+[01:49:49] 입력 준비 완료: 소파 PNG 151704B, 액자 bbox(원본px) [1366.9, 464.1, 2096.7, 1434.4], SAM2 해제
+[01:50:43] SAM3D 로드 54.4s, 이 프로세스 할당 13121 MiB, GPU 15415 MiB
+[01:50:43] ===== 조건 g2: c2 + Omni3D 연속 | 반복 워밍업 1+측정 10 | 시작 전 GPU 15415 MiB =====
+[01:51:02]   상주 sd,sam2,lama 후 GPU 19467 MiB
+[01:51:41] g2 it=0 warmup: ok wall 38.9s (39.4s 경과) GPU 18184 MiB 
+[01:52:14] g2 it=1 measure: ok wall 31.9s (32.6s 경과) GPU 18331 MiB 
+[01:52:50] g2 it=2 measure: ok wall 35.3s (35.9s 경과) GPU 18513 MiB 
+[01:53:20] g2 it=3 measure: ok wall 29.9s (30.6s 경과) GPU 18335 MiB 
+[02:03:20] !! WATCHDOG: 실행이 600초를 넘겨 프로세스를 강제 종료(경과 600초). 이 실행은 완료되지 않았다 | dmesg 증가 {'make_resident': 2, 'create_allocation': 0}
+[02:03:46] 워치독 600초 / 출력 /home/tmvlem5671/Empty_My_Room/eval/timing_results/gpucontention_20261016_001848/table5 / 조건 ['b_end'] / 사이드카 켜짐 / dxg 누적 {'make_resident': 10, 'create_allocation': 24}
+[02:03:49] 입력 준비 완료: 소파 PNG 151704B, 액자 bbox(원본px) [1366.9, 464.1, 2096.7, 1434.4], SAM2 해제
+[02:04:17] SAM3D 로드 28.2s, 이 프로세스 할당 13121 MiB, GPU 15488 MiB
+[02:04:17] ===== 조건 b_end: b 재측정 | 반복 워밍업 1+측정 5 | 시작 전 GPU 15488 MiB =====
+[02:04:45] b_end it=0 warmup: ok wall 27.2s (27.4s 경과) GPU 23918 MiB 
+[02:05:10] b_end it=1 measure: ok wall 24.9s (25.1s 경과) GPU 14495 MiB 
+[02:05:35] b_end it=2 measure: ok wall 24.4s (24.6s 경과) GPU 23512 MiB 
+[02:05:55] b_end it=3 measure: ok wall 20.4s (20.6s 경과) GPU 18974 MiB 
+[02:06:18] b_end it=4 measure: ok wall 22.4s (22.6s 경과) GPU 16753 MiB 
+[02:06:38] b_end it=5 measure: ok wall 19.7s (19.9s 경과) GPU 23805 MiB 
+[02:06:41]   정리 확인[b_end] 시도 1: 할당 13121 MiB(기준 대비 +0), nvidia-smi 13993 MiB, 다른 측정 프로세스 없음 → 정상

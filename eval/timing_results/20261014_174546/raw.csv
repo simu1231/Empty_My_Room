@@ -1,0 +1,827 @@
+scene,iteration,phase,mode,stage,furniture,seconds,status,note
+_global,0,warmup,_global,load_SAM3D,,32.5267,ok,
+sceneA,0,warmup,sequential,load_SAM2,,0.9272,ok,
+sceneA,0,warmup,sequential,load_LaMa,,1.3137,ok,
+sceneA,0,warmup,sequential,SAM2_mask,,0.5860,ok,
+sceneA,0,warmup,sequential,LaMa,,0.2313,ok,
+sceneA,0,warmup,sequential,SD_load,,5.9804,ok,
+sceneA,0,warmup,sequential,SD,,6.2431,ok,
+sceneA,0,warmup,sequential,SD_unload,,0.2041,ok,
+sceneA,0,warmup,sequential,SAM2_extract,,0.2755,ok,
+sceneA,0,warmup,sequential,release_SAM2_LaMa,,0.1749,ok,
+sceneA,0,warmup,sequential,uLayout_infer,,2.1339,ok,
+sceneA,0,warmup,sequential,uLayout_rectify,,1.2375,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneA,0,warmup,sequential,SAM3D,침대,33.7500,ok,type=vertex_color; sam3d_size_m=True
+sceneA,0,warmup,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneA,0,warmup,sequential,SAM3D,협탁,28.3204,ok,type=vertex_color; sam3d_size_m=True
+sceneA,0,warmup,sequential,Scale_Omni3D,협탁,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneA,0,warmup,sequential,e2e,,79.1708,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneA,0,warmup,sequential,stage_sum,,79.1371,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneA,0,warmup,parallel,load_SAM2,,0.9027,ok,
+sceneA,0,warmup,parallel,load_LaMa,,0.5635,ok,
+sceneA,0,warmup,parallel,SAM2_mask,,0.3465,ok,
+sceneA,0,warmup,parallel,LaMa,,0.1733,ok,
+sceneA,0,warmup,parallel,SD_load,,5.6723,ok,
+sceneA,0,warmup,parallel,SD,,6.1086,ok,
+sceneA,0,warmup,parallel,SD_unload,,0.2176,ok,
+sceneA,0,warmup,parallel,SAM2_extract,,0.2732,ok,
+sceneA,0,warmup,parallel,release_SAM2_LaMa,,0.1831,ok,
+sceneA,0,warmup,parallel,uLayout_rectify,,1.3806,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneA,0,warmup,parallel,uLayout_infer,,2.5411,ok,
+sceneA,0,warmup,parallel,uLayout_phase,,2.5420,ok,
+sceneA,0,warmup,parallel,SAM3D,침대,23.8833,ok,type=vertex_color; sam3d_size_m=True
+sceneA,0,warmup,parallel,furniture_phase,침대,23.8839,ok,
+sceneA,0,warmup,parallel,SAM3D,협탁,18.1238,ok,type=vertex_color; sam3d_size_m=True
+sceneA,0,warmup,parallel,furniture_phase,협탁,18.1249,ok,
+sceneA,0,warmup,parallel,e2e,,57.5278,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneA,1,measure,sequential,load_SAM2,,0.8279,ok,
+sceneA,1,measure,sequential,load_LaMa,,0.2937,ok,
+sceneA,1,measure,sequential,SAM2_mask,,0.3245,ok,
+sceneA,1,measure,sequential,LaMa,,0.2094,ok,
+sceneA,1,measure,sequential,SD_load,,2.7219,ok,
+sceneA,1,measure,sequential,SD,,6.2242,ok,
+sceneA,1,measure,sequential,SD_unload,,0.2077,ok,
+sceneA,1,measure,sequential,SAM2_extract,,0.2732,ok,
+sceneA,1,measure,sequential,release_SAM2_LaMa,,0.1796,ok,
+sceneA,1,measure,sequential,uLayout_infer,,1.4664,ok,
+sceneA,1,measure,sequential,uLayout_rectify,,1.1037,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneA,1,measure,sequential,SAM3D,침대,50.6263,ok,type=vertex_color; sam3d_size_m=True
+sceneA,1,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneA,1,measure,sequential,SAM3D,협탁,166.9140,ok,type=vertex_color; sam3d_size_m=True
+sceneA,1,measure,sequential,Scale_Omni3D,협탁,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneA,1,measure,sequential,e2e,,230.2542,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneA,1,measure,sequential,stage_sum,,230.2509,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneA,1,measure,parallel,load_SAM2,,0.8286,ok,
+sceneA,1,measure,parallel,load_LaMa,,0.2989,ok,
+sceneA,1,measure,parallel,SAM2_mask,,0.2508,ok,
+sceneA,1,measure,parallel,LaMa,,0.1863,ok,
+sceneA,1,measure,parallel,SD_load,,2.9804,ok,
+sceneA,1,measure,parallel,SD,,6.1798,ok,
+sceneA,1,measure,parallel,SD_unload,,0.2086,ok,
+sceneA,1,measure,parallel,SAM2_extract,,0.2663,ok,
+sceneA,1,measure,parallel,release_SAM2_LaMa,,0.1771,ok,
+sceneA,1,measure,parallel,uLayout_rectify,,1.1757,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneA,1,measure,parallel,uLayout_infer,,2.2395,ok,
+sceneA,1,measure,parallel,uLayout_phase,,2.2401,ok,
+sceneA,1,measure,parallel,SAM3D,침대,24.2675,ok,type=vertex_color; sam3d_size_m=True
+sceneA,1,measure,parallel,furniture_phase,침대,24.2681,ok,
+sceneA,1,measure,parallel,SAM3D,협탁,25.0454,ok,type=vertex_color; sam3d_size_m=True
+sceneA,1,measure,parallel,furniture_phase,협탁,25.0460,ok,
+sceneA,1,measure,parallel,e2e,,61.8054,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneA,2,measure,sequential,load_SAM2,,0.8420,ok,
+sceneA,2,measure,sequential,load_LaMa,,0.3019,ok,
+sceneA,2,measure,sequential,SAM2_mask,,0.2719,ok,
+sceneA,2,measure,sequential,LaMa,,0.1746,ok,
+sceneA,2,measure,sequential,SD_load,,2.9245,ok,
+sceneA,2,measure,sequential,SD,,6.0434,ok,
+sceneA,2,measure,sequential,SD_unload,,0.2071,ok,
+sceneA,2,measure,sequential,SAM2_extract,,0.2754,ok,
+sceneA,2,measure,sequential,release_SAM2_LaMa,,0.1791,ok,
+sceneA,2,measure,sequential,uLayout_infer,,1.3033,ok,
+sceneA,2,measure,sequential,uLayout_rectify,,1.1413,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneA,2,measure,sequential,SAM3D,침대,25.0852,ok,type=vertex_color; sam3d_size_m=True
+sceneA,2,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneA,2,measure,sequential,SAM3D,협탁,16.7808,ok,type=vertex_color; sam3d_size_m=True
+sceneA,2,measure,sequential,Scale_Omni3D,협탁,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneA,2,measure,sequential,e2e,,54.3899,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneA,2,measure,sequential,stage_sum,,54.3866,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneA,2,measure,parallel,load_SAM2,,0.8064,ok,
+sceneA,2,measure,parallel,load_LaMa,,0.2957,ok,
+sceneA,2,measure,parallel,SAM2_mask,,0.3621,ok,
+sceneA,2,measure,parallel,LaMa,,0.1717,ok,
+sceneA,2,measure,parallel,SD_load,,2.7868,ok,
+sceneA,2,measure,parallel,SD,,6.3667,ok,
+sceneA,2,measure,parallel,SD_unload,,0.2138,ok,
+sceneA,2,measure,parallel,SAM2_extract,,0.2838,ok,
+sceneA,2,measure,parallel,release_SAM2_LaMa,,0.1850,ok,
+sceneA,2,measure,parallel,uLayout_infer,,1.1661,ok,
+sceneA,2,measure,parallel,uLayout_rectify,,2.3058,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneA,2,measure,parallel,uLayout_phase,,2.3072,ok,
+sceneA,2,measure,parallel,SAM3D,침대,22.2931,ok,type=vertex_color; sam3d_size_m=True
+sceneA,2,measure,parallel,furniture_phase,침대,22.2936,ok,
+sceneA,2,measure,parallel,SAM3D,협탁,16.6870,ok,type=vertex_color; sam3d_size_m=True
+sceneA,2,measure,parallel,furniture_phase,협탁,16.6878,ok,
+sceneA,2,measure,parallel,e2e,,51.6605,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneA,3,measure,sequential,load_SAM2,,0.8112,ok,
+sceneA,3,measure,sequential,load_LaMa,,0.2861,ok,
+sceneA,3,measure,sequential,SAM2_mask,,0.3240,ok,
+sceneA,3,measure,sequential,LaMa,,0.2119,ok,
+sceneA,3,measure,sequential,SD_load,,2.8115,ok,
+sceneA,3,measure,sequential,SD,,6.1821,ok,
+sceneA,3,measure,sequential,SD_unload,,0.2061,ok,
+sceneA,3,measure,sequential,SAM2_extract,,0.2801,ok,
+sceneA,3,measure,sequential,release_SAM2_LaMa,,0.1737,ok,
+sceneA,3,measure,sequential,uLayout_infer,,1.1090,ok,
+sceneA,3,measure,sequential,uLayout_rectify,,1.1550,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneA,3,measure,sequential,SAM3D,침대,25.4552,ok,type=vertex_color; sam3d_size_m=True
+sceneA,3,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneA,3,measure,sequential,SAM3D,협탁,29.9774,ok,type=vertex_color; sam3d_size_m=True
+sceneA,3,measure,sequential,Scale_Omni3D,협탁,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneA,3,measure,sequential,e2e,,67.8894,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneA,3,measure,sequential,stage_sum,,67.8860,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneA,3,measure,parallel,load_SAM2,,0.8077,ok,
+sceneA,3,measure,parallel,load_LaMa,,0.2947,ok,
+sceneA,3,measure,parallel,SAM2_mask,,0.3245,ok,
+sceneA,3,measure,parallel,LaMa,,0.1742,ok,
+sceneA,3,measure,parallel,SD_load,,2.8407,ok,
+sceneA,3,measure,parallel,SD,,6.0096,ok,
+sceneA,3,measure,parallel,SD_unload,,0.2178,ok,
+sceneA,3,measure,parallel,SAM2_extract,,0.2882,ok,
+sceneA,3,measure,parallel,release_SAM2_LaMa,,0.1832,ok,
+sceneA,3,measure,parallel,uLayout_rectify,,1.2882,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneA,3,measure,parallel,uLayout_infer,,2.3707,ok,
+sceneA,3,measure,parallel,uLayout_phase,,2.3711,ok,
+sceneA,3,measure,parallel,SAM3D,침대,23.9510,ok,type=vertex_color; sam3d_size_m=True
+sceneA,3,measure,parallel,furniture_phase,침대,23.9517,ok,
+sceneA,3,measure,parallel,SAM3D,협탁,17.1191,ok,type=vertex_color; sam3d_size_m=True
+sceneA,3,measure,parallel,furniture_phase,협탁,17.1210,ok,
+sceneA,3,measure,parallel,e2e,,53.4841,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneA,4,measure,sequential,load_SAM2,,0.7986,ok,
+sceneA,4,measure,sequential,load_LaMa,,0.2937,ok,
+sceneA,4,measure,sequential,SAM2_mask,,0.3013,ok,
+sceneA,4,measure,sequential,LaMa,,0.1741,ok,
+sceneA,4,measure,sequential,SD_load,,2.9777,ok,
+sceneA,4,measure,sequential,SD,,6.1431,ok,
+sceneA,4,measure,sequential,SD_unload,,0.2106,ok,
+sceneA,4,measure,sequential,SAM2_extract,,0.2745,ok,
+sceneA,4,measure,sequential,release_SAM2_LaMa,,0.1791,ok,
+sceneA,4,measure,sequential,uLayout_infer,,1.1777,ok,
+sceneA,4,measure,sequential,uLayout_rectify,,1.1293,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneA,4,measure,sequential,SAM3D,침대,69.4635,ok,type=vertex_color; sam3d_size_m=True
+sceneA,4,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneA,4,measure,sequential,SAM3D,협탁,270.1224,ok,type=vertex_color; sam3d_size_m=True
+sceneA,4,measure,sequential,Scale_Omni3D,협탁,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneA,4,measure,sequential,e2e,,352.1566,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneA,4,measure,sequential,stage_sum,,352.1533,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneA,4,measure,parallel,load_SAM2,,0.8985,ok,
+sceneA,4,measure,parallel,load_LaMa,,0.3373,ok,
+sceneA,4,measure,parallel,SAM2_mask,,0.3593,ok,
+sceneA,4,measure,parallel,LaMa,,0.1722,ok,
+sceneA,4,measure,parallel,SD_load,,3.5065,ok,
+sceneA,4,measure,parallel,SD,,6.0054,ok,
+sceneA,4,measure,parallel,SD_unload,,0.2187,ok,
+sceneA,4,measure,parallel,SAM2_extract,,0.2816,ok,
+sceneA,4,measure,parallel,release_SAM2_LaMa,,0.1786,ok,
+sceneA,4,measure,parallel,uLayout_infer,,1.3088,ok,
+sceneA,4,measure,parallel,uLayout_rectify,,2.5151,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneA,4,measure,parallel,uLayout_phase,,2.5164,ok,
+sceneA,4,measure,parallel,SAM3D,침대,22.6774,ok,type=vertex_color; sam3d_size_m=True
+sceneA,4,measure,parallel,furniture_phase,침대,22.6781,ok,
+sceneA,4,measure,parallel,SAM3D,협탁,26.1262,ok,type=vertex_color; sam3d_size_m=True
+sceneA,4,measure,parallel,furniture_phase,협탁,26.1275,ok,
+sceneA,4,measure,parallel,e2e,,62.0465,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneA,5,measure,sequential,load_SAM2,,0.8248,ok,
+sceneA,5,measure,sequential,load_LaMa,,0.3162,ok,
+sceneA,5,measure,sequential,SAM2_mask,,0.3521,ok,
+sceneA,5,measure,sequential,LaMa,,0.1753,ok,
+sceneA,5,measure,sequential,SD_load,,2.7439,ok,
+sceneA,5,measure,sequential,SD,,6.1927,ok,
+sceneA,5,measure,sequential,SD_unload,,0.2246,ok,
+sceneA,5,measure,sequential,SAM2_extract,,0.2781,ok,
+sceneA,5,measure,sequential,release_SAM2_LaMa,,0.1790,ok,
+sceneA,5,measure,sequential,uLayout_infer,,1.2194,ok,
+sceneA,5,measure,sequential,uLayout_rectify,,1.0457,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneA,5,measure,sequential,SAM3D,침대,22.4070,ok,type=vertex_color; sam3d_size_m=True
+sceneA,5,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneA,5,measure,sequential,SAM3D,협탁,17.0434,ok,type=vertex_color; sam3d_size_m=True
+sceneA,5,measure,sequential,Scale_Omni3D,협탁,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneA,5,measure,sequential,e2e,,51.8641,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneA,5,measure,sequential,stage_sum,,51.8612,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneA,5,measure,parallel,load_SAM2,,0.8394,ok,
+sceneA,5,measure,parallel,load_LaMa,,0.3113,ok,
+sceneA,5,measure,parallel,SAM2_mask,,0.3738,ok,
+sceneA,5,measure,parallel,LaMa,,0.1847,ok,
+sceneA,5,measure,parallel,SD_load,,2.7023,ok,
+sceneA,5,measure,parallel,SD,,6.2625,ok,
+sceneA,5,measure,parallel,SD_unload,,0.2128,ok,
+sceneA,5,measure,parallel,SAM2_extract,,0.2730,ok,
+sceneA,5,measure,parallel,release_SAM2_LaMa,,0.1873,ok,
+sceneA,5,measure,parallel,uLayout_rectify,,1.1613,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneA,5,measure,parallel,uLayout_infer,,2.4347,ok,
+sceneA,5,measure,parallel,uLayout_phase,,2.4352,ok,
+sceneA,5,measure,parallel,SAM3D,침대,22.3075,ok,type=vertex_color; sam3d_size_m=True
+sceneA,5,measure,parallel,furniture_phase,침대,22.3081,ok,
+sceneA,5,measure,parallel,SAM3D,협탁,16.4644,ok,type=vertex_color; sam3d_size_m=True
+sceneA,5,measure,parallel,furniture_phase,협탁,16.4661,ok,
+sceneA,5,measure,parallel,e2e,,51.4080,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneB,0,warmup,sequential,load_SAM2,,0.8461,ok,
+sceneB,0,warmup,sequential,load_LaMa,,0.3064,ok,
+sceneB,0,warmup,sequential,SAM2_mask,,0.3197,ok,
+sceneB,0,warmup,sequential,LaMa,,0.2910,ok,
+sceneB,0,warmup,sequential,SD_load,,2.6895,ok,
+sceneB,0,warmup,sequential,SD,,9.8989,ok,
+sceneB,0,warmup,sequential,SD_unload,,0.2162,ok,
+sceneB,0,warmup,sequential,SAM2_extract,,0.2725,ok,
+sceneB,0,warmup,sequential,release_SAM2_LaMa,,0.1756,ok,
+sceneB,0,warmup,sequential,uLayout_infer,,1.1029,ok,
+sceneB,0,warmup,sequential,uLayout_rectify,,1.1184,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneB,0,warmup,sequential,SAM3D,소파,21.9221,ok,type=vertex_color; sam3d_size_m=True
+sceneB,0,warmup,sequential,Scale_Omni3D,소파,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneB,0,warmup,sequential,SAM3D,스탠드 조명,25.0218,ok,type=vertex_color; sam3d_size_m=True
+sceneB,0,warmup,sequential,Scale_Omni3D,스탠드 조명,1.0790,ok,"dims_m={""width"": 0.39960163831710815, ""height"": 1.7249629497528076, ""depth"": 0.38546639680862427}"
+sceneB,0,warmup,sequential,SAM3D,액자,16.3745,ok,type=vertex_color; sam3d_size_m=True
+sceneB,0,warmup,sequential,Scale_Omni3D,액자,0.2433,ok,"dims_m={""width"": 0.5886356234550476, ""height"": 0.7461342811584473, ""depth"": 0.179484561085701}"
+sceneB,0,warmup,sequential,e2e,,80.7952,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneB,0,warmup,sequential,stage_sum,,80.7254,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneB,0,warmup,parallel,load_SAM2,,0.8276,ok,
+sceneB,0,warmup,parallel,load_LaMa,,0.2893,ok,
+sceneB,0,warmup,parallel,SAM2_mask,,0.3598,ok,
+sceneB,0,warmup,parallel,LaMa,,0.2832,ok,
+sceneB,0,warmup,parallel,SD_load,,2.7212,ok,
+sceneB,0,warmup,parallel,SD,,10.1571,ok,
+sceneB,0,warmup,parallel,SD_unload,,0.2225,ok,
+sceneB,0,warmup,parallel,SAM2_extract,,0.2777,ok,
+sceneB,0,warmup,parallel,release_SAM2_LaMa,,0.1854,ok,
+sceneB,0,warmup,parallel,uLayout_rectify,,1.3622,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneB,0,warmup,parallel,uLayout_infer,,2.5655,ok,
+sceneB,0,warmup,parallel,uLayout_phase,,2.5661,ok,
+sceneB,0,warmup,parallel,SAM3D,소파,21.0554,ok,type=vertex_color; sam3d_size_m=True
+sceneB,0,warmup,parallel,furniture_phase,소파,21.0561,ok,
+sceneB,0,warmup,parallel,Scale_Omni3D,스탠드 조명,0.3379,ok,"dims_m={""width"": 0.39960163831710815, ""height"": 1.7249629497528076, ""depth"": 0.38546639680862427}"
+sceneB,0,warmup,parallel,SAM3D,스탠드 조명,24.8286,ok,type=vertex_color; sam3d_size_m=True
+sceneB,0,warmup,parallel,furniture_phase,스탠드 조명,24.8312,ok,
+sceneB,0,warmup,parallel,Scale_Omni3D,액자,0.3020,ok,"dims_m={""width"": 0.5886356234550476, ""height"": 0.7461342811584473, ""depth"": 0.179484561085701}"
+sceneB,0,warmup,parallel,SAM3D,액자,21.3570,ok,type=vertex_color; sam3d_size_m=True
+sceneB,0,warmup,parallel,furniture_phase,액자,21.3593,ok,
+sceneB,0,warmup,parallel,e2e,,84.0228,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneB,1,measure,sequential,load_SAM2,,0.9281,ok,
+sceneB,1,measure,sequential,load_LaMa,,0.3296,ok,
+sceneB,1,measure,sequential,SAM2_mask,,3.4541,ok,
+sceneB,1,measure,sequential,LaMa,,1.0850,ok,
+sceneB,1,measure,sequential,SD_load,,3.3327,ok,
+sceneB,1,measure,sequential,SD,,9.8436,ok,
+sceneB,1,measure,sequential,SD_unload,,0.2234,ok,
+sceneB,1,measure,sequential,SAM2_extract,,0.2878,ok,
+sceneB,1,measure,sequential,release_SAM2_LaMa,,0.1855,ok,
+sceneB,1,measure,sequential,uLayout_infer,,1.3411,ok,
+sceneB,1,measure,sequential,uLayout_rectify,,1.1444,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneB,1,measure,sequential,SAM3D,소파,20.9394,ok,type=vertex_color; sam3d_size_m=True
+sceneB,1,measure,sequential,Scale_Omni3D,소파,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneB,1,measure,sequential,SAM3D,스탠드 조명,26.7504,ok,type=vertex_color; sam3d_size_m=True
+sceneB,1,measure,sequential,Scale_Omni3D,스탠드 조명,0.2890,ok,"dims_m={""width"": 0.39960163831710815, ""height"": 1.7249629497528076, ""depth"": 0.38546639680862427}"
+sceneB,1,measure,sequential,SAM3D,액자,19.1378,ok,type=vertex_color; sam3d_size_m=True
+sceneB,1,measure,sequential,Scale_Omni3D,액자,0.2411,ok,"dims_m={""width"": 0.5886356234550476, ""height"": 0.7461342811584473, ""depth"": 0.179484561085701}"
+sceneB,1,measure,sequential,e2e,,88.2606,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneB,1,measure,sequential,stage_sum,,88.2553,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneB,1,measure,parallel,load_SAM2,,0.9064,ok,
+sceneB,1,measure,parallel,load_LaMa,,0.3171,ok,
+sceneB,1,measure,parallel,SAM2_mask,,0.5124,ok,
+sceneB,1,measure,parallel,LaMa,,0.2963,ok,
+sceneB,1,measure,parallel,SD_load,,3.5800,ok,
+sceneB,1,measure,parallel,SD,,9.7043,ok,
+sceneB,1,measure,parallel,SD_unload,,0.2142,ok,
+sceneB,1,measure,parallel,SAM2_extract,,0.2823,ok,
+sceneB,1,measure,parallel,release_SAM2_LaMa,,0.1782,ok,
+sceneB,1,measure,parallel,uLayout_rectify,,1.4800,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneB,1,measure,parallel,uLayout_infer,,2.5809,ok,
+sceneB,1,measure,parallel,uLayout_phase,,2.5817,ok,
+sceneB,1,measure,parallel,SAM3D,소파,22.8580,ok,type=vertex_color; sam3d_size_m=True
+sceneB,1,measure,parallel,furniture_phase,소파,22.8586,ok,
+sceneB,1,measure,parallel,Scale_Omni3D,스탠드 조명,0.4959,ok,"dims_m={""width"": 0.39960163831710815, ""height"": 1.7249629497528076, ""depth"": 0.38546639680862427}"
+sceneB,1,measure,parallel,SAM3D,스탠드 조명,21.3520,ok,type=vertex_color; sam3d_size_m=True
+sceneB,1,measure,parallel,furniture_phase,스탠드 조명,21.3527,ok,
+sceneB,1,measure,parallel,Scale_Omni3D,액자,0.4284,ok,"dims_m={""width"": 0.5886356234550476, ""height"": 0.7461342811584473, ""depth"": 0.179484561085701}"
+sceneB,1,measure,parallel,SAM3D,액자,18.5495,ok,type=vertex_color; sam3d_size_m=True
+sceneB,1,measure,parallel,furniture_phase,액자,18.5511,ok,
+sceneB,1,measure,parallel,e2e,,80.1145,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneB,2,measure,sequential,load_SAM2,,0.8795,ok,
+sceneB,2,measure,sequential,load_LaMa,,0.3098,ok,
+sceneB,2,measure,sequential,SAM2_mask,,0.2542,ok,
+sceneB,2,measure,sequential,LaMa,,0.2771,ok,
+sceneB,2,measure,sequential,SD_load,,3.0297,ok,
+sceneB,2,measure,sequential,SD,,9.8803,ok,
+sceneB,2,measure,sequential,SD_unload,,0.2177,ok,
+sceneB,2,measure,sequential,SAM2_extract,,0.2835,ok,
+sceneB,2,measure,sequential,release_SAM2_LaMa,,0.1776,ok,
+sceneB,2,measure,sequential,uLayout_infer,,1.2670,ok,
+sceneB,2,measure,sequential,uLayout_rectify,,1.1671,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneB,2,measure,sequential,SAM3D,소파,20.7126,ok,type=vertex_color; sam3d_size_m=True
+sceneB,2,measure,sequential,Scale_Omni3D,소파,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneB,2,measure,sequential,SAM3D,스탠드 조명,28.6686,ok,type=vertex_color; sam3d_size_m=True
+sceneB,2,measure,sequential,Scale_Omni3D,스탠드 조명,0.3278,ok,"dims_m={""width"": 0.39960163831710815, ""height"": 1.7249629497528076, ""depth"": 0.38546639680862427}"
+sceneB,2,measure,sequential,SAM3D,액자,16.8726,ok,type=vertex_color; sam3d_size_m=True
+sceneB,2,measure,sequential,Scale_Omni3D,액자,0.2182,ok,"dims_m={""width"": 0.5886356234550476, ""height"": 0.7461342811584473, ""depth"": 0.179484561085701}"
+sceneB,2,measure,sequential,e2e,,83.3585,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneB,2,measure,sequential,stage_sum,,83.3540,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneB,2,measure,parallel,load_SAM2,,0.8542,ok,
+sceneB,2,measure,parallel,load_LaMa,,0.3104,ok,
+sceneB,2,measure,parallel,SAM2_mask,,0.3701,ok,
+sceneB,2,measure,parallel,LaMa,,0.2868,ok,
+sceneB,2,measure,parallel,SD_load,,3.1196,ok,
+sceneB,2,measure,parallel,SD,,9.6174,ok,
+sceneB,2,measure,parallel,SD_unload,,0.2142,ok,
+sceneB,2,measure,parallel,SAM2_extract,,0.2754,ok,
+sceneB,2,measure,parallel,release_SAM2_LaMa,,0.1783,ok,
+sceneB,2,measure,parallel,uLayout_infer,,1.2954,ok,
+sceneB,2,measure,parallel,uLayout_rectify,,2.4593,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneB,2,measure,parallel,uLayout_phase,,2.4607,ok,
+sceneB,2,measure,parallel,SAM3D,소파,21.2966,ok,type=vertex_color; sam3d_size_m=True
+sceneB,2,measure,parallel,furniture_phase,소파,21.2973,ok,
+sceneB,2,measure,parallel,Scale_Omni3D,스탠드 조명,120.1063,failed,"ReadTimeout: HTTPConnectionPool(host='localhost', port=8003): Read timed out. (read timeout=120)"
+sceneB,2,measure,parallel,SAM3D,스탠드 조명,315.0061,ok,type=vertex_color; sam3d_size_m=True
+sceneB,2,measure,parallel,furniture_phase,스탠드 조명,315.0070,failed,"ReadTimeout: HTTPConnectionPool(host='localhost', port=8003): Read timed out. (read timeout=120)"
+sceneB,2,measure,parallel,e2e,,352.8294,failed,"ReadTimeout: HTTPConnectionPool(host='localhost', port=8003): Read timed out. (read timeout=120)"
+sceneB,3,measure,sequential,load_SAM2,,0.9534,ok,
+sceneB,3,measure,sequential,load_LaMa,,0.3279,ok,
+sceneB,3,measure,sequential,SAM2_mask,,0.2276,ok,
+sceneB,3,measure,sequential,LaMa,,0.3091,ok,
+sceneB,3,measure,sequential,SD_load,,3.1874,ok,
+sceneB,3,measure,sequential,SD,,9.6401,ok,
+sceneB,3,measure,sequential,SD_unload,,0.2173,ok,
+sceneB,3,measure,sequential,SAM2_extract,,0.2782,ok,
+sceneB,3,measure,sequential,release_SAM2_LaMa,,0.1812,ok,
+sceneB,3,measure,sequential,uLayout_infer,,1.3829,ok,
+sceneB,3,measure,sequential,uLayout_rectify,,1.3000,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneB,3,measure,sequential,SAM3D,소파,20.8410,ok,type=vertex_color; sam3d_size_m=True
+sceneB,3,measure,sequential,Scale_Omni3D,소파,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneB,3,measure,sequential,SAM3D,스탠드 조명,26.9332,ok,type=vertex_color; sam3d_size_m=True
+sceneB,3,measure,sequential,Scale_Omni3D,스탠드 조명,0.2650,ok,"dims_m={""width"": 0.39960163831710815, ""height"": 1.7249629497528076, ""depth"": 0.38546639680862427}"
+sceneB,3,measure,sequential,SAM3D,액자,16.5692,ok,type=vertex_color; sam3d_size_m=True
+sceneB,3,measure,sequential,Scale_Omni3D,액자,0.2200,ok,"dims_m={""width"": 0.5886356234550476, ""height"": 0.7461342811584473, ""depth"": 0.179484561085701}"
+sceneB,3,measure,sequential,e2e,,81.5565,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneB,3,measure,sequential,stage_sum,,81.5522,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneB,3,measure,parallel,load_SAM2,,0.8419,ok,
+sceneB,3,measure,parallel,load_LaMa,,0.3027,ok,
+sceneB,3,measure,parallel,SAM2_mask,,0.3417,ok,
+sceneB,3,measure,parallel,LaMa,,0.3313,ok,
+sceneB,3,measure,parallel,SD_load,,2.7019,ok,
+sceneB,3,measure,parallel,SD,,9.8849,ok,
+sceneB,3,measure,parallel,SD_unload,,0.2150,ok,
+sceneB,3,measure,parallel,SAM2_extract,,0.2846,ok,
+sceneB,3,measure,parallel,release_SAM2_LaMa,,0.1797,ok,
+sceneB,3,measure,parallel,uLayout_infer,,1.2541,ok,
+sceneB,3,measure,parallel,uLayout_rectify,,2.3348,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneB,3,measure,parallel,uLayout_phase,,2.3360,ok,
+sceneB,3,measure,parallel,SAM3D,소파,21.1521,ok,type=vertex_color; sam3d_size_m=True
+sceneB,3,measure,parallel,furniture_phase,소파,21.1527,ok,
+sceneB,3,measure,parallel,Scale_Omni3D,스탠드 조명,10.4716,ok,"dims_m={""width"": 0.39960163831710815, ""height"": 1.7249629497528076, ""depth"": 0.38546639680862427}"
+sceneB,3,measure,parallel,SAM3D,스탠드 조명,38.4113,ok,type=vertex_color; sam3d_size_m=True
+sceneB,3,measure,parallel,furniture_phase,스탠드 조명,38.4182,ok,
+sceneB,3,measure,parallel,Scale_Omni3D,액자,5.2979,ok,"dims_m={""width"": 0.5886356234550476, ""height"": 0.7461342811584473, ""depth"": 0.179484561085701}"
+sceneB,3,measure,parallel,SAM3D,액자,22.1921,ok,type=vertex_color; sam3d_size_m=True
+sceneB,3,measure,parallel,furniture_phase,액자,22.1927,ok,
+sceneB,3,measure,parallel,e2e,,98.0416,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneB,4,measure,sequential,load_SAM2,,0.8833,ok,
+sceneB,4,measure,sequential,load_LaMa,,0.3100,ok,
+sceneB,4,measure,sequential,SAM2_mask,,0.3367,ok,
+sceneB,4,measure,sequential,LaMa,,0.2911,ok,
+sceneB,4,measure,sequential,SD_load,,2.8009,ok,
+sceneB,4,measure,sequential,SD,,9.9960,ok,
+sceneB,4,measure,sequential,SD_unload,,0.2113,ok,
+sceneB,4,measure,sequential,SAM2_extract,,0.2713,ok,
+sceneB,4,measure,sequential,release_SAM2_LaMa,,0.1773,ok,
+sceneB,4,measure,sequential,uLayout_infer,,1.2409,ok,
+sceneB,4,measure,sequential,uLayout_rectify,,1.1052,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneB,4,measure,sequential,SAM3D,소파,21.6387,ok,type=vertex_color; sam3d_size_m=True
+sceneB,4,measure,sequential,Scale_Omni3D,소파,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneB,4,measure,sequential,SAM3D,스탠드 조명,16.4719,ok,type=vertex_color; sam3d_size_m=True
+sceneB,4,measure,sequential,Scale_Omni3D,스탠드 조명,0.2799,ok,"dims_m={""width"": 0.39960163831710815, ""height"": 1.7249629497528076, ""depth"": 0.38546639680862427}"
+sceneB,4,measure,sequential,SAM3D,액자,17.4122,ok,type=vertex_color; sam3d_size_m=True
+sceneB,4,measure,sequential,Scale_Omni3D,액자,0.3626,ok,"dims_m={""width"": 0.5886356234550476, ""height"": 0.7461342811584473, ""depth"": 0.179484561085701}"
+sceneB,4,measure,sequential,e2e,,72.6003,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneB,4,measure,sequential,stage_sum,,72.5960,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneB,4,measure,parallel,load_SAM2,,0.8703,ok,
+sceneB,4,measure,parallel,load_LaMa,,0.3075,ok,
+sceneB,4,measure,parallel,SAM2_mask,,3.2694,ok,
+sceneB,4,measure,parallel,LaMa,,0.6693,ok,
+sceneB,4,measure,parallel,SD_load,,3.0057,ok,
+sceneB,4,measure,parallel,SD,,9.9232,ok,
+sceneB,4,measure,parallel,SD_unload,,0.2193,ok,
+sceneB,4,measure,parallel,SAM2_extract,,0.2764,ok,
+sceneB,4,measure,parallel,release_SAM2_LaMa,,0.1776,ok,
+sceneB,4,measure,parallel,uLayout_infer,,1.2312,ok,
+sceneB,4,measure,parallel,uLayout_rectify,,2.3075,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneB,4,measure,parallel,uLayout_phase,,2.3093,ok,
+sceneB,4,measure,parallel,SAM3D,소파,22.3392,ok,type=vertex_color; sam3d_size_m=True
+sceneB,4,measure,parallel,furniture_phase,소파,22.3398,ok,
+sceneB,4,measure,parallel,Scale_Omni3D,스탠드 조명,0.2986,ok,"dims_m={""width"": 0.39960163831710815, ""height"": 1.7249629497528076, ""depth"": 0.38546639680862427}"
+sceneB,4,measure,parallel,SAM3D,스탠드 조명,28.8314,ok,type=vertex_color; sam3d_size_m=True
+sceneB,4,measure,parallel,furniture_phase,스탠드 조명,28.8324,ok,
+sceneB,4,measure,parallel,Scale_Omni3D,액자,5.5636,ok,"dims_m={""width"": 0.5886356234550476, ""height"": 0.7461342811584473, ""depth"": 0.179484561085701}"
+sceneB,4,measure,parallel,SAM3D,액자,22.1352,ok,type=vertex_color; sam3d_size_m=True
+sceneB,4,measure,parallel,furniture_phase,액자,22.1370,ok,
+sceneB,4,measure,parallel,e2e,,93.1620,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneB,5,measure,sequential,load_SAM2,,0.8372,ok,
+sceneB,5,measure,sequential,load_LaMa,,0.3279,ok,
+sceneB,5,measure,sequential,SAM2_mask,,0.3190,ok,
+sceneB,5,measure,sequential,LaMa,,0.3000,ok,
+sceneB,5,measure,sequential,SD_load,,2.9804,ok,
+sceneB,5,measure,sequential,SD,,9.8689,ok,
+sceneB,5,measure,sequential,SD_unload,,0.2425,ok,
+sceneB,5,measure,sequential,SAM2_extract,,0.2826,ok,
+sceneB,5,measure,sequential,release_SAM2_LaMa,,0.1849,ok,
+sceneB,5,measure,sequential,uLayout_infer,,1.3906,ok,
+sceneB,5,measure,sequential,uLayout_rectify,,1.1338,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneB,5,measure,sequential,SAM3D,소파,20.2369,ok,type=vertex_color; sam3d_size_m=True
+sceneB,5,measure,sequential,Scale_Omni3D,소파,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneB,5,measure,sequential,SAM3D,스탠드 조명,16.5563,ok,type=vertex_color; sam3d_size_m=True
+sceneB,5,measure,sequential,Scale_Omni3D,스탠드 조명,0.3303,ok,"dims_m={""width"": 0.39960163831710815, ""height"": 1.7249629497528076, ""depth"": 0.38546639680862427}"
+sceneB,5,measure,sequential,SAM3D,액자,19.9655,ok,type=vertex_color; sam3d_size_m=True
+sceneB,5,measure,sequential,Scale_Omni3D,액자,0.2538,ok,"dims_m={""width"": 0.5886356234550476, ""height"": 0.7461342811584473, ""depth"": 0.179484561085701}"
+sceneB,5,measure,sequential,e2e,,74.0497,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneB,5,measure,sequential,stage_sum,,74.0455,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneB,5,measure,parallel,load_SAM2,,0.9013,ok,
+sceneB,5,measure,parallel,load_LaMa,,0.3102,ok,
+sceneB,5,measure,parallel,SAM2_mask,,1.0556,ok,
+sceneB,5,measure,parallel,LaMa,,0.2891,ok,
+sceneB,5,measure,parallel,SD_load,,2.9790,ok,
+sceneB,5,measure,parallel,SD,,9.7758,ok,
+sceneB,5,measure,parallel,SD_unload,,0.2276,ok,
+sceneB,5,measure,parallel,SAM2_extract,,0.2968,ok,
+sceneB,5,measure,parallel,release_SAM2_LaMa,,0.1910,ok,
+sceneB,5,measure,parallel,uLayout_rectify,,1.3838,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneB,5,measure,parallel,uLayout_infer,,2.5213,ok,
+sceneB,5,measure,parallel,uLayout_phase,,2.5220,ok,
+sceneB,5,measure,parallel,SAM3D,소파,21.1672,ok,type=vertex_color; sam3d_size_m=True
+sceneB,5,measure,parallel,furniture_phase,소파,21.1681,ok,
+sceneB,5,measure,parallel,Scale_Omni3D,스탠드 조명,0.4606,ok,"dims_m={""width"": 0.39960163831710815, ""height"": 1.7249629497528076, ""depth"": 0.38546639680862427}"
+sceneB,5,measure,parallel,SAM3D,스탠드 조명,29.5521,ok,type=vertex_color; sam3d_size_m=True
+sceneB,5,measure,parallel,furniture_phase,스탠드 조명,29.5534,ok,
+sceneB,5,measure,parallel,Scale_Omni3D,액자,5.6302,ok,"dims_m={""width"": 0.5886356234550476, ""height"": 0.7461342811584473, ""depth"": 0.179484561085701}"
+sceneB,5,measure,parallel,SAM3D,액자,21.2047,ok,type=vertex_color; sam3d_size_m=True
+sceneB,5,measure,parallel,furniture_phase,액자,21.2057,ok,
+sceneB,5,measure,parallel,e2e,,89.2669,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneC,0,warmup,sequential,load_SAM2,,0.8630,ok,
+sceneC,0,warmup,sequential,load_LaMa,,0.3081,ok,
+sceneC,0,warmup,sequential,SAM2_mask,,0.2649,ok,
+sceneC,0,warmup,sequential,LaMa,,0.2743,ok,
+sceneC,0,warmup,sequential,SD_load,,2.9774,ok,
+sceneC,0,warmup,sequential,SD,,9.7479,ok,
+sceneC,0,warmup,sequential,SD_unload,,0.2196,ok,
+sceneC,0,warmup,sequential,SAM2_extract,,0.1881,ok,
+sceneC,0,warmup,sequential,release_SAM2_LaMa,,0.1742,ok,
+sceneC,0,warmup,sequential,uLayout_infer,,1.3345,ok,
+sceneC,0,warmup,sequential,uLayout_rectify,,1.1716,warn,api success=false: solvePnP 재투영오차 초과 (30.3px > 10.0px) — 포즈를 신뢰할 수 없습니다.
+sceneC,0,warmup,sequential,SAM3D,침대,24.0273,ok,type=vertex_color; sam3d_size_m=True
+sceneC,0,warmup,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneC,0,warmup,sequential,SAM3D,의자,20.6428,ok,type=vertex_color; sam3d_size_m=True
+sceneC,0,warmup,sequential,Scale_Omni3D,의자,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneC,0,warmup,sequential,e2e,,61.0645,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneC,0,warmup,sequential,stage_sum,,61.0226,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneC,0,warmup,parallel,load_SAM2,,0.8423,ok,
+sceneC,0,warmup,parallel,load_LaMa,,0.3177,ok,
+sceneC,0,warmup,parallel,SAM2_mask,,0.3899,ok,
+sceneC,0,warmup,parallel,LaMa,,0.2289,ok,
+sceneC,0,warmup,parallel,SD_load,,3.1380,ok,
+sceneC,0,warmup,parallel,SD,,9.6831,ok,
+sceneC,0,warmup,parallel,SD_unload,,0.2147,ok,
+sceneC,0,warmup,parallel,SAM2_extract,,0.1904,ok,
+sceneC,0,warmup,parallel,release_SAM2_LaMa,,0.1794,ok,
+sceneC,0,warmup,parallel,uLayout_rectify,,1.1910,warn,api success=false: solvePnP 재투영오차 초과 (30.3px > 10.0px) — 포즈를 신뢰할 수 없습니다.
+sceneC,0,warmup,parallel,uLayout_infer,,2.4649,ok,
+sceneC,0,warmup,parallel,uLayout_phase,,2.4655,ok,
+sceneC,0,warmup,parallel,SAM3D,침대,27.6372,ok,type=vertex_color; sam3d_size_m=True
+sceneC,0,warmup,parallel,furniture_phase,침대,27.6376,ok,
+sceneC,0,warmup,parallel,SAM3D,의자,29.9977,ok,type=vertex_color; sam3d_size_m=True
+sceneC,0,warmup,parallel,furniture_phase,의자,29.9992,ok,
+sceneC,0,warmup,parallel,e2e,,74.1290,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneC,1,measure,sequential,load_SAM2,,0.8151,ok,
+sceneC,1,measure,sequential,load_LaMa,,0.2924,ok,
+sceneC,1,measure,sequential,SAM2_mask,,0.3621,ok,
+sceneC,1,measure,sequential,LaMa,,0.2290,ok,
+sceneC,1,measure,sequential,SD_load,,3.2648,ok,
+sceneC,1,measure,sequential,SD,,9.7977,ok,
+sceneC,1,measure,sequential,SD_unload,,0.2162,ok,
+sceneC,1,measure,sequential,SAM2_extract,,0.1891,ok,
+sceneC,1,measure,sequential,release_SAM2_LaMa,,0.1885,ok,
+sceneC,1,measure,sequential,uLayout_infer,,1.3224,ok,
+sceneC,1,measure,sequential,uLayout_rectify,,1.1625,warn,api success=false: solvePnP 재투영오차 초과 (30.3px > 10.0px) — 포즈를 신뢰할 수 없습니다.
+sceneC,1,measure,sequential,SAM3D,침대,27.3055,ok,type=vertex_color; sam3d_size_m=True
+sceneC,1,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneC,1,measure,sequential,SAM3D,의자,20.0932,ok,type=vertex_color; sam3d_size_m=True
+sceneC,1,measure,sequential,Scale_Omni3D,의자,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneC,1,measure,sequential,e2e,,64.1350,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneC,1,measure,sequential,stage_sum,,64.1310,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneC,1,measure,parallel,load_SAM2,,0.8514,ok,
+sceneC,1,measure,parallel,load_LaMa,,0.3121,ok,
+sceneC,1,measure,parallel,SAM2_mask,,0.3338,ok,
+sceneC,1,measure,parallel,LaMa,,0.2405,ok,
+sceneC,1,measure,parallel,SD_load,,2.9570,ok,
+sceneC,1,measure,parallel,SD,,9.9859,ok,
+sceneC,1,measure,parallel,SD_unload,,0.2186,ok,
+sceneC,1,measure,parallel,SAM2_extract,,0.1968,ok,
+sceneC,1,measure,parallel,release_SAM2_LaMa,,0.1786,ok,
+sceneC,1,measure,parallel,uLayout_rectify,,1.1952,warn,api success=false: solvePnP 재투영오차 초과 (30.3px > 10.0px) — 포즈를 신뢰할 수 없습니다.
+sceneC,1,measure,parallel,uLayout_infer,,2.3024,ok,
+sceneC,1,measure,parallel,uLayout_phase,,2.3029,ok,
+sceneC,1,measure,parallel,SAM3D,침대,25.3408,ok,type=vertex_color; sam3d_size_m=True
+sceneC,1,measure,parallel,furniture_phase,침대,25.3414,ok,
+sceneC,1,measure,parallel,SAM3D,의자,36.1811,ok,type=vertex_color; sam3d_size_m=True
+sceneC,1,measure,parallel,furniture_phase,의자,36.1829,ok,
+sceneC,1,measure,parallel,e2e,,77.9409,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneC,2,measure,sequential,load_SAM2,,1.1663,ok,
+sceneC,2,measure,sequential,load_LaMa,,0.4012,ok,
+sceneC,2,measure,sequential,SAM2_mask,,0.4153,ok,
+sceneC,2,measure,sequential,LaMa,,0.2368,ok,
+sceneC,2,measure,sequential,SD_load,,3.6243,ok,
+sceneC,2,measure,sequential,SD,,9.9064,ok,
+sceneC,2,measure,sequential,SD_unload,,0.2175,ok,
+sceneC,2,measure,sequential,SAM2_extract,,0.1901,ok,
+sceneC,2,measure,sequential,release_SAM2_LaMa,,0.1786,ok,
+sceneC,2,measure,sequential,uLayout_infer,,1.4294,ok,
+sceneC,2,measure,sequential,uLayout_rectify,,1.2023,warn,api success=false: solvePnP 재투영오차 초과 (30.3px > 10.0px) — 포즈를 신뢰할 수 없습니다.
+sceneC,2,measure,sequential,SAM3D,침대,26.1060,ok,type=vertex_color; sam3d_size_m=True
+sceneC,2,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneC,2,measure,sequential,SAM3D,의자,20.0195,ok,type=vertex_color; sam3d_size_m=True
+sceneC,2,measure,sequential,Scale_Omni3D,의자,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneC,2,measure,sequential,e2e,,63.5303,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneC,2,measure,sequential,stage_sum,,63.5262,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneC,2,measure,parallel,load_SAM2,,0.8487,ok,
+sceneC,2,measure,parallel,load_LaMa,,0.3048,ok,
+sceneC,2,measure,parallel,SAM2_mask,,0.2927,ok,
+sceneC,2,measure,parallel,LaMa,,0.2426,ok,
+sceneC,2,measure,parallel,SD_load,,3.0681,ok,
+sceneC,2,measure,parallel,SD,,9.6047,ok,
+sceneC,2,measure,parallel,SD_unload,,0.2147,ok,
+sceneC,2,measure,parallel,SAM2_extract,,0.1878,ok,
+sceneC,2,measure,parallel,release_SAM2_LaMa,,0.1770,ok,
+sceneC,2,measure,parallel,uLayout_infer,,1.1546,ok,
+sceneC,2,measure,parallel,uLayout_rectify,,2.2622,warn,api success=false: solvePnP 재투영오차 초과 (30.3px > 10.0px) — 포즈를 신뢰할 수 없습니다.
+sceneC,2,measure,parallel,uLayout_phase,,2.2643,ok,
+sceneC,2,measure,parallel,SAM3D,침대,25.2590,ok,type=vertex_color; sam3d_size_m=True
+sceneC,2,measure,parallel,furniture_phase,침대,25.2597,ok,
+sceneC,2,measure,parallel,SAM3D,의자,29.9055,ok,type=vertex_color; sam3d_size_m=True
+sceneC,2,measure,parallel,furniture_phase,의자,29.9061,ok,
+sceneC,2,measure,parallel,e2e,,71.2201,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneC,3,measure,sequential,load_SAM2,,0.8039,ok,
+sceneC,3,measure,sequential,load_LaMa,,0.2805,ok,
+sceneC,3,measure,sequential,SAM2_mask,,0.3722,ok,
+sceneC,3,measure,sequential,LaMa,,0.2282,ok,
+sceneC,3,measure,sequential,SD_load,,2.8944,ok,
+sceneC,3,measure,sequential,SD,,9.8998,ok,
+sceneC,3,measure,sequential,SD_unload,,0.2377,ok,
+sceneC,3,measure,sequential,SAM2_extract,,0.2016,ok,
+sceneC,3,measure,sequential,release_SAM2_LaMa,,0.1952,ok,
+sceneC,3,measure,sequential,uLayout_infer,,1.3813,ok,
+sceneC,3,measure,sequential,uLayout_rectify,,1.1384,warn,api success=false: solvePnP 재투영오차 초과 (30.3px > 10.0px) — 포즈를 신뢰할 수 없습니다.
+sceneC,3,measure,sequential,SAM3D,침대,27.1286,ok,type=vertex_color; sam3d_size_m=True
+sceneC,3,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneC,3,measure,sequential,SAM3D,의자,20.5498,ok,type=vertex_color; sam3d_size_m=True
+sceneC,3,measure,sequential,Scale_Omni3D,의자,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneC,3,measure,sequential,e2e,,64.2310,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneC,3,measure,sequential,stage_sum,,64.2272,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneC,3,measure,parallel,load_SAM2,,0.8423,ok,
+sceneC,3,measure,parallel,load_LaMa,,0.3128,ok,
+sceneC,3,measure,parallel,SAM2_mask,,0.3405,ok,
+sceneC,3,measure,parallel,LaMa,,0.2344,ok,
+sceneC,3,measure,parallel,SD_load,,3.1354,ok,
+sceneC,3,measure,parallel,SD,,9.7301,ok,
+sceneC,3,measure,parallel,SD_unload,,0.2197,ok,
+sceneC,3,measure,parallel,SAM2_extract,,0.1901,ok,
+sceneC,3,measure,parallel,release_SAM2_LaMa,,0.1796,ok,
+sceneC,3,measure,parallel,uLayout_infer,,1.1467,ok,
+sceneC,3,measure,parallel,uLayout_rectify,,2.2002,warn,api success=false: solvePnP 재투영오차 초과 (30.3px > 10.0px) — 포즈를 신뢰할 수 없습니다.
+sceneC,3,measure,parallel,uLayout_phase,,2.2016,ok,
+sceneC,3,measure,parallel,SAM3D,침대,24.2483,ok,type=vertex_color; sam3d_size_m=True
+sceneC,3,measure,parallel,furniture_phase,침대,24.2488,ok,
+sceneC,3,measure,parallel,SAM3D,의자,27.9259,ok,type=vertex_color; sam3d_size_m=True
+sceneC,3,measure,parallel,furniture_phase,의자,27.9286,ok,
+sceneC,3,measure,parallel,e2e,,68.4112,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneC,4,measure,sequential,load_SAM2,,0.8788,ok,
+sceneC,4,measure,sequential,load_LaMa,,0.3095,ok,
+sceneC,4,measure,sequential,SAM2_mask,,0.3033,ok,
+sceneC,4,measure,sequential,LaMa,,0.2372,ok,
+sceneC,4,measure,sequential,SD_load,,2.8136,ok,
+sceneC,4,measure,sequential,SD,,9.8192,ok,
+sceneC,4,measure,sequential,SD_unload,,0.2200,ok,
+sceneC,4,measure,sequential,SAM2_extract,,0.1943,ok,
+sceneC,4,measure,sequential,release_SAM2_LaMa,,0.1833,ok,
+sceneC,4,measure,sequential,uLayout_infer,,1.2355,ok,
+sceneC,4,measure,sequential,uLayout_rectify,,1.2069,warn,api success=false: solvePnP 재투영오차 초과 (30.3px > 10.0px) — 포즈를 신뢰할 수 없습니다.
+sceneC,4,measure,sequential,SAM3D,침대,23.9135,ok,type=vertex_color; sam3d_size_m=True
+sceneC,4,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneC,4,measure,sequential,SAM3D,의자,19.8352,ok,type=vertex_color; sam3d_size_m=True
+sceneC,4,measure,sequential,Scale_Omni3D,의자,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneC,4,measure,sequential,e2e,,59.9657,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneC,4,measure,sequential,stage_sum,,59.9620,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneC,4,measure,parallel,load_SAM2,,1.0091,ok,
+sceneC,4,measure,parallel,load_LaMa,,0.3715,ok,
+sceneC,4,measure,parallel,SAM2_mask,,0.3602,ok,
+sceneC,4,measure,parallel,LaMa,,0.3768,ok,
+sceneC,4,measure,parallel,SD_load,,3.6058,ok,
+sceneC,4,measure,parallel,SD,,9.6775,ok,
+sceneC,4,measure,parallel,SD_unload,,0.2173,ok,
+sceneC,4,measure,parallel,SAM2_extract,,0.1904,ok,
+sceneC,4,measure,parallel,release_SAM2_LaMa,,0.1865,ok,
+sceneC,4,measure,parallel,uLayout_rectify,,1.1375,warn,api success=false: solvePnP 재투영오차 초과 (30.3px > 10.0px) — 포즈를 신뢰할 수 없습니다.
+sceneC,4,measure,parallel,uLayout_infer,,2.2388,ok,
+sceneC,4,measure,parallel,uLayout_phase,,2.2393,ok,
+sceneC,4,measure,parallel,SAM3D,침대,25.6677,ok,type=vertex_color; sam3d_size_m=True
+sceneC,4,measure,parallel,furniture_phase,침대,25.6683,ok,
+sceneC,4,measure,parallel,SAM3D,의자,27.5586,ok,type=vertex_color; sam3d_size_m=True
+sceneC,4,measure,parallel,furniture_phase,의자,27.5596,ok,
+sceneC,4,measure,parallel,e2e,,70.0840,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneC,5,measure,sequential,load_SAM2,,0.8731,ok,
+sceneC,5,measure,sequential,load_LaMa,,0.3228,ok,
+sceneC,5,measure,sequential,SAM2_mask,,0.3728,ok,
+sceneC,5,measure,sequential,LaMa,,0.2409,ok,
+sceneC,5,measure,sequential,SD_load,,3.3377,ok,
+sceneC,5,measure,sequential,SD,,9.6308,ok,
+sceneC,5,measure,sequential,SD_unload,,0.2305,ok,
+sceneC,5,measure,sequential,SAM2_extract,,0.1970,ok,
+sceneC,5,measure,sequential,release_SAM2_LaMa,,0.1819,ok,
+sceneC,5,measure,sequential,uLayout_infer,,1.3591,ok,
+sceneC,5,measure,sequential,uLayout_rectify,,1.2867,warn,api success=false: solvePnP 재투영오차 초과 (30.3px > 10.0px) — 포즈를 신뢰할 수 없습니다.
+sceneC,5,measure,sequential,SAM3D,침대,23.9136,ok,type=vertex_color; sam3d_size_m=True
+sceneC,5,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneC,5,measure,sequential,SAM3D,의자,18.8138,ok,type=vertex_color; sam3d_size_m=True
+sceneC,5,measure,sequential,Scale_Omni3D,의자,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneC,5,measure,sequential,e2e,,59.5687,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneC,5,measure,sequential,stage_sum,,59.5648,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneC,5,measure,parallel,load_SAM2,,0.8629,ok,
+sceneC,5,measure,parallel,load_LaMa,,0.3075,ok,
+sceneC,5,measure,parallel,SAM2_mask,,0.3225,ok,
+sceneC,5,measure,parallel,LaMa,,0.2297,ok,
+sceneC,5,measure,parallel,SD_load,,3.1208,ok,
+sceneC,5,measure,parallel,SD,,9.8057,ok,
+sceneC,5,measure,parallel,SD_unload,,0.2215,ok,
+sceneC,5,measure,parallel,SAM2_extract,,0.1886,ok,
+sceneC,5,measure,parallel,release_SAM2_LaMa,,0.1798,ok,
+sceneC,5,measure,parallel,uLayout_rectify,,1.2186,warn,api success=false: solvePnP 재투영오차 초과 (30.3px > 10.0px) — 포즈를 신뢰할 수 없습니다.
+sceneC,5,measure,parallel,uLayout_infer,,2.3588,ok,
+sceneC,5,measure,parallel,uLayout_phase,,2.3593,ok,
+sceneC,5,measure,parallel,SAM3D,침대,25.4967,ok,type=vertex_color; sam3d_size_m=True
+sceneC,5,measure,parallel,furniture_phase,침대,25.4973,ok,
+sceneC,5,measure,parallel,SAM3D,의자,31.0492,ok,type=vertex_color; sam3d_size_m=True
+sceneC,5,measure,parallel,furniture_phase,의자,31.0511,ok,
+sceneC,5,measure,parallel,e2e,,72.9789,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneD,0,warmup,sequential,load_SAM2,,0.9314,ok,
+sceneD,0,warmup,sequential,load_LaMa,,0.3240,ok,
+sceneD,0,warmup,sequential,SAM2_mask,,0.3344,ok,
+sceneD,0,warmup,sequential,LaMa,,0.1332,ok,
+sceneD,0,warmup,sequential,SD_load,,3.2891,ok,
+sceneD,0,warmup,sequential,SD,,4.1877,ok,
+sceneD,0,warmup,sequential,SD_unload,,0.2124,ok,
+sceneD,0,warmup,sequential,SAM2_extract,,0.1192,ok,
+sceneD,0,warmup,sequential,release_SAM2_LaMa,,0.1815,ok,
+sceneD,0,warmup,sequential,uLayout_infer,,1.2580,ok,
+sceneD,0,warmup,sequential,uLayout_rectify,,1.0733,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneD,0,warmup,sequential,SAM3D,침대,19.4207,ok,type=vertex_color; sam3d_size_m=True
+sceneD,0,warmup,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneD,0,warmup,sequential,e2e,,30.2236,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneD,0,warmup,sequential,stage_sum,,30.2095,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneD,0,warmup,parallel,load_SAM2,,0.8192,ok,
+sceneD,0,warmup,parallel,load_LaMa,,0.2906,ok,
+sceneD,0,warmup,parallel,SAM2_mask,,0.2508,ok,
+sceneD,0,warmup,parallel,LaMa,,0.1062,ok,
+sceneD,0,warmup,parallel,SD_load,,2.8140,ok,
+sceneD,0,warmup,parallel,SD,,4.2669,ok,
+sceneD,0,warmup,parallel,SD_unload,,0.2114,ok,
+sceneD,0,warmup,parallel,SAM2_extract,,0.1133,ok,
+sceneD,0,warmup,parallel,release_SAM2_LaMa,,0.1841,ok,
+sceneD,0,warmup,parallel,uLayout_infer,,1.1576,ok,
+sceneD,0,warmup,parallel,uLayout_rectify,,2.2635,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneD,0,warmup,parallel,uLayout_phase,,2.2648,ok,
+sceneD,0,warmup,parallel,SAM3D,침대,18.8001,ok,type=vertex_color; sam3d_size_m=True
+sceneD,0,warmup,parallel,furniture_phase,침대,18.8010,ok,
+sceneD,0,warmup,parallel,e2e,,29.0141,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneD,1,measure,sequential,load_SAM2,,0.8200,ok,
+sceneD,1,measure,sequential,load_LaMa,,0.3001,ok,
+sceneD,1,measure,sequential,SAM2_mask,,0.3419,ok,
+sceneD,1,measure,sequential,LaMa,,0.1071,ok,
+sceneD,1,measure,sequential,SD_load,,2.8606,ok,
+sceneD,1,measure,sequential,SD,,4.1774,ok,
+sceneD,1,measure,sequential,SD_unload,,0.2092,ok,
+sceneD,1,measure,sequential,SAM2_extract,,0.1166,ok,
+sceneD,1,measure,sequential,release_SAM2_LaMa,,0.1863,ok,
+sceneD,1,measure,sequential,uLayout_infer,,1.0852,ok,
+sceneD,1,measure,sequential,uLayout_rectify,,1.0675,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneD,1,measure,sequential,SAM3D,침대,19.5170,ok,type=vertex_color; sam3d_size_m=True
+sceneD,1,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneD,1,measure,sequential,e2e,,29.6710,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneD,1,measure,sequential,stage_sum,,29.6688,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneD,1,measure,parallel,load_SAM2,,0.8696,ok,
+sceneD,1,measure,parallel,load_LaMa,,0.2942,ok,
+sceneD,1,measure,parallel,SAM2_mask,,2.6288,ok,
+sceneD,1,measure,parallel,LaMa,,0.1874,ok,
+sceneD,1,measure,parallel,SD_load,,3.1316,ok,
+sceneD,1,measure,parallel,SD,,4.6644,ok,
+sceneD,1,measure,parallel,SD_unload,,0.2296,ok,
+sceneD,1,measure,parallel,SAM2_extract,,0.1146,ok,
+sceneD,1,measure,parallel,release_SAM2_LaMa,,0.1854,ok,
+sceneD,1,measure,parallel,uLayout_rectify,,1.2446,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneD,1,measure,parallel,uLayout_infer,,2.3924,ok,
+sceneD,1,measure,parallel,uLayout_phase,,2.3931,ok,
+sceneD,1,measure,parallel,SAM3D,침대,18.1435,ok,type=vertex_color; sam3d_size_m=True
+sceneD,1,measure,parallel,furniture_phase,침대,18.1450,ok,
+sceneD,1,measure,parallel,e2e,,31.6818,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneD,2,measure,sequential,load_SAM2,,0.8693,ok,
+sceneD,2,measure,sequential,load_LaMa,,0.3092,ok,
+sceneD,2,measure,sequential,SAM2_mask,,0.2145,ok,
+sceneD,2,measure,sequential,LaMa,,0.1316,ok,
+sceneD,2,measure,sequential,SD_load,,3.0536,ok,
+sceneD,2,measure,sequential,SD,,4.5272,ok,
+sceneD,2,measure,sequential,SD_unload,,0.2158,ok,
+sceneD,2,measure,sequential,SAM2_extract,,0.1233,ok,
+sceneD,2,measure,sequential,release_SAM2_LaMa,,0.1852,ok,
+sceneD,2,measure,sequential,uLayout_infer,,1.1889,ok,
+sceneD,2,measure,sequential,uLayout_rectify,,1.1336,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneD,2,measure,sequential,SAM3D,침대,18.7672,ok,type=vertex_color; sam3d_size_m=True
+sceneD,2,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneD,2,measure,sequential,e2e,,29.5434,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneD,2,measure,sequential,stage_sum,,29.5409,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneD,2,measure,parallel,load_SAM2,,0.8511,ok,
+sceneD,2,measure,parallel,load_LaMa,,0.3080,ok,
+sceneD,2,measure,parallel,SAM2_mask,,0.1905,ok,
+sceneD,2,measure,parallel,LaMa,,0.1261,ok,
+sceneD,2,measure,parallel,SD_load,,2.7860,ok,
+sceneD,2,measure,parallel,SD,,4.2721,ok,
+sceneD,2,measure,parallel,SD_unload,,0.2153,ok,
+sceneD,2,measure,parallel,SAM2_extract,,0.1219,ok,
+sceneD,2,measure,parallel,release_SAM2_LaMa,,0.1807,ok,
+sceneD,2,measure,parallel,uLayout_infer,,1.1733,ok,
+sceneD,2,measure,parallel,uLayout_rectify,,2.3106,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneD,2,measure,parallel,uLayout_phase,,2.3122,ok,
+sceneD,2,measure,parallel,SAM3D,침대,19.0900,ok,type=vertex_color; sam3d_size_m=True
+sceneD,2,measure,parallel,furniture_phase,침대,19.0907,ok,
+sceneD,2,measure,parallel,e2e,,29.2975,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneD,3,measure,sequential,load_SAM2,,0.8326,ok,
+sceneD,3,measure,sequential,load_LaMa,,0.3162,ok,
+sceneD,3,measure,sequential,SAM2_mask,,0.2319,ok,
+sceneD,3,measure,sequential,LaMa,,0.1419,ok,
+sceneD,3,measure,sequential,SD_load,,2.7814,ok,
+sceneD,3,measure,sequential,SD,,4.2843,ok,
+sceneD,3,measure,sequential,SD_unload,,0.2036,ok,
+sceneD,3,measure,sequential,SAM2_extract,,0.1127,ok,
+sceneD,3,measure,sequential,release_SAM2_LaMa,,0.1773,ok,
+sceneD,3,measure,sequential,uLayout_infer,,1.2121,ok,
+sceneD,3,measure,sequential,uLayout_rectify,,1.0281,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneD,3,measure,sequential,SAM3D,침대,18.4687,ok,type=vertex_color; sam3d_size_m=True
+sceneD,3,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneD,3,measure,sequential,e2e,,28.6493,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneD,3,measure,sequential,stage_sum,,28.6420,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneD,3,measure,parallel,load_SAM2,,0.8011,ok,
+sceneD,3,measure,parallel,load_LaMa,,0.2903,ok,
+sceneD,3,measure,parallel,SAM2_mask,,0.1451,ok,
+sceneD,3,measure,parallel,LaMa,,0.1163,ok,
+sceneD,3,measure,parallel,SD_load,,2.7518,ok,
+sceneD,3,measure,parallel,SD,,4.4869,ok,
+sceneD,3,measure,parallel,SD_unload,,0.2116,ok,
+sceneD,3,measure,parallel,SAM2_extract,,0.1204,ok,
+sceneD,3,measure,parallel,release_SAM2_LaMa,,0.1847,ok,
+sceneD,3,measure,parallel,uLayout_rectify,,1.2230,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneD,3,measure,parallel,uLayout_infer,,2.2978,ok,
+sceneD,3,measure,parallel,uLayout_phase,,2.2983,ok,
+sceneD,3,measure,parallel,SAM3D,침대,18.5929,ok,type=vertex_color; sam3d_size_m=True
+sceneD,3,measure,parallel,furniture_phase,침대,18.5934,ok,
+sceneD,3,measure,parallel,e2e,,28.9101,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneD,4,measure,sequential,load_SAM2,,0.8266,ok,
+sceneD,4,measure,sequential,load_LaMa,,0.3018,ok,
+sceneD,4,measure,sequential,SAM2_mask,,0.1590,ok,
+sceneD,4,measure,sequential,LaMa,,0.1092,ok,
+sceneD,4,measure,sequential,SD_load,,2.7754,ok,
+sceneD,4,measure,sequential,SD,,4.3332,ok,
+sceneD,4,measure,sequential,SD_unload,,0.2097,ok,
+sceneD,4,measure,sequential,SAM2_extract,,0.1168,ok,
+sceneD,4,measure,sequential,release_SAM2_LaMa,,0.1816,ok,
+sceneD,4,measure,sequential,uLayout_infer,,1.2612,ok,
+sceneD,4,measure,sequential,uLayout_rectify,,1.0777,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneD,4,measure,sequential,SAM3D,침대,19.1559,ok,type=vertex_color; sam3d_size_m=True
+sceneD,4,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneD,4,measure,sequential,e2e,,29.3821,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneD,4,measure,sequential,stage_sum,,29.3797,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneD,4,measure,parallel,load_SAM2,,0.8602,ok,
+sceneD,4,measure,parallel,load_LaMa,,0.3020,ok,
+sceneD,4,measure,parallel,SAM2_mask,,0.2143,ok,
+sceneD,4,measure,parallel,LaMa,,0.1275,ok,
+sceneD,4,measure,parallel,SD_load,,2.7141,ok,
+sceneD,4,measure,parallel,SD,,4.4647,ok,
+sceneD,4,measure,parallel,SD_unload,,0.2096,ok,
+sceneD,4,measure,parallel,SAM2_extract,,0.1179,ok,
+sceneD,4,measure,parallel,release_SAM2_LaMa,,0.1811,ok,
+sceneD,4,measure,parallel,uLayout_rectify,,1.1183,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneD,4,measure,parallel,uLayout_infer,,2.2006,ok,
+sceneD,4,measure,parallel,uLayout_phase,,2.2011,ok,
+sceneD,4,measure,parallel,SAM3D,침대,19.9443,ok,type=vertex_color; sam3d_size_m=True
+sceneD,4,measure,parallel,furniture_phase,침대,19.9447,ok,
+sceneD,4,measure,parallel,e2e,,30.1768,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneD,5,measure,sequential,load_SAM2,,0.8257,ok,
+sceneD,5,measure,sequential,load_LaMa,,0.3218,ok,
+sceneD,5,measure,sequential,SAM2_mask,,0.2042,ok,
+sceneD,5,measure,sequential,LaMa,,0.1257,ok,
+sceneD,5,measure,sequential,SD_load,,2.8038,ok,
+sceneD,5,measure,sequential,SD,,4.3280,ok,
+sceneD,5,measure,sequential,SD_unload,,0.2103,ok,
+sceneD,5,measure,sequential,SAM2_extract,,0.1157,ok,
+sceneD,5,measure,sequential,release_SAM2_LaMa,,0.1809,ok,
+sceneD,5,measure,sequential,uLayout_infer,,1.2516,ok,
+sceneD,5,measure,sequential,uLayout_rectify,,1.1760,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneD,5,measure,sequential,SAM3D,침대,20.0818,ok,type=vertex_color; sam3d_size_m=True
+sceneD,5,measure,sequential,Scale_Omni3D,침대,0.0000,skipped,Omni3D 미지원 카테고리 — 프런트도 호출 안 함
+sceneD,5,measure,sequential,e2e,,30.4803,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"
+sceneD,5,measure,sequential,stage_sum,,30.4780,ok,단계 합(참고용) — e2e 와의 차이는 단계 밖 작업(JPEG 인코딩 등)
+sceneD,5,measure,parallel,load_SAM2,,0.8326,ok,
+sceneD,5,measure,parallel,load_LaMa,,0.3018,ok,
+sceneD,5,measure,parallel,SAM2_mask,,0.3543,ok,
+sceneD,5,measure,parallel,LaMa,,0.1071,ok,
+sceneD,5,measure,parallel,SD_load,,3.0076,ok,
+sceneD,5,measure,parallel,SD,,4.1674,ok,
+sceneD,5,measure,parallel,SD_unload,,0.2114,ok,
+sceneD,5,measure,parallel,SAM2_extract,,0.1182,ok,
+sceneD,5,measure,parallel,release_SAM2_LaMa,,0.1846,ok,
+sceneD,5,measure,parallel,uLayout_rectify,,1.1593,warn,api success=false: 코너 2개(뒷벽 정면 구도)를 검출하지 못했습니다 — 현재는 이 구도만 지원합니다.
+sceneD,5,measure,parallel,uLayout_infer,,2.2025,ok,
+sceneD,5,measure,parallel,uLayout_phase,,2.2031,ok,
+sceneD,5,measure,parallel,SAM3D,침대,19.4278,ok,type=vertex_color; sam3d_size_m=True
+sceneD,5,measure,parallel,furniture_phase,침대,19.4283,ok,
+sceneD,5,measure,parallel,e2e,,29.7837,ok,"wall-clock; SD 로드/해제 포함, 모델 상주 로드(load_*) 제외"

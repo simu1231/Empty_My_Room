@@ -1,0 +1,23 @@
+condition,iteration,phase,metric,value,status,note
+a,0,setup,vram_idle_before_mib,2107.0000,ok,조건 시작 전 nvidia-smi 사용량
+a,0,warmup,run_result,4.0000,failed,OOM: 가짜
+a,1,measure,run_result,4.0000,failed,OOM: 가짜
+a,1,measure,condition_abort,,failed,"연속 2회 실패: 중단. 시도 2회(워밍업 포함), 측정 성공 0회"
+a,0,setup,dxg_make_resident_fail_delta,0.0000,ok,조건 중 dmesg 호스트 할당 거부 증가 수(조건 종료 시점 집계)
+a,0,setup,dxg_create_allocation_fail_delta,0.0000,ok,조건 중 dmesg 호스트 할당 거부 증가 수(조건 종료 시점 집계)
+a,0,cleanup,cleanup_leak_mib,0.0000,ok,"allocated 0 / 기준 0 MiB, nvidia-smi 2107 MiB, 다른 측정 프로세스 []"
+b,0,setup,vram_idle_before_mib,2107.0000,ok,조건 시작 전 nvidia-smi 사용량
+b,0,warmup,run_result,310.0000,ok,
+b,1,measure,run_result,305.0000,ok,
+b,1,measure,condition_abort,,failed,"연속 2회 300초 초과: 중단. 시도 2회(워밍업 포함), 측정 성공 1회"
+b,0,setup,dxg_make_resident_fail_delta,0.0000,ok,조건 중 dmesg 호스트 할당 거부 증가 수(조건 종료 시점 집계)
+b,0,setup,dxg_create_allocation_fail_delta,0.0000,ok,조건 중 dmesg 호스트 할당 거부 증가 수(조건 종료 시점 집계)
+b,0,cleanup,cleanup_leak_mib,0.0000,ok,"allocated 0 / 기준 0 MiB, nvidia-smi 2107 MiB, 다른 측정 프로세스 []"
+c1,0,setup,vram_idle_before_mib,2107.0000,ok,조건 시작 전 nvidia-smi 사용량
+c1,0,warmup,run_result,30.0000,ok,
+c1,1,measure,run_result,30.0000,ok,
+c1,2,measure,run_result,30.0000,ok,
+c1,3,measure,run_result,30.0000,ok,
+c1,0,setup,dxg_make_resident_fail_delta,0.0000,ok,조건 중 dmesg 호스트 할당 거부 증가 수(조건 종료 시점 집계)
+c1,0,setup,dxg_create_allocation_fail_delta,0.0000,ok,조건 중 dmesg 호스트 할당 거부 증가 수(조건 종료 시점 집계)
+c1,0,cleanup,cleanup_leak_mib,0.0000,ok,"allocated 0 / 기준 0 MiB, nvidia-smi 2094 MiB, 다른 측정 프로세스 []"

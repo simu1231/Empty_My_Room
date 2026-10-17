@@ -1,0 +1,1146 @@
+condition,iteration,phase,metric,value,status,note
+_global,0,setup,sam3d_load_s,29.2922,ok,
+a,0,setup,vram_idle_before_mib,14189.0000,ok,조건 시작 전 nvidia-smi 사용량
+a,0,warmup,sam3d_total_s,26.7474,ok,
+a,0,warmup,sam3d_decode_s,6.2143,ok,호출 1회 [6.214]
+a,0,warmup,sam3d_sample_ss_s,12.3810,ok,
+a,0,warmup,sam3d_sample_slat_s,4.4762,ok,
+a,0,warmup,vram_max_mib,23797.0000,ok,nvidia-smi 100ms 샘플 264개
+a,0,warmup,vram_free_min_mib,767.0000,ok,
+a,0,warmup,sm_clock_min_mhz,2115.0000,ok,
+a,0,warmup,gpu_temp_max_c,70.0000,ok,
+a,0,warmup,gpu_power_max_w,443.1000,ok,
+a,0,warmup,proc_max_allocated_mib,18420.3071,ok,
+a,0,warmup,proc_max_reserved_mib,22752.0000,ok,
+a,0,warmup,run_result,26.7474,ok,
+a,1,measure,sam3d_total_s,20.1334,ok,
+a,1,measure,sam3d_decode_s,0.9047,ok,호출 1회 [0.905]
+a,1,measure,sam3d_sample_ss_s,12.2942,ok,
+a,1,measure,sam3d_sample_slat_s,3.5082,ok,
+a,1,measure,vram_max_mib,24010.0000,ok,nvidia-smi 100ms 샘플 200개
+a,1,measure,vram_free_min_mib,554.0000,ok,
+a,1,measure,sm_clock_min_mhz,2520.0000,ok,
+a,1,measure,gpu_temp_max_c,72.0000,ok,
+a,1,measure,gpu_power_max_w,425.3700,ok,
+a,1,measure,proc_max_allocated_mib,18539.8301,ok,
+a,1,measure,proc_max_reserved_mib,23222.0000,ok,
+a,1,measure,run_result,20.1334,ok,
+a,2,measure,sam3d_total_s,24.2988,ok,
+a,2,measure,sam3d_decode_s,0.7744,ok,호출 1회 [0.774]
+a,2,measure,sam3d_sample_ss_s,15.8772,ok,
+a,2,measure,sam3d_sample_slat_s,3.9670,ok,
+a,2,measure,vram_max_mib,23924.0000,ok,nvidia-smi 100ms 샘플 240개
+a,2,measure,vram_free_min_mib,640.0000,ok,
+a,2,measure,sm_clock_min_mhz,2520.0000,ok,
+a,2,measure,gpu_temp_max_c,71.0000,ok,
+a,2,measure,gpu_power_max_w,410.6800,ok,
+a,2,measure,proc_max_allocated_mib,18519.5615,ok,
+a,2,measure,proc_max_reserved_mib,23134.0000,ok,
+a,2,measure,run_result,24.2988,ok,
+a,3,measure,sam3d_total_s,23.2450,ok,
+a,3,measure,sam3d_decode_s,0.6333,ok,호출 1회 [0.633]
+a,3,measure,sam3d_sample_ss_s,15.1803,ok,
+a,3,measure,sam3d_sample_slat_s,3.6361,ok,
+a,3,measure,vram_max_mib,23648.0000,ok,nvidia-smi 100ms 샘플 230개
+a,3,measure,vram_free_min_mib,916.0000,ok,
+a,3,measure,sm_clock_min_mhz,2520.0000,ok,
+a,3,measure,gpu_temp_max_c,71.0000,ok,
+a,3,measure,gpu_power_max_w,413.0400,ok,
+a,3,measure,proc_max_allocated_mib,18271.8579,ok,
+a,3,measure,proc_max_reserved_mib,22604.0000,ok,
+a,3,measure,run_result,23.2450,ok,
+a,4,measure,sam3d_total_s,19.0793,ok,
+a,4,measure,sam3d_decode_s,0.4936,ok,호출 1회 [0.494]
+a,4,measure,sam3d_sample_ss_s,12.2849,ok,
+a,4,measure,sam3d_sample_slat_s,3.0656,ok,
+a,4,measure,vram_max_mib,22952.0000,ok,nvidia-smi 100ms 샘플 188개
+a,4,measure,vram_free_min_mib,1612.0000,ok,
+a,4,measure,sm_clock_min_mhz,2520.0000,ok,
+a,4,measure,gpu_temp_max_c,73.0000,ok,
+a,4,measure,gpu_power_max_w,419.6800,ok,
+a,4,measure,proc_max_allocated_mib,18183.7173,ok,
+a,4,measure,proc_max_reserved_mib,21910.0000,ok,
+a,4,measure,run_result,19.0793,ok,
+a,5,measure,sam3d_total_s,20.5401,ok,
+a,5,measure,sam3d_decode_s,0.8589,ok,호출 1회 [0.859]
+a,5,measure,sam3d_sample_ss_s,12.2660,ok,
+a,5,measure,sam3d_sample_slat_s,4.0508,ok,
+a,5,measure,vram_max_mib,23954.0000,ok,nvidia-smi 100ms 샘플 204개
+a,5,measure,vram_free_min_mib,610.0000,ok,
+a,5,measure,sm_clock_min_mhz,2520.0000,ok,
+a,5,measure,gpu_temp_max_c,72.0000,ok,
+a,5,measure,gpu_power_max_w,413.1000,ok,
+a,5,measure,proc_max_allocated_mib,18635.2998,ok,
+a,5,measure,proc_max_reserved_mib,23102.0000,ok,
+a,5,measure,run_result,20.5401,ok,
+a,0,setup,dxg_alloc_fail_delta,0.0000,ok,조건 중 dmesg 의 dxgkio_create_allocation 실패 증가 수(호스트 할당 거부)
+a,0,cleanup,cleanup_leak_mib,0.0000,ok,"allocated 13121 / 기준 13121 MiB, nvidia-smi 14039 MiB, 다른 측정 프로세스 []"
+_global,0,setup,sam3d_load_s,24.6115,ok,
+b,0,setup,vram_idle_before_mib,15841.0000,ok,조건 시작 전 nvidia-smi 사용량
+b,0,warmup,sam3d_total_s,29.5665,ok,
+b,0,warmup,sam3d_decode_s,7.8507,ok,호출 1회 [7.851]
+b,0,warmup,sam3d_sample_ss_s,13.0536,ok,
+b,0,warmup,sam3d_sample_slat_s,4.6922,ok,
+b,0,warmup,vram_max_mib,24058.0000,ok,nvidia-smi 100ms 샘플 293개
+b,0,warmup,vram_free_min_mib,506.0000,ok,
+b,0,warmup,sm_clock_min_mhz,2175.0000,ok,
+b,0,warmup,gpu_temp_max_c,66.0000,ok,
+b,0,warmup,gpu_power_max_w,443.5200,ok,
+b,0,warmup,proc_max_allocated_mib,18554.1128,ok,
+b,0,warmup,proc_max_reserved_mib,23278.0000,ok,
+b,0,warmup,run_result,29.5665,ok,
+b,1,measure,sam3d_total_s,23.3343,ok,
+b,1,measure,sam3d_decode_s,0.6369,ok,호출 1회 [0.637]
+b,1,measure,sam3d_sample_ss_s,16.0448,ok,
+b,1,measure,sam3d_sample_slat_s,3.2845,ok,
+b,1,measure,vram_max_mib,23772.0000,ok,nvidia-smi 100ms 샘플 231개
+b,1,measure,vram_free_min_mib,792.0000,ok,
+b,1,measure,sm_clock_min_mhz,2520.0000,ok,
+b,1,measure,gpu_temp_max_c,67.0000,ok,
+b,1,measure,gpu_power_max_w,410.2600,ok,
+b,1,measure,proc_max_allocated_mib,18390.8110,ok,
+b,1,measure,proc_max_reserved_mib,22646.0000,ok,
+b,1,measure,run_result,23.3343,ok,
+b,2,measure,sam3d_total_s,19.5775,ok,
+b,2,measure,sam3d_decode_s,0.5936,ok,호출 1회 [0.594]
+b,2,measure,sam3d_sample_ss_s,12.3814,ok,
+b,2,measure,sam3d_sample_slat_s,3.1403,ok,
+b,2,measure,vram_max_mib,23861.0000,ok,nvidia-smi 100ms 샘플 193개
+b,2,measure,vram_free_min_mib,703.0000,ok,
+b,2,measure,sm_clock_min_mhz,2520.0000,ok,
+b,2,measure,gpu_temp_max_c,69.0000,ok,
+b,2,measure,gpu_power_max_w,409.8000,ok,
+b,2,measure,proc_max_allocated_mib,18359.7310,ok,
+b,2,measure,proc_max_reserved_mib,22792.0000,ok,
+b,2,measure,run_result,19.5775,ok,
+b,3,measure,sam3d_total_s,20.7538,ok,
+b,3,measure,sam3d_decode_s,0.6487,ok,호출 1회 [0.649]
+b,3,measure,sam3d_sample_ss_s,13.1605,ok,
+b,3,measure,sam3d_sample_slat_s,3.4275,ok,
+b,3,measure,vram_max_mib,23796.0000,ok,nvidia-smi 100ms 샘플 205개
+b,3,measure,vram_free_min_mib,768.0000,ok,
+b,3,measure,sm_clock_min_mhz,2520.0000,ok,
+b,3,measure,gpu_temp_max_c,71.0000,ok,
+b,3,measure,gpu_power_max_w,422.6300,ok,
+b,3,measure,proc_max_allocated_mib,18413.4819,ok,
+b,3,measure,proc_max_reserved_mib,22726.0000,ok,
+b,3,measure,run_result,20.7538,ok,
+b,4,measure,sam3d_total_s,19.7059,ok,
+b,4,measure,sam3d_decode_s,0.7066,ok,호출 1회 [0.707]
+b,4,measure,sam3d_sample_ss_s,12.2799,ok,
+b,4,measure,sam3d_sample_slat_s,3.4359,ok,
+b,4,measure,vram_max_mib,23854.0000,ok,nvidia-smi 100ms 샘플 194개
+b,4,measure,vram_free_min_mib,710.0000,ok,
+b,4,measure,sm_clock_min_mhz,2520.0000,ok,
+b,4,measure,gpu_temp_max_c,72.0000,ok,
+b,4,measure,gpu_power_max_w,424.7600,ok,
+b,4,measure,proc_max_allocated_mib,18456.5532,ok,
+b,4,measure,proc_max_reserved_mib,22890.0000,ok,
+b,4,measure,run_result,19.7059,ok,
+b,5,measure,sam3d_total_s,19.6304,ok,
+b,5,measure,sam3d_decode_s,0.5267,ok,호출 1회 [0.527]
+b,5,measure,sam3d_sample_ss_s,12.3244,ok,
+b,5,measure,sam3d_sample_slat_s,3.2048,ok,
+b,5,measure,vram_max_mib,23062.0000,ok,nvidia-smi 100ms 샘플 194개
+b,5,measure,vram_free_min_mib,1502.0000,ok,
+b,5,measure,sm_clock_min_mhz,2520.0000,ok,
+b,5,measure,gpu_temp_max_c,72.0000,ok,
+b,5,measure,gpu_power_max_w,403.2700,ok,
+b,5,measure,proc_max_allocated_mib,18238.6323,ok,
+b,5,measure,proc_max_reserved_mib,22098.0000,ok,
+b,5,measure,run_result,19.6304,ok,
+b,0,setup,dxg_alloc_fail_delta,0.0000,ok,조건 중 dmesg 의 dxgkio_create_allocation 실패 증가 수(호스트 할당 거부)
+b,0,cleanup,cleanup_leak_mib,0.0000,ok,"allocated 13121 / 기준 13121 MiB, nvidia-smi 14166 MiB, 다른 측정 프로세스 []"
+c1,0,setup,vram_idle_before_mib,14166.0000,ok,조건 시작 전 nvidia-smi 사용량
+c1,0,setup,sd_load_s,6.1339,ok,
+c1,0,setup,sd_infer_s,9.7574,ok,
+c1,0,setup,sd_max_allocated_mib,17981.3711,ok,
+c1,0,setup,resident_alloc_mib,2781.1201,ok,상주 sd: 이 프로세스에서 늘어난 할당량
+c1,0,setup,vram_used_after_residents_mib,16875.0000,ok,
+c1,0,warmup,sam3d_total_s,20.6338,ok,
+c1,0,warmup,sam3d_decode_s,1.7751,ok,호출 1회 [1.775]
+c1,0,warmup,sam3d_sample_ss_s,12.2557,ok,
+c1,0,warmup,sam3d_sample_slat_s,3.3939,ok,
+c1,0,warmup,vram_max_mib,24041.0000,ok,nvidia-smi 100ms 샘플 204개
+c1,0,warmup,vram_free_min_mib,523.0000,ok,
+c1,0,warmup,sm_clock_min_mhz,2520.0000,ok,
+c1,0,warmup,gpu_temp_max_c,73.0000,ok,
+c1,0,warmup,gpu_power_max_w,420.9100,ok,
+c1,0,warmup,proc_max_allocated_mib,21180.3379,ok,
+c1,0,warmup,proc_max_reserved_mib,25376.0000,ok,
+c1,0,warmup,run_result,20.6338,ok,
+c1,1,measure,sam3d_total_s,23.8759,ok,
+c1,1,measure,sam3d_decode_s,1.7488,ok,호출 1회 [1.749]
+c1,1,measure,sam3d_sample_ss_s,15.2647,ok,
+c1,1,measure,sam3d_sample_slat_s,3.4670,ok,
+c1,1,measure,vram_max_mib,24024.0000,ok,nvidia-smi 100ms 샘플 236개
+c1,1,measure,vram_free_min_mib,540.0000,ok,
+c1,1,measure,sm_clock_min_mhz,2520.0000,ok,
+c1,1,measure,gpu_temp_max_c,72.0000,ok,
+c1,1,measure,gpu_power_max_w,419.0800,ok,
+c1,1,measure,proc_max_allocated_mib,21225.5298,ok,
+c1,1,measure,proc_max_reserved_mib,25552.0000,ok,
+c1,1,measure,run_result,23.8759,ok,
+c1,2,measure,sam3d_total_s,34.6616,ok,
+c1,2,measure,sam3d_decode_s,15.7740,ok,호출 1회 [15.774]
+c1,2,measure,sam3d_sample_ss_s,12.3160,ok,
+c1,2,measure,sam3d_sample_slat_s,3.4266,ok,
+c1,2,measure,vram_max_mib,24029.0000,ok,nvidia-smi 100ms 샘플 343개
+c1,2,measure,vram_free_min_mib,535.0000,ok,
+c1,2,measure,sm_clock_min_mhz,2520.0000,ok,
+c1,2,measure,gpu_temp_max_c,72.0000,ok,
+c1,2,measure,gpu_power_max_w,415.8900,ok,
+c1,2,measure,proc_max_allocated_mib,21229.4814,ok,
+c1,2,measure,proc_max_reserved_mib,25556.0000,ok,
+c1,2,measure,run_result,34.6616,ok,
+c1,3,measure,sam3d_total_s,34.1184,ok,
+c1,3,measure,sam3d_decode_s,14.9678,ok,호출 1회 [14.968]
+c1,3,measure,sam3d_sample_ss_s,12.3044,ok,
+c1,3,measure,sam3d_sample_slat_s,3.4509,ok,
+c1,3,measure,vram_max_mib,24035.0000,ok,nvidia-smi 100ms 샘플 338개
+c1,3,measure,vram_free_min_mib,529.0000,ok,
+c1,3,measure,sm_clock_min_mhz,2520.0000,ok,
+c1,3,measure,gpu_temp_max_c,72.0000,ok,
+c1,3,measure,gpu_power_max_w,423.5800,ok,
+c1,3,measure,proc_max_allocated_mib,21237.4463,ok,
+c1,3,measure,proc_max_reserved_mib,25818.0000,ok,
+c1,3,measure,run_result,34.1184,ok,
+c1,4,measure,sam3d_total_s,20.3704,ok,
+c1,4,measure,sam3d_decode_s,1.5631,ok,호출 1회 [1.563]
+c1,4,measure,sam3d_sample_ss_s,12.2375,ok,
+c1,4,measure,sam3d_sample_slat_s,3.3156,ok,
+c1,4,measure,vram_max_mib,24007.0000,ok,nvidia-smi 100ms 샘플 202개
+c1,4,measure,vram_free_min_mib,557.0000,ok,
+c1,4,measure,sm_clock_min_mhz,2520.0000,ok,
+c1,4,measure,gpu_temp_max_c,71.0000,ok,
+c1,4,measure,gpu_power_max_w,418.2500,ok,
+c1,4,measure,proc_max_allocated_mib,21138.5142,ok,
+c1,4,measure,proc_max_reserved_mib,25216.0000,ok,
+c1,4,measure,run_result,20.3704,ok,
+c1,5,measure,sam3d_total_s,20.3558,ok,
+c1,5,measure,sam3d_decode_s,1.6315,ok,호출 1회 [1.632]
+c1,5,measure,sam3d_sample_ss_s,12.2662,ok,
+c1,5,measure,sam3d_sample_slat_s,3.2783,ok,
+c1,5,measure,vram_max_mib,24025.0000,ok,nvidia-smi 100ms 샘플 201개
+c1,5,measure,vram_free_min_mib,539.0000,ok,
+c1,5,measure,sm_clock_min_mhz,2520.0000,ok,
+c1,5,measure,gpu_temp_max_c,72.0000,ok,
+c1,5,measure,gpu_power_max_w,414.8700,ok,
+c1,5,measure,proc_max_allocated_mib,21178.0161,ok,
+c1,5,measure,proc_max_reserved_mib,25360.0000,ok,
+c1,5,measure,run_result,20.3558,ok,
+c1,6,measure,sam3d_total_s,23.8723,ok,
+c1,6,measure,sam3d_decode_s,1.6774,ok,호출 1회 [1.677]
+c1,6,measure,sam3d_sample_ss_s,15.1486,ok,
+c1,6,measure,sam3d_sample_slat_s,3.4457,ok,
+c1,6,measure,vram_max_mib,23999.0000,ok,nvidia-smi 100ms 샘플 236개
+c1,6,measure,vram_free_min_mib,565.0000,ok,
+c1,6,measure,sm_clock_min_mhz,2520.0000,ok,
+c1,6,measure,gpu_temp_max_c,73.0000,ok,
+c1,6,measure,gpu_power_max_w,425.5000,ok,
+c1,6,measure,proc_max_allocated_mib,21205.9194,ok,
+c1,6,measure,proc_max_reserved_mib,25462.0000,ok,
+c1,6,measure,run_result,23.8723,ok,
+c1,7,measure,sam3d_total_s,22.0899,ok,
+c1,7,measure,sam3d_decode_s,2.0265,ok,호출 1회 [2.027]
+c1,7,measure,sam3d_sample_ss_s,12.2406,ok,
+c1,7,measure,sam3d_sample_slat_s,4.1820,ok,
+c1,7,measure,vram_max_mib,24038.0000,ok,nvidia-smi 100ms 샘플 219개
+c1,7,measure,vram_free_min_mib,526.0000,ok,
+c1,7,measure,sm_clock_min_mhz,2520.0000,ok,
+c1,7,measure,gpu_temp_max_c,73.0000,ok,
+c1,7,measure,gpu_power_max_w,421.7900,ok,
+c1,7,measure,proc_max_allocated_mib,21366.1025,ok,
+c1,7,measure,proc_max_reserved_mib,26270.0000,ok,
+c1,7,measure,run_result,22.0899,ok,
+c1,8,measure,sam3d_total_s,21.1930,ok,
+c1,8,measure,sam3d_decode_s,2.0492,ok,호출 1회 [2.049]
+c1,8,measure,sam3d_sample_ss_s,12.2811,ok,
+c1,8,measure,sam3d_sample_slat_s,3.5210,ok,
+c1,8,measure,vram_max_mib,24017.0000,ok,nvidia-smi 100ms 샘플 210개
+c1,8,measure,vram_free_min_mib,547.0000,ok,
+c1,8,measure,sm_clock_min_mhz,2520.0000,ok,
+c1,8,measure,gpu_temp_max_c,73.0000,ok,
+c1,8,measure,gpu_power_max_w,424.4900,ok,
+c1,8,measure,proc_max_allocated_mib,21369.8169,ok,
+c1,8,measure,proc_max_reserved_mib,26120.0000,ok,
+c1,8,measure,run_result,21.1930,ok,
+c1,9,measure,sam3d_total_s,20.2523,ok,
+c1,9,measure,sam3d_decode_s,1.5193,ok,호출 1회 [1.519]
+c1,9,measure,sam3d_sample_ss_s,12.2750,ok,
+c1,9,measure,sam3d_sample_slat_s,3.3462,ok,
+c1,9,measure,vram_max_mib,24029.0000,ok,nvidia-smi 100ms 샘플 200개
+c1,9,measure,vram_free_min_mib,535.0000,ok,
+c1,9,measure,sm_clock_min_mhz,2520.0000,ok,
+c1,9,measure,gpu_temp_max_c,73.0000,ok,
+c1,9,measure,gpu_power_max_w,418.2100,ok,
+c1,9,measure,proc_max_allocated_mib,21142.8569,ok,
+c1,9,measure,proc_max_reserved_mib,25236.0000,ok,
+c1,9,measure,run_result,20.2523,ok,
+c1,10,measure,sam3d_total_s,20.4241,ok,
+c1,10,measure,sam3d_decode_s,1.4724,ok,호출 1회 [1.472]
+c1,10,measure,sam3d_sample_ss_s,12.2882,ok,
+c1,10,measure,sam3d_sample_slat_s,3.1393,ok,
+c1,10,measure,vram_max_mib,24011.0000,ok,nvidia-smi 100ms 샘플 202개
+c1,10,measure,vram_free_min_mib,553.0000,ok,
+c1,10,measure,sm_clock_min_mhz,2520.0000,ok,
+c1,10,measure,gpu_temp_max_c,73.0000,ok,
+c1,10,measure,gpu_power_max_w,412.5700,ok,
+c1,10,measure,proc_max_allocated_mib,21120.9546,ok,
+c1,10,measure,proc_max_reserved_mib,25156.0000,ok,
+c1,10,measure,run_result,20.4241,ok,
+c1,0,setup,dxg_alloc_fail_delta,0.0000,ok,조건 중 dmesg 의 dxgkio_create_allocation 실패 증가 수(호스트 할당 거부)
+c1,0,cleanup,cleanup_leak_mib,0.0000,ok,"allocated 13121 / 기준 13121 MiB, nvidia-smi 14168 MiB, 다른 측정 프로세스 []"
+c2,0,setup,vram_idle_before_mib,14168.0000,ok,조건 시작 전 nvidia-smi 사용량
+c2,0,setup,sd_load_s,3.9833,ok,
+c2,0,setup,sd_infer_s,9.7381,ok,
+c2,0,setup,sd_max_allocated_mib,17981.3711,ok,
+c2,0,setup,resident_alloc_mib,3974.6924,ok,"상주 sd,sam2,lama: 이 프로세스에서 늘어난 할당량"
+c2,0,setup,vram_used_after_residents_mib,18190.0000,ok,
+c2,0,warmup,sam3d_total_s,21.7317,ok,
+c2,0,warmup,sam3d_decode_s,2.1694,ok,호출 1회 [2.169]
+c2,0,warmup,sam3d_sample_ss_s,13.0865,ok,
+c2,0,warmup,sam3d_sample_slat_s,3.1291,ok,
+c2,0,warmup,vram_max_mib,24042.0000,ok,nvidia-smi 100ms 샘플 214개
+c2,0,warmup,vram_free_min_mib,522.0000,ok,
+c2,0,warmup,sm_clock_min_mhz,2520.0000,ok,
+c2,0,warmup,gpu_temp_max_c,73.0000,ok,
+c2,0,warmup,gpu_power_max_w,422.2600,ok,
+c2,0,warmup,proc_max_allocated_mib,22322.5029,ok,
+c2,0,warmup,proc_max_reserved_mib,26530.0000,ok,
+c2,0,warmup,run_result,21.7317,ok,
+c2,1,measure,sam3d_total_s,23.2849,ok,
+c2,1,measure,sam3d_decode_s,2.3626,ok,호출 1회 [2.363]
+c2,1,measure,sam3d_sample_ss_s,14.1823,ok,
+c2,1,measure,sam3d_sample_slat_s,3.5153,ok,
+c2,1,measure,vram_max_mib,23952.0000,ok,nvidia-smi 100ms 샘플 230개
+c2,1,measure,vram_free_min_mib,612.0000,ok,
+c2,1,measure,sm_clock_min_mhz,2520.0000,ok,
+c2,1,measure,gpu_temp_max_c,73.0000,ok,
+c2,1,measure,gpu_power_max_w,425.8000,ok,
+c2,1,measure,proc_max_allocated_mib,22529.3647,ok,
+c2,1,measure,proc_max_reserved_mib,27066.0000,ok,
+c2,1,measure,run_result,23.2849,ok,
+c2,2,measure,sam3d_total_s,21.4671,ok,
+c2,2,measure,sam3d_decode_s,2.2693,ok,호출 1회 [2.269]
+c2,2,measure,sam3d_sample_ss_s,12.2781,ok,
+c2,2,measure,sam3d_sample_slat_s,3.5741,ok,
+c2,2,measure,vram_max_mib,23986.0000,ok,nvidia-smi 100ms 샘플 212개
+c2,2,measure,vram_free_min_mib,578.0000,ok,
+c2,2,measure,sm_clock_min_mhz,2520.0000,ok,
+c2,2,measure,gpu_temp_max_c,73.0000,ok,
+c2,2,measure,gpu_power_max_w,420.5700,ok,
+c2,2,measure,proc_max_allocated_mib,22507.3242,ok,
+c2,2,measure,proc_max_reserved_mib,26974.0000,ok,
+c2,2,measure,run_result,21.4671,ok,
+c2,3,measure,sam3d_total_s,21.3531,ok,
+c2,3,measure,sam3d_decode_s,2.1060,ok,호출 1회 [2.106]
+c2,3,measure,sam3d_sample_ss_s,12.3032,ok,
+c2,3,measure,sam3d_sample_slat_s,3.3158,ok,
+c2,3,measure,vram_max_mib,23970.0000,ok,nvidia-smi 100ms 샘플 211개
+c2,3,measure,vram_free_min_mib,594.0000,ok,
+c2,3,measure,sm_clock_min_mhz,2520.0000,ok,
+c2,3,measure,gpu_temp_max_c,73.0000,ok,
+c2,3,measure,gpu_power_max_w,419.6300,ok,
+c2,3,measure,proc_max_allocated_mib,22436.6929,ok,
+c2,3,measure,proc_max_reserved_mib,26702.0000,ok,
+c2,3,measure,run_result,21.3531,ok,
+c2,4,measure,sam3d_total_s,21.4045,ok,
+c2,4,measure,sam3d_decode_s,2.2287,ok,호출 1회 [2.229]
+c2,4,measure,sam3d_sample_ss_s,12.2516,ok,
+c2,4,measure,sam3d_sample_slat_s,3.5021,ok,
+c2,4,measure,vram_max_mib,23992.0000,ok,nvidia-smi 100ms 샘플 211개
+c2,4,measure,vram_free_min_mib,572.0000,ok,
+c2,4,measure,sm_clock_min_mhz,2520.0000,ok,
+c2,4,measure,gpu_temp_max_c,74.0000,ok,
+c2,4,measure,gpu_power_max_w,424.4600,ok,
+c2,4,measure,proc_max_allocated_mib,22493.2852,ok,
+c2,4,measure,proc_max_reserved_mib,26918.0000,ok,
+c2,4,measure,run_result,21.4045,ok,
+c2,5,measure,sam3d_total_s,22.4168,ok,
+c2,5,measure,sam3d_decode_s,2.5056,ok,호출 1회 [2.506]
+c2,5,measure,sam3d_sample_ss_s,12.3958,ok,
+c2,5,measure,sam3d_sample_slat_s,4.0596,ok,
+c2,5,measure,vram_max_mib,23992.0000,ok,nvidia-smi 100ms 샘플 222개
+c2,5,measure,vram_free_min_mib,572.0000,ok,
+c2,5,measure,sm_clock_min_mhz,2520.0000,ok,
+c2,5,measure,gpu_temp_max_c,73.0000,ok,
+c2,5,measure,gpu_power_max_w,413.7600,ok,
+c2,5,measure,proc_max_allocated_mib,22572.9102,ok,
+c2,5,measure,proc_max_reserved_mib,27238.0000,ok,
+c2,5,measure,run_result,22.4168,ok,
+c2,6,measure,sam3d_total_s,21.1866,ok,
+c2,6,measure,sam3d_decode_s,2.0918,ok,호출 1회 [2.092]
+c2,6,measure,sam3d_sample_ss_s,12.2428,ok,
+c2,6,measure,sam3d_sample_slat_s,3.4984,ok,
+c2,6,measure,vram_max_mib,24010.0000,ok,nvidia-smi 100ms 샘플 210개
+c2,6,measure,vram_free_min_mib,554.0000,ok,
+c2,6,measure,sm_clock_min_mhz,2520.0000,ok,
+c2,6,measure,gpu_temp_max_c,73.0000,ok,
+c2,6,measure,gpu_power_max_w,421.9600,ok,
+c2,6,measure,proc_max_allocated_mib,22431.0054,ok,
+c2,6,measure,proc_max_reserved_mib,26678.0000,ok,
+c2,6,measure,run_result,21.1866,ok,
+c2,7,measure,sam3d_total_s,24.2092,ok,
+c2,7,measure,sam3d_decode_s,2.4955,ok,호출 1회 [2.495]
+c2,7,measure,sam3d_sample_ss_s,14.0942,ok,
+c2,7,measure,sam3d_sample_slat_s,4.0575,ok,
+c2,7,measure,vram_max_mib,23970.0000,ok,nvidia-smi 100ms 샘플 239개
+c2,7,measure,vram_free_min_mib,594.0000,ok,
+c2,7,measure,sm_clock_min_mhz,2520.0000,ok,
+c2,7,measure,gpu_temp_max_c,73.0000,ok,
+c2,7,measure,gpu_power_max_w,416.5900,ok,
+c2,7,measure,proc_max_allocated_mib,22564.7056,ok,
+c2,7,measure,proc_max_reserved_mib,27214.0000,ok,
+c2,7,measure,run_result,24.2092,ok,
+c2,8,measure,sam3d_total_s,21.9332,ok,
+c2,8,measure,sam3d_decode_s,2.2768,ok,호출 1회 [2.277]
+c2,8,measure,sam3d_sample_ss_s,12.2221,ok,
+c2,8,measure,sam3d_sample_slat_s,3.9897,ok,
+c2,8,measure,vram_max_mib,24013.0000,ok,nvidia-smi 100ms 샘플 217개
+c2,8,measure,vram_free_min_mib,551.0000,ok,
+c2,8,measure,sm_clock_min_mhz,2520.0000,ok,
+c2,8,measure,gpu_temp_max_c,73.0000,ok,
+c2,8,measure,gpu_power_max_w,415.9300,ok,
+c2,8,measure,proc_max_allocated_mib,22498.6060,ok,
+c2,8,measure,proc_max_reserved_mib,27130.0000,ok,
+c2,8,measure,run_result,21.9332,ok,
+c2,9,measure,sam3d_total_s,21.6184,ok,
+c2,9,measure,sam3d_decode_s,2.3854,ok,호출 1회 [2.385]
+c2,9,measure,sam3d_sample_ss_s,12.2507,ok,
+c2,9,measure,sam3d_sample_slat_s,3.6444,ok,
+c2,9,measure,vram_max_mib,23960.0000,ok,nvidia-smi 100ms 샘플 214개
+c2,9,measure,vram_free_min_mib,604.0000,ok,
+c2,9,measure,sm_clock_min_mhz,2520.0000,ok,
+c2,9,measure,gpu_temp_max_c,73.0000,ok,
+c2,9,measure,gpu_power_max_w,420.8100,ok,
+c2,9,measure,proc_max_allocated_mib,22532.0576,ok,
+c2,9,measure,proc_max_reserved_mib,27078.0000,ok,
+c2,9,measure,run_result,21.6184,ok,
+c2,10,measure,sam3d_total_s,22.5102,ok,
+c2,10,measure,sam3d_decode_s,1.8544,ok,호출 1회 [1.854]
+c2,10,measure,sam3d_sample_ss_s,13.1566,ok,
+c2,10,measure,sam3d_sample_slat_s,4.1692,ok,
+c2,10,measure,vram_max_mib,23992.0000,ok,nvidia-smi 100ms 샘플 222개
+c2,10,measure,vram_free_min_mib,572.0000,ok,
+c2,10,measure,sm_clock_min_mhz,2520.0000,ok,
+c2,10,measure,gpu_temp_max_c,72.0000,ok,
+c2,10,measure,gpu_power_max_w,402.1600,ok,
+c2,10,measure,proc_max_allocated_mib,22341.4326,ok,
+c2,10,measure,proc_max_reserved_mib,26342.0000,ok,
+c2,10,measure,run_result,22.5102,ok,
+c2,0,setup,dxg_alloc_fail_delta,0.0000,ok,조건 중 dmesg 의 dxgkio_create_allocation 실패 증가 수(호스트 할당 거부)
+c2,0,cleanup,cleanup_leak_mib,0.0000,ok,"allocated 13121 / 기준 13121 MiB, nvidia-smi 14116 MiB, 다른 측정 프로세스 []"
+d,0,setup,vram_idle_before_mib,14116.0000,ok,조건 시작 전 nvidia-smi 사용량
+d,0,warmup,sd_load_s,4.3875,ok,
+d,0,warmup,sd_infer_s,9.7154,ok,
+d,0,warmup,sd_max_allocated_mib,17981.3711,ok,
+d,0,warmup,sd_unload_s,0.2172,ok,
+d,0,warmup,sd_phase_vram_max_mib,19875.0000,ok,SD 로드~해제 구간 nvidia-smi 최댓값
+d,0,warmup,sam3d_total_s,22.0968,ok,
+d,0,warmup,sam3d_decode_s,1.5987,ok,호출 1회 [1.599]
+d,0,warmup,sam3d_sample_ss_s,12.2709,ok,
+d,0,warmup,sam3d_sample_slat_s,4.1844,ok,
+d,0,warmup,vram_max_mib,23824.0000,ok,nvidia-smi 100ms 샘플 218개
+d,0,warmup,vram_free_min_mib,740.0000,ok,
+d,0,warmup,sm_clock_min_mhz,2520.0000,ok,
+d,0,warmup,gpu_temp_max_c,73.0000,ok,
+d,0,warmup,gpu_power_max_w,420.9200,ok,
+d,0,warmup,proc_max_allocated_mib,18632.0630,ok,
+d,0,warmup,proc_max_reserved_mib,23590.0000,ok,
+d,0,warmup,run_result,22.0968,ok,
+d,1,measure,sd_load_s,3.5738,ok,
+d,1,measure,sd_infer_s,10.6266,ok,
+d,1,measure,sd_max_allocated_mib,17981.3711,ok,
+d,1,measure,sd_unload_s,0.2356,ok,
+d,1,measure,sd_phase_vram_max_mib,19569.0000,ok,SD 로드~해제 구간 nvidia-smi 최댓값
+d,1,measure,sam3d_total_s,19.6197,ok,
+d,1,measure,sam3d_decode_s,0.6700,ok,호출 1회 [0.67]
+d,1,measure,sam3d_sample_ss_s,12.3423,ok,
+d,1,measure,sam3d_sample_slat_s,3.2938,ok,
+d,1,measure,vram_max_mib,23285.0000,ok,nvidia-smi 100ms 샘플 194개
+d,1,measure,vram_free_min_mib,1279.0000,ok,
+d,1,measure,sm_clock_min_mhz,2520.0000,ok,
+d,1,measure,gpu_temp_max_c,74.0000,ok,
+d,1,measure,gpu_power_max_w,413.4300,ok,
+d,1,measure,proc_max_allocated_mib,18400.6504,ok,
+d,1,measure,proc_max_reserved_mib,22674.0000,ok,
+d,1,measure,run_result,19.6197,ok,
+d,2,measure,sd_load_s,3.2166,ok,
+d,2,measure,sd_infer_s,9.7173,ok,
+d,2,measure,sd_max_allocated_mib,17981.3711,ok,
+d,2,measure,sd_unload_s,0.2203,ok,
+d,2,measure,sd_phase_vram_max_mib,19563.0000,ok,SD 로드~해제 구간 nvidia-smi 최댓값
+d,2,measure,sam3d_total_s,19.5903,ok,
+d,2,measure,sam3d_decode_s,0.6358,ok,호출 1회 [0.636]
+d,2,measure,sam3d_sample_ss_s,12.3577,ok,
+d,2,measure,sam3d_sample_slat_s,3.4316,ok,
+d,2,measure,vram_max_mib,23165.0000,ok,nvidia-smi 100ms 샘플 194개
+d,2,measure,vram_free_min_mib,1399.0000,ok,
+d,2,measure,sm_clock_min_mhz,2520.0000,ok,
+d,2,measure,gpu_temp_max_c,73.0000,ok,
+d,2,measure,gpu_power_max_w,413.3900,ok,
+d,2,measure,proc_max_allocated_mib,18369.1372,ok,
+d,2,measure,proc_max_reserved_mib,22554.0000,ok,
+d,2,measure,run_result,19.5903,ok,
+d,3,measure,sd_load_s,3.9006,ok,
+d,3,measure,sd_infer_s,9.7266,ok,
+d,3,measure,sd_max_allocated_mib,17981.3711,ok,
+d,3,measure,sd_unload_s,0.2152,ok,
+d,3,measure,sd_phase_vram_max_mib,19570.0000,ok,SD 로드~해제 구간 nvidia-smi 최댓값
+d,3,measure,sam3d_total_s,19.9428,ok,
+d,3,measure,sam3d_decode_s,0.6435,ok,호출 1회 [0.644]
+d,3,measure,sam3d_sample_ss_s,12.2842,ok,
+d,3,measure,sam3d_sample_slat_s,3.4431,ok,
+d,3,measure,vram_max_mib,23313.0000,ok,nvidia-smi 100ms 샘플 197개
+d,3,measure,vram_free_min_mib,1251.0000,ok,
+d,3,measure,sm_clock_min_mhz,2520.0000,ok,
+d,3,measure,gpu_temp_max_c,74.0000,ok,
+d,3,measure,gpu_power_max_w,425.0100,ok,
+d,3,measure,proc_max_allocated_mib,18407.1821,ok,
+d,3,measure,proc_max_reserved_mib,22702.0000,ok,
+d,3,measure,run_result,19.9428,ok,
+d,4,measure,sd_load_s,4.2694,ok,
+d,4,measure,sd_infer_s,9.7464,ok,
+d,4,measure,sd_max_allocated_mib,17981.3711,ok,
+d,4,measure,sd_unload_s,0.2158,ok,
+d,4,measure,sd_phase_vram_max_mib,19563.0000,ok,SD 로드~해제 구간 nvidia-smi 최댓값
+d,4,measure,sam3d_total_s,20.9669,ok,
+d,4,measure,sam3d_decode_s,0.7126,ok,호출 1회 [0.713]
+d,4,measure,sam3d_sample_ss_s,12.7656,ok,
+d,4,measure,sam3d_sample_slat_s,3.4897,ok,
+d,4,measure,vram_max_mib,23950.0000,ok,nvidia-smi 100ms 샘플 207개
+d,4,measure,vram_free_min_mib,614.0000,ok,
+d,4,measure,sm_clock_min_mhz,2520.0000,ok,
+d,4,measure,gpu_temp_max_c,74.0000,ok,
+d,4,measure,gpu_power_max_w,420.5200,ok,
+d,4,measure,proc_max_allocated_mib,18519.2363,ok,
+d,4,measure,proc_max_reserved_mib,23340.0000,ok,
+d,4,measure,run_result,20.9669,ok,
+d,5,measure,sd_load_s,3.1520,ok,
+d,5,measure,sd_infer_s,9.7969,ok,
+d,5,measure,sd_max_allocated_mib,17981.3711,ok,
+d,5,measure,sd_unload_s,0.2034,ok,
+d,5,measure,sd_phase_vram_max_mib,19563.0000,ok,SD 로드~해제 구간 nvidia-smi 최댓값
+d,5,measure,sam3d_total_s,19.0870,ok,
+d,5,measure,sam3d_decode_s,0.5966,ok,호출 1회 [0.597]
+d,5,measure,sam3d_sample_ss_s,12.2334,ok,
+d,5,measure,sam3d_sample_slat_s,3.1117,ok,
+d,5,measure,vram_max_mib,23103.0000,ok,nvidia-smi 100ms 샘플 189개
+d,5,measure,vram_free_min_mib,1461.0000,ok,
+d,5,measure,sm_clock_min_mhz,2520.0000,ok,
+d,5,measure,gpu_temp_max_c,74.0000,ok,
+d,5,measure,gpu_power_max_w,424.3900,ok,
+d,5,measure,proc_max_allocated_mib,18350.1724,ok,
+d,5,measure,proc_max_reserved_mib,22494.0000,ok,
+d,5,measure,run_result,19.0870,ok,
+d,0,setup,dxg_alloc_fail_delta,0.0000,ok,조건 중 dmesg 의 dxgkio_create_allocation 실패 증가 수(호스트 할당 거부)
+d,0,cleanup,cleanup_leak_mib,0.0000,ok,"allocated 13121 / 기준 13121 MiB, nvidia-smi 13797 MiB, 다른 측정 프로세스 []"
+e,0,setup,vram_idle_before_mib,13797.0000,ok,조건 시작 전 nvidia-smi 사용량
+e,0,warmup,sam3d_total_s,19.9723,ok,
+e,0,warmup,sam3d_decode_s,0.6165,ok,호출 1회 [0.617]
+e,0,warmup,sam3d_sample_ss_s,12.4511,ok,
+e,0,warmup,sam3d_sample_slat_s,3.4813,ok,
+e,0,warmup,vram_max_mib,23783.0000,ok,nvidia-smi 100ms 샘플 198개
+e,0,warmup,vram_free_min_mib,781.0000,ok,
+e,0,warmup,sm_clock_min_mhz,2520.0000,ok,
+e,0,warmup,gpu_temp_max_c,74.0000,ok,
+e,0,warmup,gpu_power_max_w,421.5800,ok,
+e,0,warmup,proc_max_allocated_mib,18351.8511,ok,
+e,0,warmup,proc_max_reserved_mib,22496.0000,ok,
+e,0,warmup,omni3d_calls,1.0000,ok,실패 0
+e,0,warmup,omni3d_latency_max_s,1.1983,ok,
+e,0,warmup,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+e,0,warmup,run_result,19.9723,ok,
+e,1,measure,sam3d_total_s,19.3090,ok,
+e,1,measure,sam3d_decode_s,0.6184,ok,호출 1회 [0.618]
+e,1,measure,sam3d_sample_ss_s,12.3587,ok,
+e,1,measure,sam3d_sample_slat_s,3.1134,ok,
+e,1,measure,vram_max_mib,23875.0000,ok,nvidia-smi 100ms 샘플 191개
+e,1,measure,vram_free_min_mib,689.0000,ok,
+e,1,measure,sm_clock_min_mhz,2520.0000,ok,
+e,1,measure,gpu_temp_max_c,73.0000,ok,
+e,1,measure,gpu_power_max_w,414.3700,ok,
+e,1,measure,proc_max_allocated_mib,18372.7202,ok,
+e,1,measure,proc_max_reserved_mib,22586.0000,ok,
+e,1,measure,omni3d_calls,1.0000,ok,실패 0
+e,1,measure,omni3d_latency_max_s,0.2330,ok,
+e,1,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+e,1,measure,run_result,19.3090,ok,
+e,2,measure,sam3d_total_s,20.7007,ok,
+e,2,measure,sam3d_decode_s,0.8641,ok,호출 1회 [0.864]
+e,2,measure,sam3d_sample_ss_s,12.3207,ok,
+e,2,measure,sam3d_sample_slat_s,4.0029,ok,
+e,2,measure,vram_max_mib,24079.0000,ok,nvidia-smi 100ms 샘플 205개
+e,2,measure,vram_free_min_mib,485.0000,ok,
+e,2,measure,sm_clock_min_mhz,2520.0000,ok,
+e,2,measure,gpu_temp_max_c,73.0000,ok,
+e,2,measure,gpu_power_max_w,411.0400,ok,
+e,2,measure,proc_max_allocated_mib,18518.8047,ok,
+e,2,measure,proc_max_reserved_mib,23136.0000,ok,
+e,2,measure,omni3d_calls,1.0000,ok,실패 0
+e,2,measure,omni3d_latency_max_s,0.2349,ok,
+e,2,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+e,2,measure,run_result,20.7007,ok,
+e,3,measure,sam3d_total_s,23.1557,ok,
+e,3,measure,sam3d_decode_s,0.5825,ok,호출 1회 [0.583]
+e,3,measure,sam3d_sample_ss_s,16.0382,ok,
+e,3,measure,sam3d_sample_slat_s,3.0455,ok,
+e,3,measure,vram_max_mib,24006.0000,ok,nvidia-smi 100ms 샘플 229개
+e,3,measure,vram_free_min_mib,558.0000,ok,
+e,3,measure,sm_clock_min_mhz,2520.0000,ok,
+e,3,measure,gpu_temp_max_c,73.0000,ok,
+e,3,measure,gpu_power_max_w,417.9400,ok,
+e,3,measure,proc_max_allocated_mib,18334.8472,ok,
+e,3,measure,proc_max_reserved_mib,22718.0000,ok,
+e,3,measure,omni3d_calls,1.0000,ok,실패 0
+e,3,measure,omni3d_latency_max_s,0.2620,ok,
+e,3,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+e,3,measure,run_result,23.1557,ok,
+e,4,measure,sam3d_total_s,19.0865,ok,
+e,4,measure,sam3d_decode_s,0.5498,ok,호출 1회 [0.55]
+e,4,measure,sam3d_sample_ss_s,12.2841,ok,
+e,4,measure,sam3d_sample_slat_s,3.1167,ok,
+e,4,measure,vram_max_mib,23569.0000,ok,nvidia-smi 100ms 샘플 189개
+e,4,measure,vram_free_min_mib,995.0000,ok,
+e,4,measure,sm_clock_min_mhz,2520.0000,ok,
+e,4,measure,gpu_temp_max_c,74.0000,ok,
+e,4,measure,gpu_power_max_w,420.8700,ok,
+e,4,measure,proc_max_allocated_mib,18289.7256,ok,
+e,4,measure,proc_max_reserved_mib,22282.0000,ok,
+e,4,measure,omni3d_calls,1.0000,ok,실패 0
+e,4,measure,omni3d_latency_max_s,0.2341,ok,
+e,4,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+e,4,measure,run_result,19.0865,ok,
+e,5,measure,sam3d_total_s,19.8338,ok,
+e,5,measure,sam3d_decode_s,0.7272,ok,호출 1회 [0.727]
+e,5,measure,sam3d_sample_ss_s,12.3049,ok,
+e,5,measure,sam3d_sample_slat_s,3.4768,ok,
+e,5,measure,vram_max_mib,24009.0000,ok,nvidia-smi 100ms 샘플 197개
+e,5,measure,vram_free_min_mib,555.0000,ok,
+e,5,measure,sm_clock_min_mhz,2520.0000,ok,
+e,5,measure,gpu_temp_max_c,73.0000,ok,
+e,5,measure,gpu_power_max_w,414.3600,ok,
+e,5,measure,proc_max_allocated_mib,18441.9492,ok,
+e,5,measure,proc_max_reserved_mib,22842.0000,ok,
+e,5,measure,omni3d_calls,1.0000,ok,실패 0
+e,5,measure,omni3d_latency_max_s,0.2293,ok,
+e,5,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+e,5,measure,run_result,19.8338,ok,
+e,0,setup,dxg_alloc_fail_delta,0.0000,ok,조건 중 dmesg 의 dxgkio_create_allocation 실패 증가 수(호스트 할당 거부)
+e,0,cleanup,cleanup_leak_mib,0.0000,ok,"allocated 13121 / 기준 13121 MiB, nvidia-smi 14354 MiB, 다른 측정 프로세스 []"
+f1,0,setup,vram_idle_before_mib,14354.0000,ok,조건 시작 전 nvidia-smi 사용량
+f1,0,setup,sd_load_s,4.0816,ok,
+f1,0,setup,sd_infer_s,9.7619,ok,
+f1,0,setup,sd_max_allocated_mib,17981.3711,ok,
+f1,0,setup,resident_alloc_mib,2781.1201,ok,상주 sd: 이 프로세스에서 늘어난 할당량
+f1,0,setup,vram_used_after_residents_mib,17194.0000,ok,
+f1,0,warmup,sam3d_total_s,21.3136,ok,
+f1,0,warmup,sam3d_decode_s,1.8074,ok,호출 1회 [1.807]
+f1,0,warmup,sam3d_sample_ss_s,12.3335,ok,
+f1,0,warmup,sam3d_sample_slat_s,3.5330,ok,
+f1,0,warmup,vram_max_mib,24083.0000,ok,nvidia-smi 100ms 샘플 211개
+f1,0,warmup,vram_free_min_mib,481.0000,ok,
+f1,0,warmup,sm_clock_min_mhz,2520.0000,ok,
+f1,0,warmup,gpu_temp_max_c,74.0000,ok,
+f1,0,warmup,gpu_power_max_w,427.7400,ok,
+f1,0,warmup,proc_max_allocated_mib,21278.4409,ok,
+f1,0,warmup,proc_max_reserved_mib,25740.0000,ok,
+f1,0,warmup,omni3d_calls,1.0000,ok,실패 0
+f1,0,warmup,omni3d_latency_max_s,0.2285,ok,
+f1,0,warmup,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f1,0,warmup,run_result,21.3136,ok,
+f1,1,measure,sam3d_total_s,24.5544,ok,
+f1,1,measure,sam3d_decode_s,1.8751,ok,호출 1회 [1.875]
+f1,1,measure,sam3d_sample_ss_s,15.7586,ok,
+f1,1,measure,sam3d_sample_slat_s,3.3554,ok,
+f1,1,measure,vram_max_mib,24043.0000,ok,nvidia-smi 100ms 샘플 243개
+f1,1,measure,vram_free_min_mib,521.0000,ok,
+f1,1,measure,sm_clock_min_mhz,2520.0000,ok,
+f1,1,measure,gpu_temp_max_c,73.0000,ok,
+f1,1,measure,gpu_power_max_w,417.0100,ok,
+f1,1,measure,proc_max_allocated_mib,21247.5430,ok,
+f1,1,measure,proc_max_reserved_mib,25636.0000,ok,
+f1,1,measure,omni3d_calls,1.0000,ok,실패 0
+f1,1,measure,omni3d_latency_max_s,0.2984,ok,
+f1,1,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f1,1,measure,run_result,24.5544,ok,
+f1,2,measure,sam3d_total_s,20.7017,ok,
+f1,2,measure,sam3d_decode_s,1.7005,ok,호출 1회 [1.7]
+f1,2,measure,sam3d_sample_ss_s,12.3159,ok,
+f1,2,measure,sam3d_sample_slat_s,3.4146,ok,
+f1,2,measure,vram_max_mib,24061.0000,ok,nvidia-smi 100ms 샘플 205개
+f1,2,measure,vram_free_min_mib,503.0000,ok,
+f1,2,measure,sm_clock_min_mhz,2520.0000,ok,
+f1,2,measure,gpu_temp_max_c,74.0000,ok,
+f1,2,measure,gpu_power_max_w,421.9800,ok,
+f1,2,measure,proc_max_allocated_mib,21205.1079,ok,
+f1,2,measure,proc_max_reserved_mib,25460.0000,ok,
+f1,2,measure,omni3d_calls,1.0000,ok,실패 0
+f1,2,measure,omni3d_latency_max_s,0.2214,ok,
+f1,2,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f1,2,measure,run_result,20.7017,ok,
+f1,3,measure,sam3d_total_s,21.1618,ok,
+f1,3,measure,sam3d_decode_s,1.8731,ok,호출 1회 [1.873]
+f1,3,measure,sam3d_sample_ss_s,12.3178,ok,
+f1,3,measure,sam3d_sample_slat_s,3.5101,ok,
+f1,3,measure,vram_max_mib,24087.0000,ok,nvidia-smi 100ms 샘플 210개
+f1,3,measure,vram_free_min_mib,477.0000,ok,
+f1,3,measure,sm_clock_min_mhz,2520.0000,ok,
+f1,3,measure,gpu_temp_max_c,74.0000,ok,
+f1,3,measure,gpu_power_max_w,427.0100,ok,
+f1,3,measure,proc_max_allocated_mib,21275.9185,ok,
+f1,3,measure,proc_max_reserved_mib,25934.0000,ok,
+f1,3,measure,omni3d_calls,1.0000,ok,실패 0
+f1,3,measure,omni3d_latency_max_s,0.2192,ok,
+f1,3,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f1,3,measure,run_result,21.1618,ok,
+f1,4,measure,sam3d_total_s,21.8124,ok,
+f1,4,measure,sam3d_decode_s,1.9522,ok,호출 1회 [1.952]
+f1,4,measure,sam3d_sample_ss_s,12.3312,ok,
+f1,4,measure,sam3d_sample_slat_s,4.2433,ok,
+f1,4,measure,vram_max_mib,24061.0000,ok,nvidia-smi 100ms 샘플 216개
+f1,4,measure,vram_free_min_mib,503.0000,ok,
+f1,4,measure,sm_clock_min_mhz,2520.0000,ok,
+f1,4,measure,gpu_temp_max_c,73.0000,ok,
+f1,4,measure,gpu_power_max_w,417.3700,ok,
+f1,4,measure,proc_max_allocated_mib,21319.8447,ok,
+f1,4,measure,proc_max_reserved_mib,26102.0000,ok,
+f1,4,measure,omni3d_calls,1.0000,ok,실패 0
+f1,4,measure,omni3d_latency_max_s,0.2210,ok,
+f1,4,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f1,4,measure,run_result,21.8124,ok,
+f1,5,measure,sam3d_total_s,22.3815,ok,
+f1,5,measure,sam3d_decode_s,1.9564,ok,호출 1회 [1.956]
+f1,5,measure,sam3d_sample_ss_s,12.3957,ok,
+f1,5,measure,sam3d_sample_slat_s,4.4772,ok,
+f1,5,measure,vram_max_mib,24088.0000,ok,nvidia-smi 100ms 샘플 221개
+f1,5,measure,vram_free_min_mib,476.0000,ok,
+f1,5,measure,sm_clock_min_mhz,2520.0000,ok,
+f1,5,measure,gpu_temp_max_c,74.0000,ok,
+f1,5,measure,gpu_power_max_w,424.3300,ok,
+f1,5,measure,proc_max_allocated_mib,21417.4805,ok,
+f1,5,measure,proc_max_reserved_mib,25808.0000,ok,
+f1,5,measure,omni3d_calls,1.0000,ok,실패 0
+f1,5,measure,omni3d_latency_max_s,0.2410,ok,
+f1,5,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f1,5,measure,run_result,22.3815,ok,
+f1,6,measure,sam3d_total_s,20.7527,ok,
+f1,6,measure,sam3d_decode_s,1.8131,ok,호출 1회 [1.813]
+f1,6,measure,sam3d_sample_ss_s,12.2889,ok,
+f1,6,measure,sam3d_sample_slat_s,3.3410,ok,
+f1,6,measure,vram_max_mib,24063.0000,ok,nvidia-smi 100ms 샘플 205개
+f1,6,measure,vram_free_min_mib,501.0000,ok,
+f1,6,measure,sm_clock_min_mhz,2520.0000,ok,
+f1,6,measure,gpu_temp_max_c,74.0000,ok,
+f1,6,measure,gpu_power_max_w,421.1100,ok,
+f1,6,measure,proc_max_allocated_mib,21252.6699,ok,
+f1,6,measure,proc_max_reserved_mib,25656.0000,ok,
+f1,6,measure,omni3d_calls,1.0000,ok,실패 0
+f1,6,measure,omni3d_latency_max_s,0.2289,ok,
+f1,6,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f1,6,measure,run_result,20.7527,ok,
+f1,7,measure,sam3d_total_s,24.2796,ok,
+f1,7,measure,sam3d_decode_s,1.7459,ok,호출 1회 [1.746]
+f1,7,measure,sam3d_sample_ss_s,15.8829,ok,
+f1,7,measure,sam3d_sample_slat_s,3.4629,ok,
+f1,7,measure,vram_max_mib,24002.0000,ok,nvidia-smi 100ms 샘플 240개
+f1,7,measure,vram_free_min_mib,562.0000,ok,
+f1,7,measure,sm_clock_min_mhz,2655.0000,ok,
+f1,7,measure,gpu_temp_max_c,73.0000,ok,
+f1,7,measure,gpu_power_max_w,414.3600,ok,
+f1,7,measure,proc_max_allocated_mib,21172.5859,ok,
+f1,7,measure,proc_max_reserved_mib,25340.0000,ok,
+f1,7,measure,omni3d_calls,1.0000,ok,실패 0
+f1,7,measure,omni3d_latency_max_s,0.3163,ok,
+f1,7,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f1,7,measure,run_result,24.2796,ok,
+f1,8,measure,sam3d_total_s,21.8423,ok,
+f1,8,measure,sam3d_decode_s,2.0962,ok,호출 1회 [2.096]
+f1,8,measure,sam3d_sample_ss_s,12.3190,ok,
+f1,8,measure,sam3d_sample_slat_s,4.0642,ok,
+f1,8,measure,vram_max_mib,23989.0000,ok,nvidia-smi 100ms 샘플 216개
+f1,8,measure,vram_free_min_mib,575.0000,ok,
+f1,8,measure,sm_clock_min_mhz,2520.0000,ok,
+f1,8,measure,gpu_temp_max_c,73.0000,ok,
+f1,8,measure,gpu_power_max_w,417.0100,ok,
+f1,8,measure,proc_max_allocated_mib,21389.5898,ok,
+f1,8,measure,proc_max_reserved_mib,26350.0000,ok,
+f1,8,measure,omni3d_calls,1.0000,ok,실패 0
+f1,8,measure,omni3d_latency_max_s,0.2225,ok,
+f1,8,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f1,8,measure,run_result,21.8423,ok,
+f1,9,measure,sam3d_total_s,20.9462,ok,
+f1,9,measure,sam3d_decode_s,1.7992,ok,호출 1회 [1.799]
+f1,9,measure,sam3d_sample_ss_s,12.2662,ok,
+f1,9,measure,sam3d_sample_slat_s,3.5035,ok,
+f1,9,measure,vram_max_mib,23985.0000,ok,nvidia-smi 100ms 샘플 207개
+f1,9,measure,vram_free_min_mib,579.0000,ok,
+f1,9,measure,sm_clock_min_mhz,2520.0000,ok,
+f1,9,measure,gpu_temp_max_c,73.0000,ok,
+f1,9,measure,gpu_power_max_w,423.6200,ok,
+f1,9,measure,proc_max_allocated_mib,21234.0767,ok,
+f1,9,measure,proc_max_reserved_mib,25576.0000,ok,
+f1,9,measure,omni3d_calls,1.0000,ok,실패 0
+f1,9,measure,omni3d_latency_max_s,0.2302,ok,
+f1,9,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f1,9,measure,run_result,20.9462,ok,
+f1,10,measure,sam3d_total_s,20.8863,ok,
+f1,10,measure,sam3d_decode_s,1.7786,ok,호출 1회 [1.779]
+f1,10,measure,sam3d_sample_ss_s,12.3670,ok,
+f1,10,measure,sam3d_sample_slat_s,3.4536,ok,
+f1,10,measure,vram_max_mib,23993.0000,ok,nvidia-smi 100ms 샘플 207개
+f1,10,measure,vram_free_min_mib,571.0000,ok,
+f1,10,measure,sm_clock_min_mhz,2520.0000,ok,
+f1,10,measure,gpu_temp_max_c,74.0000,ok,
+f1,10,measure,gpu_power_max_w,424.4000,ok,
+f1,10,measure,proc_max_allocated_mib,21219.5752,ok,
+f1,10,measure,proc_max_reserved_mib,25520.0000,ok,
+f1,10,measure,omni3d_calls,1.0000,ok,실패 0
+f1,10,measure,omni3d_latency_max_s,0.2389,ok,
+f1,10,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f1,10,measure,run_result,20.8863,ok,
+f1,0,setup,dxg_alloc_fail_delta,0.0000,ok,조건 중 dmesg 의 dxgkio_create_allocation 실패 증가 수(호스트 할당 거부)
+f1,0,cleanup,cleanup_leak_mib,0.0000,ok,"allocated 13121 / 기준 13121 MiB, nvidia-smi 14488 MiB, 다른 측정 프로세스 []"
+f2,0,setup,vram_idle_before_mib,14488.0000,ok,조건 시작 전 nvidia-smi 사용량
+f2,0,setup,sd_load_s,4.6514,ok,
+f2,0,setup,sd_infer_s,9.6946,ok,
+f2,0,setup,sd_max_allocated_mib,17981.3711,ok,
+f2,0,setup,resident_alloc_mib,3974.6924,ok,"상주 sd,sam2,lama: 이 프로세스에서 늘어난 할당량"
+f2,0,setup,vram_used_after_residents_mib,18495.0000,ok,
+f2,0,warmup,sam3d_total_s,46.5643,ok,
+f2,0,warmup,sam3d_decode_s,27.6590,ok,호출 1회 [27.659]
+f2,0,warmup,sam3d_sample_ss_s,12.3383,ok,
+f2,0,warmup,sam3d_sample_slat_s,3.2212,ok,
+f2,0,warmup,vram_max_mib,24083.0000,ok,nvidia-smi 100ms 샘플 460개
+f2,0,warmup,vram_free_min_mib,481.0000,ok,
+f2,0,warmup,sm_clock_min_mhz,2520.0000,ok,
+f2,0,warmup,gpu_temp_max_c,72.0000,ok,
+f2,0,warmup,gpu_power_max_w,418.6600,ok,
+f2,0,warmup,proc_max_allocated_mib,22294.6675,ok,
+f2,0,warmup,proc_max_reserved_mib,26168.0000,ok,
+f2,0,warmup,omni3d_calls,1.0000,ok,실패 0
+f2,0,warmup,omni3d_latency_max_s,0.2576,ok,
+f2,0,warmup,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f2,0,warmup,run_result,46.5643,ok,
+f2,1,measure,sam3d_total_s,52.6973,ok,
+f2,1,measure,sam3d_decode_s,26.2698,ok,호출 1회 [26.27]
+f2,1,measure,sam3d_sample_ss_s,16.4731,ok,
+f2,1,measure,sam3d_sample_slat_s,3.3713,ok,
+f2,1,measure,vram_max_mib,24026.0000,ok,nvidia-smi 100ms 샘플 522개
+f2,1,measure,vram_free_min_mib,538.0000,ok,
+f2,1,measure,sm_clock_min_mhz,2520.0000,ok,
+f2,1,measure,gpu_temp_max_c,70.0000,ok,
+f2,1,measure,gpu_power_max_w,409.8800,ok,
+f2,1,measure,proc_max_allocated_mib,22292.1074,ok,
+f2,1,measure,proc_max_reserved_mib,26154.0000,ok,
+f2,1,measure,omni3d_calls,1.0000,ok,실패 0
+f2,1,measure,omni3d_latency_max_s,1.3422,ok,
+f2,1,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f2,1,measure,run_result,52.6973,ok,
+f2,2,measure,sam3d_total_s,63.5524,ok,
+f2,2,measure,sam3d_decode_s,36.7219,ok,호출 1회 [36.722]
+f2,2,measure,sam3d_sample_ss_s,17.0328,ok,
+f2,2,measure,sam3d_sample_slat_s,3.9543,ok,
+f2,2,measure,vram_max_mib,24041.0000,ok,nvidia-smi 100ms 샘플 628개
+f2,2,measure,vram_free_min_mib,523.0000,ok,
+f2,2,measure,sm_clock_min_mhz,2520.0000,ok,
+f2,2,measure,gpu_temp_max_c,69.0000,ok,
+f2,2,measure,gpu_power_max_w,411.1100,ok,
+f2,2,measure,proc_max_allocated_mib,22435.6572,ok,
+f2,2,measure,proc_max_reserved_mib,26690.0000,ok,
+f2,2,measure,omni3d_calls,1.0000,ok,실패 0
+f2,2,measure,omni3d_latency_max_s,1.7622,ok,
+f2,2,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f2,2,measure,run_result,63.5524,ok,
+f2,3,measure,sam3d_total_s,65.1937,ok,
+f2,3,measure,sam3d_decode_s,38.2135,ok,호출 1회 [38.213]
+f2,3,measure,sam3d_sample_ss_s,17.3191,ok,
+f2,3,measure,sam3d_sample_slat_s,3.4312,ok,
+f2,3,measure,vram_max_mib,24122.0000,ok,nvidia-smi 100ms 샘플 643개
+f2,3,measure,vram_free_min_mib,442.0000,ok,
+f2,3,measure,sm_clock_min_mhz,2520.0000,ok,
+f2,3,measure,gpu_temp_max_c,69.0000,ok,
+f2,3,measure,gpu_power_max_w,422.1600,ok,
+f2,3,measure,proc_max_allocated_mib,22483.9072,ok,
+f2,3,measure,proc_max_reserved_mib,26886.0000,ok,
+f2,3,measure,omni3d_calls,1.0000,ok,실패 0
+f2,3,measure,omni3d_latency_max_s,1.9024,ok,
+f2,3,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f2,3,measure,run_result,65.1937,ok,
+f2,4,measure,sam3d_total_s,59.3793,ok,
+f2,4,measure,sam3d_decode_s,33.6193,ok,호출 1회 [33.619]
+f2,4,measure,sam3d_sample_ss_s,17.2867,ok,
+f2,4,measure,sam3d_sample_slat_s,3.4061,ok,
+f2,4,measure,vram_max_mib,24079.0000,ok,nvidia-smi 100ms 샘플 588개
+f2,4,measure,vram_free_min_mib,485.0000,ok,
+f2,4,measure,sm_clock_min_mhz,2520.0000,ok,
+f2,4,measure,gpu_temp_max_c,68.0000,ok,
+f2,4,measure,gpu_power_max_w,412.5600,ok,
+f2,4,measure,proc_max_allocated_mib,22429.3330,ok,
+f2,4,measure,proc_max_reserved_mib,26670.0000,ok,
+f2,4,measure,omni3d_calls,1.0000,ok,실패 0
+f2,4,measure,omni3d_latency_max_s,1.6147,ok,
+f2,4,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f2,4,measure,run_result,59.3793,ok,
+f2,5,measure,sam3d_total_s,62.9614,ok,
+f2,5,measure,sam3d_decode_s,35.6975,ok,호출 1회 [35.698]
+f2,5,measure,sam3d_sample_ss_s,17.6577,ok,
+f2,5,measure,sam3d_sample_slat_s,3.4008,ok,
+f2,5,measure,vram_max_mib,24126.0000,ok,nvidia-smi 100ms 샘플 624개
+f2,5,measure,vram_free_min_mib,438.0000,ok,
+f2,5,measure,sm_clock_min_mhz,2520.0000,ok,
+f2,5,measure,gpu_temp_max_c,68.0000,ok,
+f2,5,measure,gpu_power_max_w,419.5400,ok,
+f2,5,measure,proc_max_allocated_mib,22452.7397,ok,
+f2,5,measure,proc_max_reserved_mib,26762.0000,ok,
+f2,5,measure,omni3d_calls,1.0000,ok,실패 0
+f2,5,measure,omni3d_latency_max_s,2.0965,ok,
+f2,5,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f2,5,measure,run_result,62.9614,ok,
+f2,6,measure,sam3d_total_s,59.6139,ok,
+f2,6,measure,sam3d_decode_s,32.4958,ok,호출 1회 [32.496]
+f2,6,measure,sam3d_sample_ss_s,16.9028,ok,
+f2,6,measure,sam3d_sample_slat_s,3.9769,ok,
+f2,6,measure,vram_max_mib,24122.0000,ok,nvidia-smi 100ms 샘플 591개
+f2,6,measure,vram_free_min_mib,442.0000,ok,
+f2,6,measure,sm_clock_min_mhz,2520.0000,ok,
+f2,6,measure,gpu_temp_max_c,67.0000,ok,
+f2,6,measure,gpu_power_max_w,407.3500,ok,
+f2,6,measure,proc_max_allocated_mib,22455.0615,ok,
+f2,6,measure,proc_max_reserved_mib,26766.0000,ok,
+f2,6,measure,omni3d_calls,1.0000,ok,실패 0
+f2,6,measure,omni3d_latency_max_s,2.0456,ok,
+f2,6,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f2,6,measure,run_result,59.6139,ok,
+f2,7,measure,sam3d_total_s,69.6562,ok,
+f2,7,measure,sam3d_decode_s,43.3832,ok,호출 1회 [43.383]
+f2,7,measure,sam3d_sample_ss_s,16.9948,ok,
+f2,7,measure,sam3d_sample_slat_s,3.5991,ok,
+f2,7,measure,vram_max_mib,24091.0000,ok,nvidia-smi 100ms 샘플 689개
+f2,7,measure,vram_free_min_mib,473.0000,ok,
+f2,7,measure,sm_clock_min_mhz,2520.0000,ok,
+f2,7,measure,gpu_temp_max_c,68.0000,ok,
+f2,7,measure,gpu_power_max_w,414.8900,ok,
+f2,7,measure,proc_max_allocated_mib,22506.4526,ok,
+f2,7,measure,proc_max_reserved_mib,26974.0000,ok,
+f2,7,measure,omni3d_calls,1.0000,ok,실패 0
+f2,7,measure,omni3d_latency_max_s,1.8992,ok,
+f2,7,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f2,7,measure,run_result,69.6562,ok,
+f2,8,measure,sam3d_total_s,70.4956,ok,
+f2,8,measure,sam3d_decode_s,41.0470,ok,호출 1회 [41.047]
+f2,8,measure,sam3d_sample_ss_s,19.9791,ok,
+f2,8,measure,sam3d_sample_slat_s,3.9997,ok,
+f2,8,measure,vram_max_mib,24122.0000,ok,nvidia-smi 100ms 샘플 697개
+f2,8,measure,vram_free_min_mib,442.0000,ok,
+f2,8,measure,sm_clock_min_mhz,2520.0000,ok,
+f2,8,measure,gpu_temp_max_c,67.0000,ok,
+f2,8,measure,gpu_power_max_w,412.4200,ok,
+f2,8,measure,proc_max_allocated_mib,22523.8042,ok,
+f2,8,measure,proc_max_reserved_mib,27042.0000,ok,
+f2,8,measure,omni3d_calls,1.0000,ok,실패 0
+f2,8,measure,omni3d_latency_max_s,1.5836,ok,
+f2,8,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f2,8,measure,run_result,70.4956,ok,
+f2,9,measure,sam3d_total_s,66.4418,ok,
+f2,9,measure,sam3d_decode_s,39.7188,ok,호출 1회 [39.719]
+f2,9,measure,sam3d_sample_ss_s,17.4265,ok,
+f2,9,measure,sam3d_sample_slat_s,3.5394,ok,
+f2,9,measure,vram_max_mib,24125.0000,ok,nvidia-smi 100ms 샘플 658개
+f2,9,measure,vram_free_min_mib,439.0000,ok,
+f2,9,measure,sm_clock_min_mhz,2520.0000,ok,
+f2,9,measure,gpu_temp_max_c,67.0000,ok,
+f2,9,measure,gpu_power_max_w,414.4900,ok,
+f2,9,measure,proc_max_allocated_mib,22553.5020,ok,
+f2,9,measure,proc_max_reserved_mib,27166.0000,ok,
+f2,9,measure,omni3d_calls,1.0000,ok,실패 0
+f2,9,measure,omni3d_latency_max_s,1.9813,ok,
+f2,9,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f2,9,measure,run_result,66.4418,ok,
+f2,10,measure,sam3d_total_s,39.6507,ok,
+f2,10,measure,sam3d_decode_s,11.4600,ok,호출 1회 [11.46]
+f2,10,measure,sam3d_sample_ss_s,18.2089,ok,
+f2,10,measure,sam3d_sample_slat_s,3.9655,ok,
+f2,10,measure,vram_max_mib,24083.0000,ok,nvidia-smi 100ms 샘플 392개
+f2,10,measure,vram_free_min_mib,481.0000,ok,
+f2,10,measure,sm_clock_min_mhz,2520.0000,ok,
+f2,10,measure,gpu_temp_max_c,67.0000,ok,
+f2,10,measure,gpu_power_max_w,416.3900,ok,
+f2,10,measure,proc_max_allocated_mib,22241.5151,ok,
+f2,10,measure,proc_max_reserved_mib,26364.0000,ok,
+f2,10,measure,omni3d_calls,1.0000,ok,실패 0
+f2,10,measure,omni3d_latency_max_s,1.7525,ok,
+f2,10,measure,omni3d_overlap_decode_s,0.0000,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+f2,10,measure,run_result,39.6507,ok,
+f2,0,setup,dxg_alloc_fail_delta,0.0000,ok,조건 중 dmesg 의 dxgkio_create_allocation 실패 증가 수(호스트 할당 거부)
+f2,0,cleanup,cleanup_leak_mib,0.0000,ok,"allocated 13121 / 기준 13121 MiB, nvidia-smi 14070 MiB, 다른 측정 프로세스 []"
+g1,0,setup,vram_idle_before_mib,14070.0000,ok,조건 시작 전 nvidia-smi 사용량
+g1,0,setup,sd_load_s,4.1192,ok,
+g1,0,setup,sd_infer_s,10.6077,ok,
+g1,0,setup,sd_max_allocated_mib,17981.3711,ok,
+g1,0,setup,resident_alloc_mib,2781.1201,ok,상주 sd: 이 프로세스에서 늘어난 할당량
+g1,0,setup,vram_used_after_residents_mib,17183.0000,ok,
+g1,0,warmup,run_result,2474.0000,failed,"수동 강제 종료: 첫 실행(워밍업)이 약 41분(≥2474초) 동안 완료되지 않음(기준 300초). 안전장치는 실행 종료 후에만 판정해 막지 못했다. SIGTERM 후 1초 내 종료됨. 증거: GPU 사용률 100%·전력 91W·41℃, Omni3D 처리 로그 10초간 0건, Omni3D /health 5초 무응답, dmesg dxgkio_make_resident -12 가 01:06:26 에 1건(g1 시작 직후). g1 은 재실행하지 않았다"
+g1,0,warmup,condition_abort,,failed,수동 강제 종료(미완료 35분 이상): 수동 강제 종료: 첫 실행(워밍업)이 약 41분(≥2474초) 동안 완료되지 않음(기준 300초). 안전장치 …증거는 g1_evidence.txt
+g1,0,warmup,post_kill_gpu_used_mib,454,ok,"종료 후 GPU 사용 454 MiB, 사이드카 health 정상, 측정 프로세스 없음"
+_global,0,setup,sam3d_load_s,54.4020,ok,
+g2,0,setup,vram_idle_before_mib,15415.0000,ok,조건 시작 전 nvidia-smi 사용량
+g2,0,setup,sd_load_s,4.5852,ok,
+g2,0,setup,sd_infer_s,9.9401,ok,
+g2,0,setup,sd_max_allocated_mib,17980.2930,ok,
+g2,0,setup,resident_alloc_mib,3972.7471,ok,"상주 sd,sam2,lama: 이 프로세스에서 늘어난 할당량"
+g2,0,setup,vram_used_after_residents_mib,19467.0000,ok,
+g2,0,warmup,sam3d_total_s,38.8599,ok,
+g2,0,warmup,sam3d_decode_s,17.0438,ok,호출 1회 [17.044]
+g2,0,warmup,sam3d_sample_ss_s,13.5228,ok,
+g2,0,warmup,sam3d_sample_slat_s,4.6210,ok,
+g2,0,warmup,vram_max_mib,24059.0000,ok,nvidia-smi 100ms 샘플 383개
+g2,0,warmup,vram_free_min_mib,505.0000,ok,
+g2,0,warmup,sm_clock_min_mhz,2340.0000,ok,
+g2,0,warmup,gpu_temp_max_c,66.0000,ok,
+g2,0,warmup,gpu_power_max_w,443.3300,ok,
+g2,0,warmup,proc_max_allocated_mib,22342.6353,ok,
+g2,0,warmup,proc_max_reserved_mib,26348.0000,ok,
+g2,0,warmup,omni3d_calls,98.0000,ok,실패 0
+g2,0,warmup,omni3d_latency_max_s,4.5225,ok,
+g2,0,warmup,omni3d_overlap_decode_s,17.0425,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+g2,0,warmup,run_result,38.8599,ok,
+g2,1,measure,sam3d_total_s,31.9485,ok,
+g2,1,measure,sam3d_decode_s,7.2647,ok,호출 1회 [7.265]
+g2,1,measure,sam3d_sample_ss_s,17.8657,ok,
+g2,1,measure,sam3d_sample_slat_s,3.4547,ok,
+g2,1,measure,vram_max_mib,23966.0000,ok,nvidia-smi 100ms 샘플 316개
+g2,1,measure,vram_free_min_mib,598.0000,ok,
+g2,1,measure,sm_clock_min_mhz,2520.0000,ok,
+g2,1,measure,gpu_temp_max_c,67.0000,ok,
+g2,1,measure,gpu_power_max_w,394.7300,ok,
+g2,1,measure,proc_max_allocated_mib,22296.8643,ok,
+g2,1,measure,proc_max_reserved_mib,26446.0000,ok,
+g2,1,measure,omni3d_calls,115.0000,ok,실패 0
+g2,1,measure,omni3d_latency_max_s,2.1098,ok,
+g2,1,measure,omni3d_overlap_decode_s,7.2633,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+g2,1,measure,run_result,31.9485,ok,
+g2,2,measure,sam3d_total_s,35.2891,ok,
+g2,2,measure,sam3d_decode_s,10.4413,ok,호출 1회 [10.441]
+g2,2,measure,sam3d_sample_ss_s,18.2874,ok,
+g2,2,measure,sam3d_sample_slat_s,3.2988,ok,
+g2,2,measure,vram_max_mib,23935.0000,ok,nvidia-smi 100ms 샘플 348개
+g2,2,measure,vram_free_min_mib,629.0000,ok,
+g2,2,measure,sm_clock_min_mhz,2520.0000,ok,
+g2,2,measure,gpu_temp_max_c,68.0000,ok,
+g2,2,measure,gpu_power_max_w,391.4400,ok,
+g2,2,measure,proc_max_allocated_mib,22194.3672,ok,
+g2,2,measure,proc_max_reserved_mib,25820.0000,ok,
+g2,2,measure,omni3d_calls,107.0000,ok,실패 0
+g2,2,measure,omni3d_latency_max_s,2.1887,ok,
+g2,2,measure,omni3d_overlap_decode_s,10.4402,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+g2,2,measure,run_result,35.2891,ok,
+g2,3,measure,sam3d_total_s,29.9436,ok,
+g2,3,measure,sam3d_decode_s,4.7368,ok,호출 1회 [4.737]
+g2,3,measure,sam3d_sample_ss_s,18.0740,ok,
+g2,3,measure,sam3d_sample_slat_s,3.6608,ok,
+g2,3,measure,vram_max_mib,23885.0000,ok,nvidia-smi 100ms 샘플 296개
+g2,3,measure,vram_free_min_mib,679.0000,ok,
+g2,3,measure,sm_clock_min_mhz,2520.0000,ok,
+g2,3,measure,gpu_temp_max_c,69.0000,ok,
+g2,3,measure,gpu_power_max_w,395.4200,ok,
+g2,3,measure,proc_max_allocated_mib,22344.4561,ok,
+g2,3,measure,proc_max_reserved_mib,26352.0000,ok,
+g2,3,measure,omni3d_calls,101.0000,ok,실패 0
+g2,3,measure,omni3d_latency_max_s,2.2433,ok,
+g2,3,measure,omni3d_overlap_decode_s,4.7361,ok,Omni3D 호출 구간과 SAM3D decode_slat 구간이 겹친 시간
+g2,3,measure,run_result,29.9436,ok,
+g2,4,measure,run_result,600.0277,failed,WATCHDOG: 실행이 600초를 넘겨 프로세스를 강제 종료(경과 600초). 이 실행은 완료되지 않았다
+g2,4,measure,condition_abort,,failed,"WATCHDOG: 실행이 600초를 넘겨 프로세스를 강제 종료(경과 600초). 이 실행은 완료되지 않았다; 조건 중단, 재실행 안 함"
+g2,0,setup,dxg_make_resident_fail_delta,2.0000,ok,워치독 종료 시점까지의 조건 중 dmesg 호스트 할당 거부 증가 수
+g2,0,setup,dxg_create_allocation_fail_delta,0.0000,ok,워치독 종료 시점까지의 조건 중 dmesg 호스트 할당 거부 증가 수
+g2,4,measure,watchdog_gpu_used_mib,23869.0000,ok,종료 직전 nvidia-smi 사용량
+_global,0,setup,sam3d_load_s,28.2300,ok,
+b_end,0,setup,vram_idle_before_mib,15488.0000,ok,조건 시작 전 nvidia-smi 사용량
+b_end,0,warmup,sam3d_total_s,27.2055,ok,
+b_end,0,warmup,sam3d_decode_s,6.6478,ok,호출 1회 [6.648]
+b_end,0,warmup,sam3d_sample_ss_s,12.3246,ok,
+b_end,0,warmup,sam3d_sample_slat_s,4.3962,ok,
+b_end,0,warmup,vram_max_mib,24003.0000,ok,nvidia-smi 100ms 샘플 269개
+b_end,0,warmup,vram_free_min_mib,561.0000,ok,
+b_end,0,warmup,sm_clock_min_mhz,2385.0000,ok,
+b_end,0,warmup,gpu_temp_max_c,65.0000,ok,
+b_end,0,warmup,gpu_power_max_w,442.9500,ok,
+b_end,0,warmup,proc_max_allocated_mib,18447.8311,ok,
+b_end,0,warmup,proc_max_reserved_mib,23094.0000,ok,
+b_end,0,warmup,run_result,27.2055,ok,
+b_end,1,measure,sam3d_total_s,24.9133,ok,
+b_end,1,measure,sam3d_decode_s,0.8254,ok,호출 1회 [0.825]
+b_end,1,measure,sam3d_sample_ss_s,16.0676,ok,
+b_end,1,measure,sam3d_sample_slat_s,4.5764,ok,
+b_end,1,measure,vram_max_mib,23825.0000,ok,nvidia-smi 100ms 샘플 247개
+b_end,1,measure,vram_free_min_mib,739.0000,ok,
+b_end,1,measure,sm_clock_min_mhz,2520.0000,ok,
+b_end,1,measure,gpu_temp_max_c,68.0000,ok,
+b_end,1,measure,gpu_power_max_w,406.7800,ok,
+b_end,1,measure,proc_max_allocated_mib,18561.0063,ok,
+b_end,1,measure,proc_max_reserved_mib,23306.0000,ok,
+b_end,1,measure,run_result,24.9133,ok,
+b_end,2,measure,sam3d_total_s,24.3628,ok,
+b_end,2,measure,sam3d_decode_s,0.6803,ok,호출 1회 [0.68]
+b_end,2,measure,sam3d_sample_ss_s,15.7485,ok,
+b_end,2,measure,sam3d_sample_slat_s,3.2199,ok,
+b_end,2,measure,vram_max_mib,23525.0000,ok,nvidia-smi 100ms 샘플 240개
+b_end,2,measure,vram_free_min_mib,1039.0000,ok,
+b_end,2,measure,sm_clock_min_mhz,2520.0000,ok,
+b_end,2,measure,gpu_temp_max_c,69.0000,ok,
+b_end,2,measure,gpu_power_max_w,413.0700,ok,
+b_end,2,measure,proc_max_allocated_mib,18404.2358,ok,
+b_end,2,measure,proc_max_reserved_mib,22690.0000,ok,
+b_end,2,measure,run_result,24.3628,ok,
+b_end,3,measure,sam3d_total_s,20.3704,ok,
+b_end,3,measure,sam3d_decode_s,0.8419,ok,호출 1회 [0.842]
+b_end,3,measure,sam3d_sample_ss_s,12.2187,ok,
+b_end,3,measure,sam3d_sample_slat_s,4.0466,ok,
+b_end,3,measure,vram_max_mib,23832.0000,ok,nvidia-smi 100ms 샘플 202개
+b_end,3,measure,vram_free_min_mib,732.0000,ok,
+b_end,3,measure,sm_clock_min_mhz,2520.0000,ok,
+b_end,3,measure,gpu_temp_max_c,71.0000,ok,
+b_end,3,measure,gpu_power_max_w,416.1200,ok,
+b_end,3,measure,proc_max_allocated_mib,18595.1724,ok,
+b_end,3,measure,proc_max_reserved_mib,23616.0000,ok,
+b_end,3,measure,run_result,20.3704,ok,
+b_end,4,measure,sam3d_total_s,22.4098,ok,
+b_end,4,measure,sam3d_decode_s,0.5904,ok,호출 1회 [0.59]
+b_end,4,measure,sam3d_sample_ss_s,15.7026,ok,
+b_end,4,measure,sam3d_sample_slat_s,3.0837,ok,
+b_end,4,measure,vram_max_mib,23155.0000,ok,nvidia-smi 100ms 샘플 222개
+b_end,4,measure,vram_free_min_mib,1409.0000,ok,
+b_end,4,measure,sm_clock_min_mhz,2520.0000,ok,
+b_end,4,measure,gpu_temp_max_c,71.0000,ok,
+b_end,4,measure,gpu_power_max_w,413.5100,ok,
+b_end,4,measure,proc_max_allocated_mib,18312.7744,ok,
+b_end,4,measure,proc_max_reserved_mib,22362.0000,ok,
+b_end,4,measure,run_result,22.4098,ok,
+b_end,5,measure,sam3d_total_s,19.6720,ok,
+b_end,5,measure,sam3d_decode_s,0.7451,ok,호출 1회 [0.745]
+b_end,5,measure,sam3d_sample_ss_s,12.2695,ok,
+b_end,5,measure,sam3d_sample_slat_s,3.4445,ok,
+b_end,5,measure,vram_max_mib,23807.0000,ok,nvidia-smi 100ms 샘플 194개
+b_end,5,measure,vram_free_min_mib,757.0000,ok,
+b_end,5,measure,sm_clock_min_mhz,2520.0000,ok,
+b_end,5,measure,gpu_temp_max_c,72.0000,ok,
+b_end,5,measure,gpu_power_max_w,419.7400,ok,
+b_end,5,measure,proc_max_allocated_mib,18487.7983,ok,
+b_end,5,measure,proc_max_reserved_mib,23014.0000,ok,
+b_end,5,measure,run_result,19.6720,ok,
+b_end,0,setup,dxg_make_resident_fail_delta,1.0000,ok,조건 중 dmesg 호스트 할당 거부 증가 수(조건 종료 시점 집계)
+b_end,0,setup,dxg_create_allocation_fail_delta,0.0000,ok,조건 중 dmesg 호스트 할당 거부 증가 수(조건 종료 시점 집계)
+b_end,0,cleanup,cleanup_leak_mib,0.0000,ok,"allocated 13121 / 기준 13121 MiB, nvidia-smi 13993 MiB, 다른 측정 프로세스 []"
+a,0,setup,dxg_make_resident_posthoc,0,ok,"사후 대조(dmesg 타임스탬프↔조건 구간, ±2초): 없음"
+b,0,setup,dxg_make_resident_posthoc,0,ok,"사후 대조(dmesg 타임스탬프↔조건 구간, ±2초): 없음"
+c1,0,setup,dxg_make_resident_posthoc,2,ok,"사후 대조(dmesg 타임스탬프↔조건 구간, ±2초): 00:35:54, 00:38:09"
+c2,0,setup,dxg_make_resident_posthoc,2,ok,"사후 대조(dmesg 타임스탬프↔조건 구간, ±2초): 00:40:40, 00:42:54"
+d,0,setup,dxg_make_resident_posthoc,1,ok,"사후 대조(dmesg 타임스탬프↔조건 구간, ±2초): 00:45:07"
+e,0,setup,dxg_make_resident_posthoc,0,ok,"사후 대조(dmesg 타임스탬프↔조건 구간, ±2초): 없음"
+f1,0,setup,dxg_make_resident_posthoc,2,ok,"사후 대조(dmesg 타임스탬프↔조건 구간, ±2초): 00:50:42, 00:52:56"
+f2,0,setup,dxg_make_resident_posthoc,0,ok,"사후 대조(dmesg 타임스탬프↔조건 구간, ±2초): 없음"
+g1,0,setup,dxg_make_resident_posthoc,1,ok,"사후 대조(dmesg 타임스탬프↔조건 구간, ±2초): 01:06:27"
+g2,0,setup,dxg_make_resident_posthoc,2,ok,"사후 대조(dmesg 타임스탬프↔조건 구간, ±2초): 01:51:28, 01:53:42"
+b_end,0,setup,dxg_make_resident_posthoc,1,ok,"사후 대조(dmesg 타임스탬프↔조건 구간, ±2초): 02:05:52"

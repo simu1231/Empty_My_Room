@@ -1,0 +1,59 @@
+SAM2 로드 완료!
+[00:18:51] 입력 준비 완료: 소파 PNG 151704B, 액자 bbox(원본px) [1366.9, 464.1, 2096.7, 1434.4], SAM2 해제
+[00:18:51] 가중치 파일 4개, 5.32 GiB
+[00:19:08] cache it=0 warmup: import 1.32s load 3.85s infer 9.98s unload 0.10s | 로드 후 allocated 2768 MiB
+[00:19:27] cache it=1 measure: import 1.45s load 3.64s infer 9.99s unload 0.11s | 로드 후 allocated 2764 MiB
+[00:19:45] cache it=2 measure: import 1.47s load 3.67s infer 9.99s unload 0.10s | 로드 후 allocated 2770 MiB
+[00:20:04] cache it=3 measure: import 1.39s load 3.83s infer 9.96s unload 0.10s | 로드 후 allocated 2768 MiB
+[00:20:24] cache it=4 measure: import 1.40s load 4.45s infer 10.41s unload 0.10s | 로드 후 allocated 2764 MiB
+[00:20:43] cache it=5 measure: import 1.34s load 4.17s infer 10.08s unload 0.11s | 로드 후 allocated 2764 MiB
+[00:21:04] evict it=0 warmup: import 1.35s load 5.77s infer 9.99s unload 0.12s | 로드 후 allocated 2765 MiB
+[00:21:25] evict it=1 measure: import 1.34s load 5.90s infer 9.97s unload 0.11s | 로드 후 allocated 2765 MiB
+[00:21:46] evict it=2 measure: import 1.31s load 5.64s infer 10.01s unload 0.11s | 로드 후 allocated 2765 MiB
+[00:22:07] evict it=3 measure: import 1.40s load 5.80s infer 9.97s unload 0.11s | 로드 후 allocated 2765 MiB
+[00:22:28] evict it=4 measure: import 1.35s load 5.87s infer 10.00s unload 0.12s | 로드 후 allocated 2758 MiB
+[00:22:49] evict it=5 measure: import 1.35s load 5.76s infer 9.95s unload 0.10s | 로드 후 allocated 2757 MiB
+[00:24:13] warm it=0 warmup: load 4.98s infer 9.96s unload 0.11s
+[00:24:13] warm it=1 measure: load 3.04s infer 9.69s unload 0.14s
+[00:24:13] warm it=2 measure: load 2.98s infer 9.70s unload 0.15s
+[00:24:13] warm it=3 measure: load 2.87s infer 9.68s unload 0.14s
+[00:24:13] warm it=4 measure: load 2.93s infer 9.76s unload 0.14s
+[00:24:13] warm it=5 measure: load 2.89s infer 9.69s unload 0.15s
+# 표 6 SD·ControlNet 로딩 및 해제 비용
+
+**이번에 측정한 실제 값**이다(과거 기록은 마지막 절). 워밍업 1회 제외, 평균±표본표준편차(n). GPU 는 RTX 4090 한 장, 사이드카·백엔드는 꺼진 상태, SD/ControlNet 은 fp16.
+
+## 표 6-A. 로딩 시간 (초)
+
+| 변형 | diffusers import | SDService() 생성(로드) | 첫 호출 합계(import+로드) | 추론 1회 | 해제 |
+|---|---|---|---|---|---|
+| 새 프로세스·캐시 유지 | 1.41±0.05 (n=5) | 3.95±0.35 (n=5) | 5.36±0.31 (n=5) | 10.09±0.19 (n=5) | 0.10±0.01 (n=5) |
+| 새 프로세스·파일별 캐시 비움 | 1.35±0.03 (n=5) | 5.79±0.10 (n=5) | 7.14±0.12 (n=5) | 9.98±0.02 (n=5) | 0.11±0.01 (n=5) |
+| 같은 프로세스 반복(웜) | 첫 반복에서만(워밍업) | 2.94±0.07 (n=5) | — | 9.70±0.03 (n=5) | 0.14±0.00 (n=5) |
+
+## 표 6-B. GPU 점유 (MiB)
+
+| 변형 | 로드 후 allocated | 로드 후 reserved | 로드 후 nvidia-smi 증가분 | 추론 후 피크 allocated | 추론 후 피크 reserved | 추론 후 nvidia-smi 증가분 | 해제 후 nvidia-smi 잔여(기준 대비) |
+|---|---|---|---|---|---|---|---|
+| 새 프로세스·캐시 유지 | 2766.08±2.87 (n=5) | 2795.20±9.86 (n=5) | 2824.20±13.24 (n=5) | 4853.44±3.15 (n=5) | 5848.40±18.89 (n=5) | 5921.40±23.13 (n=5) | 95.80±6.10 (n=5) |
+| 새 프로세스·파일별 캐시 비움 | 2762.23±4.11 (n=5) | 2810.40±19.97 (n=5) | 2853.20±14.52 (n=5) | 4849.74±4.38 (n=5) | 5862.40±16.94 (n=5) | 5942.80±13.03 (n=5) | 100.40±6.80 (n=5) |
+| 같은 프로세스 반복(웜) | 2766.34±0.00 (n=5) | 2822.00±0.00 (n=5) | 2799.40±5.81 (n=5) | 4845.39±0.00 (n=5) | 5862.00±0.00 (n=5) | 5839.40±5.81 (n=5) | -2.60±5.81 (n=5) |
+
+### 측정 방법과 한계
+
+- **evict**: 시작 직전에 가중치 파일 4개(약 5.3 GiB)에 각각 `posix_fadvise(DONTNEED)` 적용 → 가장 큰 파일 64MiB 읽기 속도 1.66±0.07 (n=5) GiB/s (비우기 전 같은 파일은 약 12 GiB/s, 지난 사전 점검 기준). 시스템 전체 `drop_caches` 는 하지 않았다.
+- **한계**: 게스트(WSL) 페이지 캐시만 비운다. Windows 호스트 캐시·SSD 속도는 통제하지 못했고, 클라우드 EBS 의 콜드 상태(과거 SD 로드 553초 보고)를 대표하지 않는다.
+- **"첫 호출 합계"**: `SDService._load` 가 첫 호출에서 `from diffusers import …` 를 실행하므로 import 와 로드를 더한 값이 새 프로세스에서 사용자가 겪는 첫 로드와 같다.
+- **nvidia-smi 증가분**은 로드 직전 대비 증가량(CUDA 컨텍스트 포함 여부는 변형 간 같다). allocated 는 텐서가 차지한 양, reserved 는 할당자가 잡아 둔 양.
+
+## 실패 (0건) — 재실행하지 않았다
+
+없음
+
+## 과거 기록과 이번 측정 (구분해서 읽을 것)
+
+| 항목 | 과거 관찰 [기록, 이번 측정 아님] | 이번 측정 [측정] |
+|---|---|---|
+| SD 점유 | "3~4GB"(코드 주석·논문 문장), "실측 5.6GB"(커밋 ec74862) — 측정 정의 불명 | 로드 후 allocated 2766.08±2.87 (n=5) MiB, 추론 후 피크 allocated 4853.44±3.15 (n=5) MiB, 추론 후 피크 reserved 5848.40±18.89 (n=5) MiB |
+| SD 로드 시간 | 7.6초(주석·면접 노트, 로드/사용 불명), 6.3초(커밋 ec74862), 5.30초(sd_warm.py, 개발 PC) — 원 로그 없음 | 새 프로세스 첫 호출 합계: 캐시 유지 5.36±0.31 (n=5) s, 캐시 비움 7.14±0.12 (n=5) s; 웜 로드 2.94±0.07 (n=5) s |
+| 과거 값의 재현 여부 | — | 정의(무엇을 어떤 상태에서 쟀는지)가 기록에 없어 일치 여부는 **확인 불가** |

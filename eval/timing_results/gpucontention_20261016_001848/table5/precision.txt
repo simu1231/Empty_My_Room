@@ -1,0 +1,2 @@
+SAM3D: bfloat16 autocast (InferencePipeline 기본 dtype="bfloat16", pipeline.yaml 에서 덮어쓰지 않음)
+SD inpainting / ControlNet: float16 (services/sd_service.py torch_dtype=torch.float16)

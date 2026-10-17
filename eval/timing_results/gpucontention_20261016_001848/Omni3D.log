@@ -1,0 +1,137 @@
+/home/tmvlem5671/omni3d/server.py:62: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [40244]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8003 (Press CTRL+C to quit)
+Omni3D 모델 로드 중...
+Omni3D 서버 준비 완료 (port 8003)
+INFO:     127.0.0.1:43380 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41956 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43234 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35952 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52694 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43718 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38936 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33278 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60792 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46970 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48326 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44034 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46468 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34058 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45450 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36878 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58406 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43082 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59866 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57516 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33076 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46060 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34752 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40682 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41300 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33328 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45068 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38870 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47006 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59440 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59452 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59458 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35530 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35538 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35552 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35560 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35570 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35580 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35586 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35590 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35594 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35604 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35606 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35618 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35628 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35644 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35650 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35652 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35658 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35664 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35674 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35676 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35690 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35704 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35720 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35724 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35736 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35742 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35750 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35756 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35766 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35774 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35786 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35788 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35794 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35798 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35804 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35810 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35826 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35830 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35838 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35850 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35854 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35870 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35886 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35900 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35914 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35928 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56900 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56906 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56914 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56920 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56922 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56930 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56932 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56936 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56952 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56968 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56978 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56990 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57002 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57006 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57012 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57020 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57032 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57046 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57060 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57072 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57074 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57086 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57098 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57112 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57116 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57128 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57138 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57146 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57154 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57164 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57180 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57182 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57188 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57194 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57202 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57214 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57226 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57234 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47734 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48286 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49510 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49520 - "POST /estimate HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [40244]

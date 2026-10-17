@@ -1,0 +1,20 @@
+[00:18:51] 입력 준비 완료: 소파 PNG 151704B, 액자 bbox(원본px) [1366.9, 464.1, 2096.7, 1434.4], SAM2 해제
+[00:18:51] 가중치 파일 4개, 5.32 GiB
+[00:19:08] cache it=0 warmup: import 1.32s load 3.85s infer 9.98s unload 0.10s | 로드 후 allocated 2768 MiB
+[00:19:27] cache it=1 measure: import 1.45s load 3.64s infer 9.99s unload 0.11s | 로드 후 allocated 2764 MiB
+[00:19:45] cache it=2 measure: import 1.47s load 3.67s infer 9.99s unload 0.10s | 로드 후 allocated 2770 MiB
+[00:20:04] cache it=3 measure: import 1.39s load 3.83s infer 9.96s unload 0.10s | 로드 후 allocated 2768 MiB
+[00:20:24] cache it=4 measure: import 1.40s load 4.45s infer 10.41s unload 0.10s | 로드 후 allocated 2764 MiB
+[00:20:43] cache it=5 measure: import 1.34s load 4.17s infer 10.08s unload 0.11s | 로드 후 allocated 2764 MiB
+[00:21:04] evict it=0 warmup: import 1.35s load 5.77s infer 9.99s unload 0.12s | 로드 후 allocated 2765 MiB
+[00:21:25] evict it=1 measure: import 1.34s load 5.90s infer 9.97s unload 0.11s | 로드 후 allocated 2765 MiB
+[00:21:46] evict it=2 measure: import 1.31s load 5.64s infer 10.01s unload 0.11s | 로드 후 allocated 2765 MiB
+[00:22:07] evict it=3 measure: import 1.40s load 5.80s infer 9.97s unload 0.11s | 로드 후 allocated 2765 MiB
+[00:22:28] evict it=4 measure: import 1.35s load 5.87s infer 10.00s unload 0.12s | 로드 후 allocated 2758 MiB
+[00:22:49] evict it=5 measure: import 1.35s load 5.76s infer 9.95s unload 0.10s | 로드 후 allocated 2757 MiB
+[00:24:13] warm it=0 warmup: load 4.98s infer 9.96s unload 0.11s
+[00:24:13] warm it=1 measure: load 3.04s infer 9.69s unload 0.14s
+[00:24:13] warm it=2 measure: load 2.98s infer 9.70s unload 0.15s
+[00:24:13] warm it=3 measure: load 2.87s infer 9.68s unload 0.14s
+[00:24:13] warm it=4 measure: load 2.93s infer 9.76s unload 0.14s
+[00:24:13] warm it=5 measure: load 2.89s infer 9.69s unload 0.15s

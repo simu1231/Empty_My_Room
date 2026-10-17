@@ -1,0 +1,505 @@
+[00:24:16] 출력 /home/tmvlem5671/Empty_My_Room/eval/timing_results/gpucontention_20261016_001848/table5 / 조건 ['a'] / 사이드카 꺼짐 / dxg 누적 8
+SAM2 로드 완료!
+[00:24:18] 입력 준비 완료: 소파 PNG 151704B, 액자 bbox(원본px) [1366.9, 464.1, 2096.7, 1434.4], SAM2 해제
+2026-10-16 00:24:19.118 | INFO     | sam3d_objects.pipeline.inference_pipeline:set_attention_backend:17 - GPU name is NVIDIA GeForce RTX 4090
+2026-10-16 00:24:20.838 | INFO     | sam3d_objects.model.backbone.tdfy_dit.modules.sparse:__from_env:39 - [SPARSE] Backend: spconv, Attention: sdpa
+2026-10-16 00:24:23.113 | INFO     | sam3d_objects.model.backbone.tdfy_dit.modules.attention:__from_env:30 - [ATTENTION] Using backend: sdpa
+2026-10-16 00:24:25.516 | WARNING  | sam3d_objects.data.dataset.tdfy.preprocessor:__post_init__:51 - No rgb pointmap normalizer provided, using scale + shift 
+2026-10-16 00:24:25.516 | WARNING  | sam3d_objects.data.dataset.tdfy.preprocessor:__post_init__:51 - No rgb pointmap normalizer provided, using scale + shift 
+2026-10-16 00:24:25.521 | WARNING  | sam3d_objects.data.dataset.tdfy.preprocessor:__post_init__:51 - No rgb pointmap normalizer provided, using scale + shift 
+2026-10-16 00:24:29.014 | WARNING  | sam3d_objects.data.dataset.tdfy.preprocessor:__post_init__:51 - No rgb pointmap normalizer provided, using scale + shift 
+2026-10-16 00:24:29.015 | INFO     | sam3d_objects.pipeline.inference_pipeline:__init__:100 - self.device: cuda
+2026-10-16 00:24:29.015 | INFO     | sam3d_objects.pipeline.inference_pipeline:__init__:101 - CUDA_VISIBLE_DEVICES: None
+2026-10-16 00:24:29.015 | INFO     | sam3d_objects.pipeline.inference_pipeline:__init__:102 - Actually using GPU: 0
+2026-10-16 00:24:29.015 | INFO     | sam3d_objects.pipeline.inference_pipeline:init_pose_decoder:297 - Using pose decoder: ScaleShiftInvariant
+2026-10-16 00:24:29.015 | INFO     | sam3d_objects.pipeline.inference_pipeline:__init__:133 - Loading model weights...
+2026-10-16 00:24:29.165 | INFO     | sam3d_objects.model.io:load_model_from_checkpoint:158 - Loading checkpoint from /home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints/ss_generator.ckpt
+2026-10-16 00:24:36.266 | INFO     | sam3d_objects.model.io:load_model_from_checkpoint:158 - Loading checkpoint from /home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints/slat_generator.ckpt
+2026-10-16 00:24:39.366 | INFO     | sam3d_objects.model.io:load_model_from_checkpoint:158 - Loading checkpoint from /home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints/ss_decoder.ckpt
+2026-10-16 00:24:39.553 | INFO     | sam3d_objects.model.io:load_model_from_checkpoint:158 - Loading checkpoint from /home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints/slat_decoder_gs.ckpt
+2026-10-16 00:24:39.725 | INFO     | sam3d_objects.model.io:load_model_from_checkpoint:158 - Loading checkpoint from /home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints/slat_decoder_gs_4.ckpt
+2026-10-16 00:24:39.932 | INFO     | sam3d_objects.model.io:load_model_from_checkpoint:158 - Loading checkpoint from /home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints/slat_decoder_mesh.ckpt
+2026-10-16 00:24:40.206 | INFO     | sam3d_objects.model.backbone.dit.embedder.dino:__init__:31 - Loading DINO model: dinov2_vitl14_reg from facebookresearch/dinov2 (source: github)
+2026-10-16 00:24:40.908 | INFO     | sam3d_objects.model.backbone.dit.embedder.dino:__init__:44 - Loaded DINO model - type: <class 'dinov2.models.vision_transformer.DinoVisionTransformer'>, embed_dim: 1024, patch_size: (14, 14)
+2026-10-16 00:24:40.911 | INFO     | sam3d_objects.model.backbone.dit.embedder.dino:__init__:31 - Loading DINO model: dinov2_vitl14_reg from facebookresearch/dinov2 (source: github)
+2026-10-16 00:24:41.254 | INFO     | sam3d_objects.model.backbone.dit.embedder.dino:__init__:44 - Loaded DINO model - type: <class 'dinov2.models.vision_transformer.DinoVisionTransformer'>, embed_dim: 1024, patch_size: (14, 14)
+2026-10-16 00:24:41.264 | INFO     | sam3d_objects.model.io:load_model_from_checkpoint:158 - Loading checkpoint from /home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints/ss_generator.ckpt
+2026-10-16 00:24:44.424 | INFO     | sam3d_objects.model.backbone.dit.embedder.dino:__init__:31 - Loading DINO model: dinov2_vitl14_reg from facebookresearch/dinov2 (source: github)
+2026-10-16 00:24:44.772 | INFO     | sam3d_objects.model.backbone.dit.embedder.dino:__init__:44 - Loaded DINO model - type: <class 'dinov2.models.vision_transformer.DinoVisionTransformer'>, embed_dim: 1024, patch_size: (14, 14)
+2026-10-16 00:24:44.774 | INFO     | sam3d_objects.model.backbone.dit.embedder.dino:__init__:31 - Loading DINO model: dinov2_vitl14_reg from facebookresearch/dinov2 (source: github)
+2026-10-16 00:24:45.079 | INFO     | sam3d_objects.model.backbone.dit.embedder.dino:__init__:44 - Loaded DINO model - type: <class 'dinov2.models.vision_transformer.DinoVisionTransformer'>, embed_dim: 1024, patch_size: (14, 14)
+2026-10-16 00:24:45.084 | INFO     | sam3d_objects.model.io:load_model_from_checkpoint:158 - Loading checkpoint from /home/tmvlem5671/sam-3d-objects/checkpoints/hf/checkpoints/slat_generator.ckpt
+2026-10-16 00:24:48.187 | INFO     | sam3d_objects.pipeline.inference_pipeline:override_ss_generator_cfg_config:438 - ss_generator parameters: inference_steps=25, cfg_strength=7, cfg_interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:24:48.187 | INFO     | sam3d_objects.pipeline.inference_pipeline:override_slat_generator_cfg_config:460 - slat_generator parameters: inference_steps=25, cfg_strength=1, cfg_interval=[0, 500], rescale_t=1
+2026-10-16 00:24:48.187 | INFO     | sam3d_objects.pipeline.inference_pipeline:__init__:198 - Loading model weights completed!
+[SPARSE][CONV] spconv algo: auto
+[00:24:48] SAM3D 로드 29.3s, 이 프로세스 할당 13121 MiB, GPU 14189 MiB
+[00:24:48] ===== 조건 a: SAM3D 단독 | 반복 워밍업 1+측정 5 | 시작 전 GPU 14189 MiB =====
+2026-10-16 00:24:48.197 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:24:48.538 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:24:48.539 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:24:48.637 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:24:50.257 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 19847 to 18979
+2026-10-16 00:24:50.272 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:24:50.272 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:24:50.283 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:24:50.380 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:24:50.380 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:24:50.447 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:24:52.051 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 20372 to 18151
+2026-10-16 00:24:52.055 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:24:52.055 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:24:52.065 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:24:52.150 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:24:52.150 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:24:52.226 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:24:53.822 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 20605 to 17640
+2026-10-16 00:24:53.830 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:24:53.830 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:24:53.844 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:24:53.945 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:24:53.945 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:24:54.011 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:24:55.601 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 18278 to 18148
+2026-10-16 00:24:55.605 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:24:55.605 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:24:55.617 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:24:55.704 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:24:55.704 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:24:55.780 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:24:57.426 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 18572 to 17328
+2026-10-16 00:24:57.433 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:24:57.433 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:24:57.619 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:24:57.715 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=25, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:24:57.715 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:24:57.781 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:01.656 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 18745 to 18345
+2026-10-16 00:25:01.660 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:25:01.660 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_slat:742 - Sampling sparse latent: inference_steps=25, strength=1, interval=[0, 500], rescale_t=1
+2026-10-16 00:25:01.661 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:01.720 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:06.137 | INFO     | sam3d_objects.pipeline.inference_pipeline:decode_slat:604 - Decoding sparse latent...
+2026-10-16 00:25:12.351 | INFO     | sam3d_objects.pipeline.inference_pipeline:postprocess_slat_output:540 - Postprocessing mesh with option with_mesh_postprocess True, with_texture_baking False...
+
+Loading ..0%Loading ..10%Loading ..20%Loading ..30%Loading ..40%Loading ..50%Loading ..60%Loading ..70%Loading ..80%Loading ..90%
+
+0% done 0% done 1% done 2% done 3% done 3% done 4% done 5% done 6% done 7% done 7% done 8% done 9% done 10% done 11% done 11% done 12% done 13% done 14% done 15% done 15% done 16% done 17% done 18% done 19% done 19% done 20% done 21% done 22% done 23% done 23% done 24% done 25% done 26% done 26% done 27% done 28% done 29% done 30% done 30% done 31% done 32% done 33% done 34% done 34% done 35% done 36% done 37% done 38% done 38% done 39% done 40% done 41% done 42% done 42% done 43% done 44% done 45% done 46% done 46% done 47% done 48% done 49% done 50% done 50% done 51% done 52% done 53% done 53% done 54% done 55% done 56% done 57% done 57% done 58% done 59% done 60% done 61% done 61% done 62% done 63% done 64% done 65% done 65% done 66% done 67% done 68% done 69% done 69% done 70% done 71% done 72% done 73% done 73% done 74% done 75% done 76% done 76% done 77% done 78% done 79% done 80% done 80% done 81% done 82% done 83% done 84% done 84% done 85% done 86% done 87% done 88% done 88% done 89% done 90% done 91% done 92% done 92% done 93% done 94% done 95% done 96% done 96% done 97% done 98% done 99% done 100% done 2026-10-16 00:25:14.935 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:509 - Finished!
+[전처리] 396x210 → 512x271
+Meta SAM3D 3D 메쉬 생성 중...
+[Stage1 시도 1/5] seed=1445684757 score=0.4844
+[Stage1 시도 2/5] seed=1080205626 score=0.4844
+[Stage1 시도 3/5] seed=1965303790 score=0.4844
+[Stage1 시도 4/5] seed=1701522122 score=0.4844
+[Stage1 시도 5/5] seed=105602326 score=0.4844
+[⏱ 처리시간] SAM3D Stage1 탐색 (5회 × 10스텝): 9.25초
+[최적 seed 선택] seed=1445684757 score=0.4844
+[⏱ 처리시간] SAM3D Stage2 (메쉬 생성): 17.32초
+[⏱ 처리시간] SAM3D 전체: 26.74초
+[sam3d_size_m] scale=2.5322, extents(canonical)=[0.9983891844749451, 0.494340717792511, 0.6222003698348999], size_m={'width': 2.5281102412188403, 'height': 1.2517641924977028, 'depth': 1.5755290136651467}
+[텍스처 확인] visual type=ColorVisuals, has_uv=False
+[텍스처 확인] uv=False, material=None
+[텍스처 확인] baseColorTexture=False
+[완료] 버텍스 컬러 fallback, 버텍스: 5177, 페이스: 10315
+[00:25:15] a it=0 warmup: ok wall 26.7s (26.9s 경과) GPU 23795 MiB 
+2026-10-16 00:25:15.140 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:25:15.234 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:25:15.235 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:15.306 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:16.909 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 21177 to 20774
+2026-10-16 00:25:16.914 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:25:16.914 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:25:16.925 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:25:17.017 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:25:17.017 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:17.084 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:18.696 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 22039 to 21238
+2026-10-16 00:25:18.700 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:25:18.700 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:25:18.711 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:25:18.801 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:25:18.801 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:18.867 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:20.460 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 19688 to 17275
+2026-10-16 00:25:20.464 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:25:20.465 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:25:20.479 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:25:20.564 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:25:20.565 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:20.632 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:22.227 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 20657 to 20547
+2026-10-16 00:25:22.232 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:25:22.232 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:25:22.244 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:25:22.328 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:25:22.328 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:22.396 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:24.011 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 18974 to 18918
+2026-10-16 00:25:24.016 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:25:24.016 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:25:24.191 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:25:24.285 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=25, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:25:24.285 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:24.352 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:28.219 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 20406 to 20277
+2026-10-16 00:25:28.223 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:25:28.223 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_slat:742 - Sampling sparse latent: inference_steps=25, strength=1, interval=[0, 500], rescale_t=1
+2026-10-16 00:25:28.223 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:28.280 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:31.731 | INFO     | sam3d_objects.pipeline.inference_pipeline:decode_slat:604 - Decoding sparse latent...
+2026-10-16 00:25:32.636 | INFO     | sam3d_objects.pipeline.inference_pipeline:postprocess_slat_output:540 - Postprocessing mesh with option with_mesh_postprocess True, with_texture_baking False...
+
+
+Loading ..0%Loading ..10%Loading ..21%Loading ..32%Loading ..43%Loading ..54%Loading ..65%Loading ..75%Loading ..86%Loading ..97%
+
+0% done 0% done 1% done 2% done 3% done 4% done 5% done 6% done 7% done 7% done 8% done 9% done 10% done 11% done 12% done 13% done 14% done 15% done 15% done 16% done 17% done 18% done 19% done 20% done 21% done 22% done 23% done 23% done 24% done 25% done 26% done 27% done 28% done 29% done 30% done 30% done 31% done 32% done 33% done 34% done 35% done 36% done 37% done 38% done 38% done 39% done 40% done 41% done 42% done 43% done 44% done 45% done 46% done 46% done 47% done 48% done 49% done 50% done 51% done 52% done 53% done 53% done 54% done 55% done 56% done 57% done 58% done 59% done 60% done 61% done 61% done 62% done 63% done 64% done 65% done 66% done 67% done 68% done 69% done 69% done 70% done 71% done 72% done 73% done 74% done 75% done 76% done 76% done 77% done 78% done 79% done 80% done 81% done 82% done 83% done 84% done 84% done 85% done 86% done 87% done 88% done 89% done 90% done 91% done 92% done 92% done 93% done 94% done 95% done 96% done 97% done 98% done 99% done 100% done 2026-10-16 00:25:35.265 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:509 - Finished!
+[전처리] 396x210 → 512x271
+Meta SAM3D 3D 메쉬 생성 중...
+[Stage1 시도 1/5] seed=301448937 score=0.5156
+[Stage1 시도 2/5] seed=1230149211 score=0.5156
+[Stage1 시도 3/5] seed=853558716 score=0.5156
+[Stage1 시도 4/5] seed=1579330924 score=0.5156
+[Stage1 시도 5/5] seed=204909668 score=0.5156
+[⏱ 처리시간] SAM3D Stage1 탐색 (5회 × 10스텝): 8.89초
+[최적 seed 선택] seed=301448937 score=0.5156
+[⏱ 처리시간] SAM3D Stage2 (메쉬 생성): 11.08초
+[⏱ 처리시간] SAM3D 전체: 20.13초
+[sam3d_size_m] scale=2.6569, extents(canonical)=[0.999127984046936, 0.5071694850921631, 0.5900977253913879], size_m={'width': 2.654557581380658, 'height': 1.3474856306627885, 'depth': 1.5678155508650065}
+[텍스처 확인] visual type=ColorVisuals, has_uv=False
+[텍스처 확인] uv=False, material=None
+[텍스처 확인] baseColorTexture=False
+[완료] 버텍스 컬러 fallback, 버텍스: 4950, 페이스: 9575
+[00:25:35] a it=1 measure: ok wall 20.1s (20.3s 경과) GPU 22938 MiB 
+2026-10-16 00:25:35.479 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:25:35.606 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:25:35.606 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:35.705 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:39.745 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 22926 to 20462
+2026-10-16 00:25:39.750 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:25:39.750 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:25:39.761 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:25:39.887 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:25:39.887 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:39.981 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:41.921 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 20344 to 18465
+2026-10-16 00:25:41.925 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:25:41.926 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:25:41.937 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:25:42.025 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:25:42.025 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:42.090 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:43.680 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 21748 to 21024
+2026-10-16 00:25:43.684 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:25:43.684 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:25:43.695 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:25:43.787 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:25:43.787 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:43.854 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:45.458 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 19765 to 19547
+2026-10-16 00:25:45.464 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:25:45.464 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:25:45.475 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:25:45.582 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:25:45.583 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:45.658 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:47.263 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 21479 to 21082
+2026-10-16 00:25:47.273 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:25:47.273 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:25:47.460 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:25:47.559 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=25, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:25:47.559 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:47.630 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:52.253 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 22086 to 19921
+2026-10-16 00:25:52.257 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:25:52.257 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_slat:742 - Sampling sparse latent: inference_steps=25, strength=1, interval=[0, 500], rescale_t=1
+2026-10-16 00:25:52.257 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:25:52.314 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:25:56.224 | INFO     | sam3d_objects.pipeline.inference_pipeline:decode_slat:604 - Decoding sparse latent...
+2026-10-16 00:25:56.999 | INFO     | sam3d_objects.pipeline.inference_pipeline:postprocess_slat_output:540 - Postprocessing mesh with option with_mesh_postprocess True, with_texture_baking False...
+
+
+Loading ..0%Loading ..11%Loading ..22%Loading ..33%Loading ..44%Loading ..56%Loading ..67%Loading ..78%Loading ..89%
+
+0% done 1% done 3% done 5% done 7% done 9% done 10% done 12% done 14% done 16% done 18% done 20% done 21% done 23% done 25% done 27% done 29% done 30% done 32% done 34% done 36% done 38% done 40% done 41% done 43% done 45% done 47% done 49% done 50% done 52% done 54% done 56% done 58% done 60% done 61% done 63% done 65% done 67% done 69% done 70% done 72% done 74% done 76% done 78% done 80% done 81% done 83% done 85% done 87% done 89% done 90% done 92% done 94% done 96% done 98% done 100% done 2026-10-16 00:25:59.770 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:509 - Finished!
+[전처리] 396x210 → 512x271
+Meta SAM3D 3D 메쉬 생성 중...
+[Stage1 시도 1/5] seed=1477400823 score=0.4844
+[Stage1 시도 2/5] seed=1741414678 score=0.4844
+[Stage1 시도 3/5] seed=2074996391 score=0.4531
+[Stage1 시도 4/5] seed=1329774626 score=0.4844
+[Stage1 시도 5/5] seed=1635874050 score=0.4844
+[⏱ 처리시간] SAM3D Stage1 탐색 (5회 × 10스텝): 11.81초
+[최적 seed 선택] seed=1477400823 score=0.4844
+[⏱ 처리시간] SAM3D Stage2 (메쉬 생성): 12.31초
+[⏱ 처리시간] SAM3D 전체: 24.29초
+[sam3d_size_m] scale=2.6700, extents(canonical)=[0.9992412328720093, 0.4923732280731201, 0.6540453433990479], size_m={'width': 2.6679393853037823, 'height': 1.3146194174452148, 'depth': 1.746278350037187}
+[텍스처 확인] visual type=ColorVisuals, has_uv=False
+[텍스처 확인] uv=False, material=None
+[텍스처 확인] baseColorTexture=False
+[완료] 버텍스 컬러 fallback, 버텍스: 4553, 페이스: 9097
+[00:25:59] a it=2 measure: ok wall 24.3s (24.5s 경과) GPU 23922 MiB 
+2026-10-16 00:25:59.984 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:00.106 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:00.106 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:00.202 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:04.105 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 19396 to 19323
+2026-10-16 00:26:04.110 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:04.110 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:04.120 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:04.244 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:04.244 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:04.344 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:06.384 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 25165 to 22143
+2026-10-16 00:26:06.389 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:06.389 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:06.399 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:06.489 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:06.490 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:06.557 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:08.158 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 19735 to 17605
+2026-10-16 00:26:08.163 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:08.163 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:08.175 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:08.260 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:08.260 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:08.327 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:09.922 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 20023 to 19652
+2026-10-16 00:26:09.930 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:09.930 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:09.941 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:10.029 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:10.029 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:10.114 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:11.770 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 19232 to 18948
+2026-10-16 00:26:11.779 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:11.779 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:11.962 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:12.054 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=25, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:12.054 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:12.136 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:16.021 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 15920 to 15917
+2026-10-16 00:26:16.025 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:16.025 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_slat:742 - Sampling sparse latent: inference_steps=25, strength=1, interval=[0, 500], rescale_t=1
+2026-10-16 00:26:16.026 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:16.088 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:19.662 | INFO     | sam3d_objects.pipeline.inference_pipeline:decode_slat:604 - Decoding sparse latent...
+2026-10-16 00:26:20.295 | INFO     | sam3d_objects.pipeline.inference_pipeline:postprocess_slat_output:540 - Postprocessing mesh with option with_mesh_postprocess True, with_texture_baking False...
+
+
+Loading ..0%Loading ..15%Loading ..30%Loading ..45%Loading ..61%Loading ..76%Loading ..91%WARNING- Some cuts were necessary to cope with non manifold configuration.
+
+
+0% done 2% done 5% done 7% done 10% done 12% done 15% done 17% done 20% done 22% done 25% done 27% done 30% done 32% done 35% done 37% done 40% done 42% done 45% done 47% done 50% done 52% done 55% done 57% done 60% done 62% done 65% done 67% done 70% done 72% done 75% done 77% done 80% done 82% done 85% done 87% done 90% done 92% done 95% done 97% done 100% done 2026-10-16 00:26:23.221 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:509 - Finished!
+[전처리] 396x210 → 512x271
+Meta SAM3D 3D 메쉬 생성 중...
+[Stage1 시도 1/5] seed=1361543556 score=0.5156
+[Stage1 시도 2/5] seed=1800674628 score=0.5156
+[Stage1 시도 3/5] seed=772083535 score=0.5156
+[Stage1 시도 4/5] seed=1606142150 score=0.4844
+[Stage1 시도 5/5] seed=539103023 score=0.5156
+[⏱ 처리시간] SAM3D Stage1 탐색 (5회 × 10스텝): 11.81초
+[최적 seed 선택] seed=1361543556 score=0.5156
+[⏱ 처리시간] SAM3D Stage2 (메쉬 생성): 11.26초
+[⏱ 처리시간] SAM3D 전체: 23.24초
+[sam3d_size_m] scale=2.6784, extents(canonical)=[0.9989231824874878, 0.5230301022529602, 0.6175200939178467], size_m={'width': 2.675517558737539, 'height': 1.4008847195250809, 'depth': 1.653966874646187}
+[텍스처 확인] visual type=ColorVisuals, has_uv=False
+[텍스처 확인] uv=False, material=None
+[텍스처 확인] baseColorTexture=False
+[완료] 버텍스 컬러 fallback, 버텍스: 3330, 페이스: 6602
+[00:26:23] a it=3 measure: ok wall 23.2s (23.5s 경과) GPU 23062 MiB 
+2026-10-16 00:26:23.435 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:23.525 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:23.525 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:23.594 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:25.196 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 19694 to 17653
+2026-10-16 00:26:25.205 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:25.205 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:25.215 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:25.310 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:25.310 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:25.376 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:26.975 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 18658 to 18460
+2026-10-16 00:26:26.979 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:26.979 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:26.992 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:27.086 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:27.087 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:27.185 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:28.781 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 19228 to 17370
+2026-10-16 00:26:28.787 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:28.787 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:28.799 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:28.884 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:28.885 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:28.952 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:30.547 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 26093 to 21021
+2026-10-16 00:26:30.552 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:30.552 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:30.566 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:30.653 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:30.653 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:30.722 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:32.311 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 18413 to 18209
+2026-10-16 00:26:32.315 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:32.315 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:32.489 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:32.575 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=25, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:32.575 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:32.643 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:36.508 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 14563 to 14497
+2026-10-16 00:26:36.513 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:36.513 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_slat:742 - Sampling sparse latent: inference_steps=25, strength=1, interval=[0, 500], rescale_t=1
+2026-10-16 00:26:36.513 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:36.573 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:39.578 | INFO     | sam3d_objects.pipeline.inference_pipeline:decode_slat:604 - Decoding sparse latent...
+2026-10-16 00:26:40.072 | INFO     | sam3d_objects.pipeline.inference_pipeline:postprocess_slat_output:540 - Postprocessing mesh with option with_mesh_postprocess True, with_texture_baking False...
+
+
+Loading ..0%Loading ..15%Loading ..31%Loading ..47%Loading ..63%Loading ..79%Loading ..95%WARNING- Some cuts were necessary to cope with non manifold configuration.
+
+
+0% done 1% done 2% done 4% done 5% done 7% done 8% done 10% done 11% done 13% done 14% done 16% done 17% done 19% done 20% done 22% done 23% done 25% done 26% done 28% done 29% done 31% done 32% done 34% done 35% done 37% done 38% done 40% done 41% done 43% done 44% done 46% done 47% done 49% done 50% done 52% done 53% done 55% done 56% done 58% done 59% done 61% done 62% done 64% done 65% done 67% done 68% done 70% done 71% done 73% done 74% done 76% done 77% done 79% done 80% done 82% done 83% done 85% done 86% done 88% done 89% done 91% done 92% done 94% done 95% done 97% done 98% done 100% done 2026-10-16 00:26:42.507 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:509 - Finished!
+[전처리] 396x210 → 512x271
+Meta SAM3D 3D 메쉬 생성 중...
+[Stage1 시도 1/5] seed=2142292660 score=0.4844
+[Stage1 시도 2/5] seed=284686494 score=0.5156
+[Stage1 시도 3/5] seed=1858469029 score=0.5156
+[Stage1 시도 4/5] seed=5192128 score=0.4844
+[Stage1 시도 5/5] seed=1346057547 score=0.4844
+[⏱ 처리시간] SAM3D Stage1 탐색 (5회 × 10스텝): 8.89초
+[최적 seed 선택] seed=284686494 score=0.5156
+[⏱ 처리시간] SAM3D Stage2 (메쉬 생성): 10.02초
+[⏱ 처리시간] SAM3D 전체: 19.07초
+[sam3d_size_m] scale=2.6546, extents(canonical)=[0.9995043277740479, 0.5178875923156738, 0.5606940984725952], size_m={'width': 2.653238101592592, 'height': 1.374760522882525, 'depth': 1.4883927003284612}
+[텍스처 확인] visual type=ColorVisuals, has_uv=False
+[텍스처 확인] uv=False, material=None
+[텍스처 확인] baseColorTexture=False
+[완료] 버텍스 컬러 fallback, 버텍스: 3259, 페이스: 6368
+[00:26:42] a it=4 measure: ok wall 19.1s (19.3s 경과) GPU 22952 MiB 
+2026-10-16 00:26:42.704 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:42.795 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:42.796 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:42.863 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:44.452 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 21531 to 21436
+2026-10-16 00:26:44.456 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:44.456 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:44.467 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:44.562 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:44.562 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:44.627 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:46.212 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 21124 to 18286
+2026-10-16 00:26:46.216 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:46.216 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:46.228 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:46.318 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:46.318 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:46.384 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:47.987 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 19401 to 16843
+2026-10-16 00:26:47.991 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:47.991 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:48.003 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:48.093 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:48.093 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:48.157 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:49.748 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 20691 to 17969
+2026-10-16 00:26:49.753 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:49.753 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:49.764 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:49.875 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=10, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:49.875 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:49.941 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:51.565 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 23556 to 19041
+2026-10-16 00:26:51.570 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:51.570 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:448 - Finished!
+2026-10-16 00:26:51.742 | INFO     | sam3d_objects.pipeline.inference_pipeline:merge_image_and_mask:582 - Replacing alpha channel with the provided mask
+2026-10-16 00:26:51.832 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:662 - Sampling sparse structure: inference_steps=25, strength=7, interval=[0, 500], rescale_t=3, cfg_strength_pm=0.0
+2026-10-16 00:26:51.832 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:51.900 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:55.775 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_sparse_structure:712 - Downsampled coords from 21912 to 21822
+2026-10-16 00:26:55.779 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:444 - Rescaling scale by 1 after downsampling
+2026-10-16 00:26:55.779 | INFO     | sam3d_objects.pipeline.inference_pipeline:sample_slat:742 - Sampling sparse latent: inference_steps=25, strength=1, interval=[0, 500], rescale_t=1
+2026-10-16 00:26:55.779 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:631 - Running condition embedder ...
+2026-10-16 00:26:55.833 | INFO     | sam3d_objects.pipeline.inference_pipeline:get_condition_input:635 - Condition embedder finishes!
+2026-10-16 00:26:59.830 | INFO     | sam3d_objects.pipeline.inference_pipeline:decode_slat:604 - Decoding sparse latent...
+2026-10-16 00:27:00.689 | INFO     | sam3d_objects.pipeline.inference_pipeline:postprocess_slat_output:540 - Postprocessing mesh with option with_mesh_postprocess True, with_texture_baking False...
+
+
+Loading ..0%Loading ..11%Loading ..22%Loading ..34%Loading ..45%Loading ..57%Loading ..68%Loading ..80%Loading ..91%
+
+0% done 1% done 2% done 3% done 4% done 5% done 7% done 8% done 9% done 10% done 11% done 12% done 14% done 15% done 16% done 17% done 18% done 20% done 21% done 22% done 23% done 24% done 25% done 27% done 28% done 29% done 30% done 31% done 32% done 34% done 35% done 36% done 37% done 38% done 40% done 41% done 42% done 43% done 44% done 45% done 47% done 48% done 49% done 50% done 51% done 52% done 54% done 55% done 56% done 57% done 58% done 60% done 61% done 62% done 63% done 64% done 65% done 67% done 68% done 69% done 70% done 71% done 72% done 74% done 75% done 76% done 77% done 78% done 80% done 81% done 82% done 83% done 84% done 85% done 87% done 88% done 89% done 90% done 91% done 92% done 94% done 95% done 96% done 97% done 98% done 100% done 2026-10-16 00:27:03.237 | INFO     | sam3d_objects.pipeline.inference_pipeline_pointmap:run:509 - Finished!
+[전처리] 396x210 → 512x271
+Meta SAM3D 3D 메쉬 생성 중...
+[Stage1 시도 1/5] seed=10720697 score=0.5156
+[Stage1 시도 2/5] seed=2015850708 score=0.5156
+[Stage1 시도 3/5] seed=327258239 score=0.4844
+[Stage1 시도 4/5] seed=1256000395 score=0.4844
+[Stage1 시도 5/5] seed=1849355954 score=0.5156
+[⏱ 처리시간] SAM3D Stage1 탐색 (5회 × 10스텝): 8.88초
+[최적 seed 선택] seed=10720697 score=0.5156
+[⏱ 처리시간] SAM3D Stage2 (메쉬 생성): 11.50초
+[⏱ 처리시간] SAM3D 전체: 20.53초
+[sam3d_size_m] scale=2.5616, extents(canonical)=[0.9995017051696777, 0.5118536353111267, 0.6067085266113281], size_m={'width': 2.5602846949780087, 'height': 1.311144365014826, 'depth': 1.5541209654384147}
+[텍스처 확인] visual type=ColorVisuals, has_uv=False
+[텍스처 확인] uv=False, material=None
+[텍스처 확인] baseColorTexture=False
+[완료] 버텍스 컬러 fallback, 버텍스: 4541, 페이스: 8970
+[00:27:03] a it=5 measure: ok wall 20.5s (20.8s 경과) GPU 23054 MiB 
+[00:27:06]   정리 확인[a] 시도 1: 할당 13121 MiB(기준 대비 +0), nvidia-smi 14039 MiB, 다른 측정 프로세스 없음 → 정상
+# 표 5 단일 GPU 자원 경합 측정
+
+**모든 수치는 이번에 측정한 실제 값**이다(기존 기록은 마지막 절에 따로 있다). 워밍업 1회는 집계에서 뺐고, 평균±표본표준편차는 **성공한 측정 실행만**으로 계산했다. 실패·중단된 조건은 표 5-B 에 따로 있다. GPU 는 전 조건 같은 RTX 4090 24GB 한 장이다.
+
+## 표 5-A. 조건별 결과 (성공한 측정 실행만)
+
+| 조건 | 상주(측정 프로세스) | 동시 GPU 작업 | 성공/계획 | VRAM 최댓값 (MiB) | 최소 여유 (MiB) | 프로세스 max_allocated (MiB) | SAM3D 디코드 (s) | SAM3D 전체 (s) | Omni3D·디코드 겹침 (s) |
+|---|---|---|---|---|---|---|---|---|---|
+| **a** SAM3D 단독 | SAM3D | 없음 | 5/5 | 23697.60±439.59 | 866.40±439.59 | 18430.05±192.29 | 0.73±0.17 | 21.46±2.21 | — |
+
+- 성공/계획의 n 이 조건마다 다르다(5 또는 10). 중단된 조건은 n 이 계획보다 작다.
+- **VRAM 최댓값 / 최소 여유**: SAM3D 실행 구간의 `nvidia-smi -lms 100` 샘플 중 모든 프로세스 합의 최댓값, 24,564 MiB 에서 뺀 값. 캐싱 할당자가 남는 공간을 채우므로 "여유"는 필요량이 아니다. 100 ms 보다 짧은 스파이크는 놓칠 수 있다.
+- **프로세스 max_allocated**: 이 측정 프로세스의 `torch.cuda.max_memory_allocated`(실행마다 초기화).
+- **사이드카(uLayout, Omni3D)별 max_memory_allocated 는 확인 불가**(사이드카 코드를 고쳐야 하고 WSL2 nvidia-smi 는 프로세스별 값을 N/A 로 준다).
+- **SAM3D 디코드**: `pipeline.decode_slat` 호출 시간(동기화 후, 코드는 수정하지 않고 감쌈).
+- **Omni3D·디코드 겹침**: Omni3D 요청 구간과 디코드 구간이 실제로 겹친 시간. 조건 e, f 는 요청이 약 0.3초뿐이라 거의 0 이 정상이다.
+- 조건 d 의 SAM3D 구간은 SD 를 해제한 뒤라 b 와 같은 구성이다. d 의 SD 구간 비용은 raw.csv 의 `sd_*` 행에 있다.
+
+### 조건이 비교하는 것
+
+| 조건 | 비교 목적 |
+|---|---|
+| a | 기준(SAM3D 자체) |
+
+## 표 5-A2. 분포 (중앙값 (최소~최대), 성공한 측정 실행)
+
+| 조건 | 디코드 (s) | SAM3D 전체 (s) | SM 클럭 최소 (MHz) | GPU 온도 최대 (℃) |
+|---|---|---|---|---|
+| a | 0.77 (0.49~0.90) | 20.54 (19.08~24.30) | 2520.00 (2520.00~2520.00) | 72.00 (71.00~73.00) |
+
+## 표 5-B. 실패·중단 (성공 결과와 구분, 재실행하지 않았다)
+
+실패·중단된 조건 없음.
+
+## 회차별 원본값
+
+| 조건 | 회차 | 결과 | wall(s) | VRAM 최댓값 | 최소 여유 | max_allocated | 디코드(s) | 비고 |
+|---|---|---|---|---|---|---|---|---|
+| a | W | ok | 26.7 | 23797.0000 | 767.0000 | 18420.3071 | 6.2143 |  |
+| a | 1 | ok | 20.1 | 24010.0000 | 554.0000 | 18539.8301 | 0.9047 |  |
+| a | 2 | ok | 24.3 | 23924.0000 | 640.0000 | 18519.5615 | 0.7744 |  |
+| a | 3 | ok | 23.2 | 23648.0000 | 916.0000 | 18271.8579 | 0.6333 |  |
+| a | 4 | ok | 19.1 | 22952.0000 | 1612.0000 | 18183.7173 | 0.4936 |  |
+| a | 5 | ok | 20.5 | 23954.0000 | 610.0000 | 18635.2998 | 0.8589 |  |
+
+## 정리 확인 (조건 사이)
+
+| 조건 | 기준 대비 잔여 할당(MiB) | 결과 | 내용 |
+|---|---|---|---|
+| a | +0 | ok | allocated 13121 / 기준 13121 MiB, nvidia-smi 14039 MiB, 다른 측정 프로세스 [] |
+
+## 과거 기록과 이번 측정 (구분해서 읽을 것)
+
+| 항목 | 과거 관찰 [기록, 이번 측정 아님] | 이번 측정 [측정] | 비고 |
+|---|---|---|---|
+| VRAM 여유 | 약 2.4GB (커밋 ec74862, 원 로그 없음) | c2 최소 여유 — MiB (n=0), c1 — MiB | 구성이 완전히 같다는 보장 없음 |
+| 디코드 시간 | 0.2초 → 67.7초 (커밋 ec74862, 원 로그 없음) | a 0.73±0.17 s, 전 조건 최댓값 0.90 s | 과거와 같은 코드·정의인지 확인 불가 |
+

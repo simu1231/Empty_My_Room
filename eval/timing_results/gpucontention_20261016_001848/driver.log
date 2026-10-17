@@ -1,0 +1,22 @@
+[00:18:48] PHASE 0: 사전 점검
+[00:18:48] GPU 정리 확인: 559 MiB (상한 1500)
+[00:18:48] 출력 /home/tmvlem5671/Empty_My_Room/eval/timing_results/gpucontention_20261016_001848 / dxg 누적(부팅 이후) 8
+[00:18:48] PHASE 1: 표 6 (SD 콜드/웜)
+[00:24:13] 표 6 완료
+[00:24:13] GPU 정리 확인: 524 MiB (상한 1500)
+[00:24:13] PHASE 2: 조건 a (사이드카 없음)
+[00:27:08] 조건 a 완료
+[00:27:08] GPU 정리 확인: 528 MiB (상한 1500)
+[00:27:08] PHASE 3: 사이드카 기동
+[00:31:16] !! Omni3D :8003 기동 실패
+[00:31:16] 사이드카 :8002 종료 (pid 36628)
+[00:31:21] PHASE ABORTED
+[00:32:19] PHASE 0: 사전 점검
+[00:32:19] GPU 정리 확인: 525 MiB (상한 1500)
+[00:32:19] 출력 /home/tmvlem5671/Empty_My_Room/eval/timing_results/gpucontention_20261016_001848 / dxg 누적(부팅 이후) 8
+[00:32:19] PHASE 1~2 건너뜀(START_PHASE=3) — 기존 결과 유지
+[00:32:19] PHASE 3: 사이드카 기동
+[00:32:33] uLayout health: {"status":"ok","ulayout_loaded":true}
+[00:32:33] Omni3D health: {"status":"ok","omni3d_loaded":true}
+[00:32:33] 사이드카 유휴 상태 GPU: 2192 MiB
+[00:32:33] PHASE 4: 조건 b, c1, c2, d, e, f1, f2, g1, g2, b_end

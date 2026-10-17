@@ -1,0 +1,15 @@
+[01:49:19] RESUME 사전 점검
+[01:49:19] 정리 확인: 측정 프로세스 없음, GPU 1729 MiB
+[01:49:19] PHASE g2: 사이드카 새로 기동
+[01:49:42] uLayout health: {"status":"ok","ulayout_loaded":true} / Omni3D health: {"status":"ok","omni3d_loaded":true} / 유휴 GPU 1771 MiB
+[01:49:42] PHASE g2: 조건 실행(워치독 600초)
+[02:03:21] 조건 g2 종료코드 97 (워치독이 강제 종료)
+[02:03:21] 정리 확인: 측정 프로세스 없음, GPU 659 MiB
+[02:03:21] PHASE b_end: 사이드카 새로 기동
+[02:03:43] uLayout health: {"status":"ok","ulayout_loaded":true} / Omni3D health: {"status":"ok","omni3d_loaded":true} / 유휴 GPU 1820 MiB
+[02:03:43] PHASE b_end: 조건 실행(워치독 600초)
+[02:06:43] 조건 b_end 종료코드 0 
+[02:06:43] 정리 확인: 측정 프로세스 없음, GPU 289 MiB
+[02:06:43] PHASE 마무리: 사이드카 종료
+[02:06:49] 최종 GPU 137 MiB / 사이드카 포트 닫힘
+[02:06:49] DONE

@@ -1,0 +1,160 @@
+[17:45:46] 출력: /home/tmvlem5671/Empty_My_Room/eval/timing_results/20261014_174546
+[17:45:46] 장면 sceneA eval/timing/scenes/sceneA.jpg [7095, 3546] 원본파일명=알 수 없음 (첨부 시 1.jpg 로 전달됨)
+[17:45:46]   가구 "침대" 클릭 좌표(원본 해상도) [[3195, 2840], [2876, 2041]]
+[17:45:46]   가구 "협탁" 클릭 좌표(원본 해상도) [[5857, 2449]]
+[17:45:46] 장면 sceneB eval/timing/scenes/sceneB.jpg [4320, 2880] 원본파일명=알 수 없음 (첨부 시 2.jpg 로 전달됨)
+[17:45:46]   가구 "소파" 클릭 좌표(원본 해상도) [[1642, 2160], [2808, 1944]]
+[17:45:46]   가구 "스탠드 조명" 클릭 좌표(원본 해상도) [[3802, 1102]]
+[17:45:46]   가구 "액자" 클릭 좌표(원본 해상도) [[1728, 1426]]
+[17:45:46] 장면 sceneC eval/timing/scenes/sceneC.png [2044, 1364] 원본파일명=알 수 없음 (첨부 시 3.png 로 전달됨)
+[17:45:46]   가구 "침대" 클릭 좌표(원본 해상도) [[653, 1020], [612, 836]]
+[17:45:46]   가구 "의자" 클릭 좌표(원본 해상도) [[1550, 898]]
+[17:45:46] 장면 sceneD eval/timing/scenes/sceneD.jpg [768, 512] 원본파일명=알 수 없음 (첨부 시 4.jpg 로 전달됨)
+[17:45:46]   가구 "침대" 클릭 좌표(원본 해상도) [[400, 300], [320, 250]]
+[17:45:46] uLayout health: {'status': 'ok', 'ulayout_loaded': True}
+[17:45:46] Omni3D health: {'status': 'ok', 'omni3d_loaded': True}
+[17:45:47] 측정 전 GPU 사용 2872 MiB
+[17:46:19] SAM3D 로드 후 GPU 사용 16110 MiB
+[17:46:19] ===== sceneA 시작 (GPU 16110 MiB) =====
+[17:46:35]   overlay sceneA/침대: 마스크 면적 17.4%
+[17:46:35]   overlay sceneA/협탁: 마스크 면적 3.8%
+[17:47:41] sceneA it=0 warmup sequential: OK (81.6s, GPU 15127 MiB)
+[17:48:40] sceneA it=0 warmup parallel: OK (59.2s, GPU 16375 MiB)
+[17:52:32] sceneA it=1 measure sequential: OK (231.6s, GPU 16396 MiB)
+[17:53:36] sceneA it=1 measure parallel: OK (63.1s, GPU 15468 MiB)
+[17:54:31] sceneA it=2 measure sequential: OK (55.8s, GPU 16414 MiB)
+[17:55:24] sceneA it=2 measure parallel: OK (53.0s, GPU 16397 MiB)
+[17:56:34] sceneA it=3 measure sequential: OK (69.2s, GPU 15434 MiB)
+[17:57:29] sceneA it=3 measure parallel: OK (54.8s, GPU 16397 MiB)
+[18:03:23] sceneA it=4 measure sequential: OK (353.5s, GPU 16418 MiB)
+[18:04:27] sceneA it=4 measure parallel: OK (63.5s, GPU 15425 MiB)
+[18:05:20] sceneA it=5 measure sequential: OK (53.2s, GPU 16408 MiB)
+[18:06:13] sceneA it=5 measure parallel: OK (52.8s, GPU 16411 MiB)
+[18:06:13] ===== sceneB 시작 (GPU 16411 MiB) =====
+[18:06:28]   overlay sceneB/소파: 마스크 면적 7.7%
+[18:06:28]   overlay sceneB/스탠드 조명: 마스크 면적 3.3%
+[18:06:28]   overlay sceneB/액자: 마스크 면적 5.7%
+[18:07:35] sceneB it=0 warmup sequential: OK (82.2s, GPU 15786 MiB)
+[18:09:01] sceneB it=0 warmup parallel: OK (85.4s, GPU 15580 MiB)
+[18:10:31] sceneB it=1 measure sequential: OK (89.8s, GPU 15702 MiB)
+[18:11:52] sceneB it=1 measure parallel: OK (81.6s, GPU 16190 MiB)
+[18:13:17] sceneB it=2 measure sequential: OK (84.8s, GPU 15859 MiB)
+[18:19:12] !! 실패 Ctx(scene='sceneB', it=2, phase='measure', mode='parallel'): ReadTimeout: HTTPConnectionPool(host='localhost', port=8003): Read timed out. (read timeout=120)
+Traceback (most recent call last):
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/urllib3/connectionpool.py", line 537, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/urllib3/connection.py", line 466, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/http/client.py", line 1415, in getresponse
+    response.begin()
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/http/client.py", line 330, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/http/client.py", line 291, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/socket.py", line 718, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+TimeoutError: timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/requests/adapters.py", line 486, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/urllib3/connectionpool.py", line 847, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/urllib3/util/retry.py", line 470, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/urllib3/util/util.py", line 39, in reraise
+    raise value
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/urllib3/connectionpool.py", line 793, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/urllib3/connectionpool.py", line 539, in _make_request
+    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/urllib3/connectionpool.py", line 370, in _raise_timeout
+    raise ReadTimeoutError(
+urllib3.exceptions.ReadTimeoutError: HTTPConnectionPool(host='localhost', port=8003): Read timed out. (read timeout=120)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/tmvlem5671/Empty_My_Room/tools/timing/measure_timing.py", line 334, in run_once
+    f.result()
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/concurrent/futures/_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/Empty_My_Room/tools/timing/measure_timing.py", line 315, in do_scale
+    r = call_omni3d(S, scene, it)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/Empty_My_Room/tools/timing/measure_timing.py", line 213, in call_omni3d
+    return _post(f'{S.omni_url}/estimate', p.read_bytes(), p.name, _ctype(p),
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/Empty_My_Room/tools/timing/measure_timing.py", line 200, in _post
+    r = requests.post(url, files={'image': (filename, data_bytes, ctype)}, data=data or {}, timeout=timeout)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/requests/api.py", line 115, in post
+    return request("post", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tmvlem5671/miniconda3/envs/sam3d/lib/python3.11/site-packages/requests/adapters.py", line 532, in send
+    raise ReadTimeout(e, request=request)
+requests.exceptions.ReadTimeout: HTTPConnectionPool(host='localhost', port=8003): Read timed out. (read timeout=120)
+
+[18:19:12] sceneB it=2 measure parallel: FAIL (354.2s, GPU 15675 MiB)
+[18:20:35] sceneB it=3 measure sequential: OK (83.0s, GPU 15832 MiB)
+[18:22:14] sceneB it=3 measure parallel: OK (99.5s, GPU 15711 MiB)
+[18:23:28] sceneB it=4 measure sequential: OK (74.0s, GPU 15950 MiB)
+[18:25:03] sceneB it=4 measure parallel: OK (94.6s, GPU 15923 MiB)
+[18:26:18] sceneB it=5 measure sequential: OK (75.4s, GPU 15593 MiB)
+[18:27:49] sceneB it=5 measure parallel: OK (90.7s, GPU 15825 MiB)
+[18:27:49] ===== sceneC 시작 (GPU 15825 MiB) =====
+[18:28:04]   overlay sceneC/침대: 마스크 면적 8.7%
+[18:28:04]   overlay sceneC/의자: 마스크 면적 1.7%
+[18:28:52] sceneC it=0 warmup sequential: OK (62.6s, GPU 17047 MiB)
+[18:30:07] sceneC it=0 warmup parallel: OK (75.5s, GPU 15667 MiB)
+[18:31:13] sceneC it=1 measure sequential: OK (65.6s, GPU 16683 MiB)
+[18:32:32] sceneC it=1 measure parallel: OK (79.4s, GPU 15695 MiB)
+[18:33:38] sceneC it=2 measure sequential: OK (65.4s, GPU 16577 MiB)
+[18:34:51] sceneC it=2 measure parallel: OK (72.6s, GPU 15550 MiB)
+[18:35:57] sceneC it=3 measure sequential: OK (65.6s, GPU 16548 MiB)
+[18:37:06] sceneC it=3 measure parallel: OK (69.8s, GPU 15349 MiB)
+[18:38:08] sceneC it=4 measure sequential: OK (61.5s, GPU 16459 MiB)
+[18:39:20] sceneC it=4 measure parallel: OK (71.7s, GPU 15136 MiB)
+[18:40:21] sceneC it=5 measure sequential: OK (61.0s, GPU 16328 MiB)
+[18:41:35] sceneC it=5 measure parallel: OK (74.4s, GPU 15758 MiB)
+[18:41:35] ===== sceneD 시작 (GPU 15758 MiB) =====
+[18:41:45]   overlay sceneD/침대: 마스크 면적 8.7%
+[18:42:07] sceneD it=0 warmup sequential: OK (31.8s, GPU 16328 MiB)
+[18:42:38] sceneD it=0 warmup parallel: OK (30.4s, GPU 16328 MiB)
+[18:43:09] sceneD it=1 measure sequential: OK (31.0s, GPU 15527 MiB)
+[18:43:42] sceneD it=1 measure parallel: OK (33.1s, GPU 15690 MiB)
+[18:44:13] sceneD it=2 measure sequential: OK (31.0s, GPU 15558 MiB)
+[18:44:44] sceneD it=2 measure parallel: OK (30.7s, GPU 15094 MiB)
+[18:45:14] sceneD it=3 measure sequential: OK (30.0s, GPU 15073 MiB)
+[18:45:44] sceneD it=3 measure parallel: OK (30.2s, GPU 15103 MiB)
+[18:46:15] sceneD it=4 measure sequential: OK (30.7s, GPU 15520 MiB)
+[18:46:47] sceneD it=4 measure parallel: OK (31.6s, GPU 14795 MiB)
+[18:47:19] sceneD it=5 measure sequential: OK (32.0s, GPU 16333 MiB)
+[18:47:50] sceneD it=5 measure parallel: OK (31.2s, GPU 16354 MiB)
+[18:47:50] 측정 후 GPU 사용 16354 MiB / 실패 실행 1건
