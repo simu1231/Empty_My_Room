@@ -93,6 +93,10 @@ async def lifespan(app: FastAPI):
         print(f"세션 상태 알림 → {app.state.session.path} "
               f"(활동 유효 {app.state.session.busy_sec:.0f}초, {WRITE_SEC:.0f}초 간격)")
 
+    # SAM3D 백엔드와 GPU 여유. fal 이면 SAM3D 파이프라인이 빠진 뒤의 여유가 여기서 보인다.
+    from services import sam3d_runner
+    sam3d_runner.log_gpu_headroom("서버 시작")
+
     print("서버 준비 완료!")
     yield
     for t in (sweeper, stater):

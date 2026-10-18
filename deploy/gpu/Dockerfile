@@ -42,6 +42,17 @@ RUN pip install --no-cache-dir --break-system-packages \
         --no-deps --target /opt/worker-deps \
         boto3 botocore jmespath s3transfer
 
+# fal_client (SAM3D_BACKEND=fal). boto3 와 달리 **PYTHONPATH 로 앞에 얹지 않는다.**
+# fal_client 는 httpx/websockets 등을 끌고 오는데, 앞에 두면 conda 환경이 검증해 둔
+# 버전(httpx 0.27 등)을 가린다. 그래서 의존성까지 통째로 /opt/fal-deps 에 깔고,
+# sam3d_fal.py 가 import 실패했을 때만 sys.path **끝**에 붙인다(SAM3D_FAL_DEPS).
+# 환경에 이미 있는 패키지는 그쪽이 이기고, 없는 것(httpx-sse, msgpack 등)만 여기서 채워진다.
+# 마운트된 conda 환경이 python 3.11 이라 휠도 3.11 용으로 받는다(이미지의 pip 는 3.12).
+# 버전은 deploy/worker/requirements.txt 와 같게 유지한다.
+RUN pip install --no-cache-dir --break-system-packages \
+        --only-binary=:all: --python-version 3.11 --target /opt/fal-deps \
+        fal_client==1.0.3
+
 # ── 모델 루트 ────────────────────────────────────────────────────────────
 # conda 환경 · 소스 · 가중치가 호스트에 놓인 위치. 컨테이너 안에서도 같은
 # 경로로 마운트한다(위 "왜 경로가 같은가" 참고).

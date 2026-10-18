@@ -1,25 +1,10 @@
 #!/bin/bash
-# 인스턴스가 뜰 때마다 실행된다. 하는 일은 하나 — 이미 구워진 스택을 올린다.
-#
-# 여기서 모델을 내려받거나 conda 환경을 설치하거나 도커 이미지를 빌드하지 않는다.
-# 전부 AMI에 들어 있어야 한다(약 80GB). 부팅할 때마다 하면 콜드스타트가 수십 분이
-# 되고, 그러면 스케일투제로로 아낀 돈을 대기 시간으로 도로 토해낸다.
-#
-# 이 스크립트가 실패하면 **인스턴스를 스스로 회수한다**(아래 트랩). 실패한 채
-# 살아있는 인스턴스가 제일 비싸기 때문이다 — 리퍼가 안 떠서 아무도 회수하지 않고,
-# ASG 헬스체크는 EC2 타입이라 "켜져 있음"만 보고 정상으로 판단한다. 그 상태로
-# g6.xlarge는 일 없이 시간당 $0.45, 한 달 $327을 먹는다.
-#
-# 이 파일은 16KB 를 넘으면 안 된다 — 주석도 센다. config.sh 의 같은 제목
-# 주석을 먼저 읽을 것. 구분선 꼬리 `──` 를 다시 늘이지 말 것.
+# 부팅마다 실행된다. 이미 구워진 스택을 올릴 뿐이다 — 모델 다운로드/빌드는 하지 않는다(AMI 에 있다).
+# 실패하면 인스턴스를 스스로 회수한다(아래 트랩): 실패한 채 살아 있으면 리퍼가 없어 요금만 나간다.
+# 이 파일은 렌더 후 16KB 를 넘으면 안 된다(주석도 센다). config.sh 의 같은 제목 주석을 읽을 것.
 set -euxo pipefail
-# /dev/console 에도 흘린다. 워커는 SSH 키도 인바운드 규칙도 없고(큐에서 당겨
-# 쓰는 구조라 접속할 일이 없다) 실패하면 트랩이 인스턴스를 회수해서
-# /var/log/emr-userdata.log 가 같이 사라진다. logger 만으로는 안 된다 —
-# journald 기본값이 ForwardToConsole=no 이고 get-console-output 은 직렬
-# 콘솔에 쓴 것만 보여준다(전부 기록되는데 밖에서만 안 보였다). 콘솔을 미리
-# 검사하는 건 tee 가 대상 하나를 못 열면 1 을 돌려주고, set -e 아래의 exec
-# 이라 기동이 통째로 죽기 때문이다.
+# 콘솔에도 흘린다: 워커는 SSH 가 없고 실패하면 트랩이 인스턴스를 회수해 로그 파일이 사라진다.
+# 콘솔을 미리 검사하지 않는 이유: tee 가 대상 하나를 못 열면 set -e 아래 exec 이 기동을 죽인다.
 CONSOLE=/dev/console
 [ -w "$CONSOLE" ] 2>/dev/null || CONSOLE=/dev/null
 exec > >(tee /var/log/emr-userdata.log "$CONSOLE" | logger -t emr-userdata) 2>&1
@@ -31,19 +16,13 @@ WARM_SKIP="__WARM_SKIP__"
 WARM_BG_DIRS="__WARM_BG_DIRS__"
 WARM_BG_TIMEOUT=__WARM_BG_TIMEOUT__
 EMR_ROOT=__EMR_ROOT__
-# 버킷/테이블은 .env 와 아래 컴포즈 덮어쓰기가 **같은 변수**를 쓰게 쉘로 올린다.
-# 두 군데에 따로 적으면 조용히 어긋난다 — 이미 가디언 유예와 워밍 상한에서
-# 한 번 당했다.
+# 버킷/테이블은 .env 와 컴포즈 덮어쓰기가 같은 변수를 쓰게 쉘로 올린다(따로 적으면 어긋난다).
 S3_BUCKET=__S3_BUCKET__
 DDB_TABLE=__DDB_TABLE__
 RETIRE=/opt/emr/bin/self-retire.sh
 
 # ── 실패 트랩 ──
-# 실패하면 조용히 남지 말고 요금을 끊는다. 배포가 실패하는 쪽이 요금이 새는
-# 쪽보다 낫다 — 실패는 ASG 활동 로그와 /var/log/emr-userdata.log 에 남는다.
-#
-# ERR 이 아니라 EXIT 에 건다. ERR 트랩은 `exit 1` 로 일부러 죽는 자리(이미지
-# 없음, 리퍼 안 뜸 …)에서는 안 돈다 — 정작 제일 회수해야 할 경우들이다.
+# 실패하면 요금을 끊는다(배포 실패가 요금 누수보다 낫다). EXIT 에 건다 — ERR 은 `exit 1` 에서 안 돈다.
 STEP="시작"
 on_exit() {
   local rc=$?
@@ -58,16 +37,12 @@ on_exit() {
 trap on_exit EXIT
 
 # ── 저장소 ──
-# 경로는 시작 템플릿이 주입한다. 예전엔 개발 PC 홈(/home/<사용자>/...)이 박혀
-# 있었는데, EC2 기본 사용자는 ubuntu라 그 경로가 없다 → cd 실패 → 위 트랩 직행.
 STEP="저장소 확인"
 [ -d "$REPO" ] || { echo "[userdata] $REPO 가 없다 — AMI가 잘못됐다"; exit 1; }
 cd "$REPO"
 
 # ── 모델 루트 확인 ──
-# compose가 이 경로들을 바인드 마운트한다. **없으면 도커가 조용히 빈 디렉터리를
-# root 소유로 만들어 준다.** 컨테이너는 정상적으로 뜨고, 리퍼도 뜨고, 겉보기엔
-# 다 성공한 뒤 첫 요청에서 ModuleNotFoundError로 죽는다. 여기서 먼저 깨뜨린다.
+# 없으면 도커가 빈 디렉터리를 만들어 첫 요청에서 죽는다 — 여기서 먼저 깨뜨린다.
 STEP="모델 루트 확인"
 for d in "$EMR_ROOT/miniconda3" "$EMR_ROOT/sam-3d-objects" "$EMR_ROOT/uLayout" \
          "$EMR_ROOT/omni3d" "$EMR_ROOT/detectron2" "$EMR_ROOT/pytorch3d_omni3d_build" \
@@ -77,9 +52,7 @@ for d in "$EMR_ROOT/miniconda3" "$EMR_ROOT/sam-3d-objects" "$EMR_ROOT/uLayout" \
 done
 
 # ── 이미지 확인 ──
-# `docker compose up -d`는 이미지가 없으면 **그 자리에서 빌드한다**. 부팅 중
-# 빌드는 수십 분이고, 그동안 요금은 계속 나간다. 그래서 먼저 태그가 실제로
-# 있는지 보고, 없으면 빌드 대신 크게 실패한다(=회수된다).
+# 이미지가 없으면 compose 가 부팅 중 빌드한다(수십 분) — 빌드 대신 실패시킨다.
 STEP="이미지 태그 확인"
 for img in "emr/api:$IMAGE_TAG" "emr/worker:$IMAGE_TAG" "emr/gpu:$IMAGE_TAG"; do
   docker image inspect "$img" >/dev/null 2>&1 || {
@@ -89,9 +62,6 @@ for img in "emr/api:$IMAGE_TAG" "emr/worker:$IMAGE_TAG" "emr/gpu:$IMAGE_TAG"; do
 done
 
 # ── 환경변수 주입 ──
-# 큐/버킷 이름은 환경변수로만 준다. 코드에는 기본값만 있고 어느 큐를 보는지는
-# 배포가 정한다. 덕분에 나중에 sam3d와 scene을 다른 인스턴스로 쪼갤 때 코드를
-# 한 줄도 안 고치고 컴포즈만 나누면 된다.
 STEP="환경변수 주입"
 umask 077   # .env는 소유자만 읽는다
 cat > deploy/.env <<ENV
@@ -110,12 +80,17 @@ DRY_RUN=0
 ENV
 umask 022
 
+# fal 이면 SSM 에서 키를 읽는다. set +x 필수 — xtrace 가 값을 찍는다. 실패하면 set -e 로 중단.
+if [ "__SAM3D_BACKEND__" = fal ]; then
+  STEP="FAL_KEY 읽기"
+  set +x
+  { printf 'SAM3D_BACKEND=fal\nFAL_KEY='; aws ssm get-parameter --region __REGION__ --name __FAL_KEY_PARAM__ --with-decryption --query Parameter.Value --output text; } >> deploy/.env
+  set -x
+  grep -q '^FAL_KEY=.' deploy/.env
+fi
+
 # ── 가디언 유예 조정 ──
-# GUARDIAN_GRACE_SEC 은 bake-ami.sh 가 emr-guardian.service 에 **구워 넣는다.**
-# 그래서 config.sh 만 고치면 이미 구운 AMI에는 안 먹는다(EMR_IMAGE_TAG 와 같은
-# 함정이다). 유예가 부팅 시간보다 짧으면 가디언이 멀쩡히 부팅 중인 워커를
-# 죽인다 — 2026-10-01 에 20.2분째 워밍 중이던 워커가 그렇게 회수됐다.
-# 드롭인은 본체 뒤에 처리되므로 같은 변수는 이쪽 값이 이긴다.
+# bake-ami.sh 가 구운 값을 드롭인으로 덮는다(config.sh 만 고치면 구운 AMI 에 안 먹는다).
 STEP="가디언 유예 조정"
 mkdir -p /etc/systemd/system/emr-guardian.service.d
 cat > /etc/systemd/system/emr-guardian.service.d/10-grace.conf <<CONF
@@ -125,18 +100,11 @@ Environment=GUARDIAN_FAIL_MIN=__GUARDIAN_FAIL_MIN__
 CONF
 systemctl daemon-reload
 
-# 스냅샷 워밍은 여기(부팅 경로)에 있었는데 기동 뒤로 옮겼다. 맨 아래 참고.
-# 네 번 재보니 부팅 경로에서 데우는 건 매번 손해였다(674 → 345초). 되살리고
-# 싶어지면 먼저 config.sh 의 EMR_WARM_TIMEOUT 자리에 남긴 측정표를 읽을 것.
+# 스냅샷 워밍은 부팅 경로에서 뺐다(손해였다). 되살리려면 config.sh EMR_WARM_TIMEOUT 의 측정표부터.
 
 # ── 기동 ──
-# --no-build 가 핵심이다. 컴포즈가 만에 하나 빌드하려 들면 부팅이 몇십 분짜리가
-# 된다. 빌드는 굽는 시점의 일이다.
-#
-# 네 번째 -f: AMI 안의 컴포즈 파일은 구운 시점에 굳는다. 유저데이터는 시작
-# 템플릿에 있으니 재굽기 없이 바꿀 수 있다 — 낡은 AMI 를 고치는 유일한 통로다.
-# 왜 버킷/테이블을 덮는지는 deploy/docker-compose.aws.yml 머리말,
-# 왜 awslogs 를 붙이는지는 config.sh 의 LOG_GROUP 주석에 있다.
+# --no-build: 컴포즈가 빌드하려 들면 부팅이 몇십 분이 된다.
+# 네 번째 -f: AMI 안의 컴포즈 파일은 굳어 있어 유저데이터로 덮는다(docker-compose.aws.yml, config.sh LOG_GROUP).
 STEP="컴포즈 덮어쓰기"
 cat > /run/emr-deploy-env.yml <<YML
 x-log: &log
@@ -159,10 +127,6 @@ services:
     environment:
       EMR_BACKEND_STATE_FILE: "__BACKEND_STATE__"
       EMR_BACKEND_BUSY_SEC: "__BACKEND_BUSY_SEC__"
-    # 헬스체크 덮어쓰기. gpu.yml 은 AMI 에 굳어 있어 저장소 수정이 이미 구운
-    # AMI 에 닿지 않는다. 재빌드 대신 여기서 덮는다(다음 AMI 부터는 같은 값).
-    # sam2 가 아니라 extract 를 보는 근거는 gpu.yml 주석에.
-    # 이 heredoc 은 따옴표 없이 열려 쓰는 시점에 전개된다 — 절대경로를 박는다.
     healthcheck:
       test: ["CMD", "$EMR_ROOT/miniconda3/envs/sam3d/bin/python", "-c",
              "import urllib.request,json,sys; d=json.load(urllib.request.urlopen('http://localhost:8001/health',timeout=5)); sys.exit(0 if d.get('extract')=='loaded' else 1)"]
@@ -170,45 +134,26 @@ YML
 DC="docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml"
 DC="$DC -f deploy/docker-compose.aws.yml -f /run/emr-deploy-env.yml"
 
-# 워커의 워밍 게이트가 볼 플래그 디렉터리. /run 은 tmpfs라 부팅마다 비어
-# 있다 — 지난 부팅의 플래그가 남으면 게이트가 처음부터 열려 의미가 없다.
-# 컴포즈가 :ro 로 붙이므로 기동 **전에** 만든다.
+# 워밍 게이트 플래그 디렉터리(/run 은 tmpfs). 컴포즈가 :ro 로 붙이므로 기동 전에 만든다.
 mkdir -p /run/emr
 
 # ── 기동과 동시에 백그라운드 워밍 ──
-# 부팅을 막지 않으면서 첫 요청(스모크 187초)만 데운다. 근거와 측정표는
-# config.sh 의 EMR_WARM_BG_DIRS 주석에 있다.
-#
-# 컴포즈 기동 **앞**에 둔 이유: 컨테이너가 다 뜨는 데 수 분이 걸린다
-# (ulayout 헬스체크의 start_period 가 300초다). 예전엔 워밍을 그 뒤에
-# 걸어서, 디스크가 한가한 그 몇 분을 통째로 버리고 나서야 읽기 시작했다.
-# systemd-run 으로 분리해 띄우므로 여기서 먼저 걸어도 기동을 막지 않고,
-# nice 10 + io idle 이라 이미지 로드와 겹쳐도 컴포즈에 양보한다.
-#
-# 게이트 파일(/run/emr/warm-bg.done)을 워커가 :ro 로 보므로, 위의
-# mkdir -p /run/emr 뒤라는 순서는 그대로 지켜야 한다.
-#
-# 여기서 중요한 건 셋뿐이다:
-#   systemd-run : `&` 로 띄우면 상속한 fd 를 붙들어 cloud-init 이 끝난 것으로
-#                 안 보이고, 가디언의 "running 이면 판단 보류"가 안 풀린다.
-#   우선순위     : 실제 작업이 들어오면 양보해야 한다(nice 10 + io idle).
-#   journal+console : 콘솔로 내보내야 바깥에서 측정할 수 있다.
+# 컴포즈 기동 앞에 둔다(컨테이너가 뜨는 수 분 동안 디스크가 한가하다). systemd-run 으로 분리하고
+# nice 10 + io idle 로 컴포즈에 양보한다. `&` 는 fd 를 붙들어 cloud-init 이 안 끝난다.
+# 위 mkdir -p /run/emr 뒤여야 한다. 근거/측정표: config.sh 의 EMR_WARM_BG_DIRS.
 STEP="백그라운드 워밍 예약"
 if [ -n "$WARM_BG_DIRS" ] && command -v systemd-run >/dev/null 2>&1; then
   cat > /run/emr-warm-bg.sh <<'BGEOF'
 #!/bin/sh
 set -u
 t0=$(date +%s); L=/run/emr-warmbg.list; : > "$L"
-# 목록은 AMI 를 구울 때 미리 만든다(bake-ami.sh 2.5). AMI 안의 불변 데이터라
-# 부팅마다 셀 이유가 없다 — find 가 혼자 53초였다(경위는 config.sh).
+# 목록은 bake-ami.sh 2.5 가 미리 만든다(find 가 53초).
 if [ -s /opt/emr/warmlist ]; then
   cp /opt/emr/warmlist "$L"
 else
   # 목록이 없는 옛 AMI 용 폴백. 느리지만 틀리지는 않는다.
   echo "[warm-bg] 구워둔 목록이 없다 — find 로 만든다(느리다)"
-  # if/else 로 쓴다. `[ -d ] && find || echo` 는 find 가 권한 오류 등으로 0이
-  # 아닌 값을 내면 "없음"을 잘못 찍는다 — 틀린 로그가 제일 비싸다. BG_DIRS 는
-  # 이제 파일 경로도 담으므로(-d 만 보면 전부 건너뛴다) -e 가지도 둔다.
+  # if/else: `[ -d ] && find || echo` 는 find 오류 때 '없음'을 잘못 찍는다. 파일 경로도 있어 -e 필요.
   for d in $BG_DIRS; do
     if [ -d "$d" ]; then
       find -L "$d" -type f -size +8M ! -name '*.a' -print 2>/dev/null >> "$L"
@@ -221,17 +166,13 @@ if [ -n "${BG_SKIP:-}" ]; then
   grep -Ev "$(printf '%s\n' $BG_SKIP | paste -sd'|' -)" "$L" > "$L.f" || true
   mv "$L.f" "$L"
 fi
-# 작성 시간을 **따로** 찍는다. find 가 혼자 53초 먹는 걸 몰라서 처리량을 세 번
-# 잘못 계산했다.
 echo "[warm-bg] 목록 조각 $(wc -l < "$L")개, 작성 $(( $(date +%s) - t0 ))초"
-# 읽은 양은 디스크에 직접 묻는다(끝낸 파일만 더하면 중간까지 읽힌 양이 빠진다).
+# 읽은 양은 디스크에 직접 묻는다.
 rd() { t=0; for f in /sys/block/*/stat; do
     case "$f" in */loop*|*/ram*|*/zram*) continue;; esac
     t=$(( t + $(awk '{print $3}' "$f") )); done; echo "$t"; }
 s0=$(rd); t1=$(date +%s)
-# 리퍼가 유휴 회수로 중간에 끊을 수 있으니 진행을 주기적으로 남긴다. 끝 줄만
-# 찍으면 "얼마나 데웠나"를 영원히 모른다. 서브셸의 sleep 이 고아로 남는 건
-# 여기서는 걱정 없다 — systemd 유닛이라 cgroup 째로 정리된다.
+# 리퍼가 중간에 끊을 수 있으니 진행을 주기적으로 남긴다.
 ( while [ -e "$L" ]; do sleep 30
     echo "[warm-bg] 진행 $(( ($(rd) - s0) / 2048 ))MB, $(( $(date +%s) - t1 ))초"
   done ) &
@@ -265,11 +206,7 @@ STEP="컴포즈 기동"
 $DC up -d --no-build
 
 # ── 설정이 컨테이너까지 닿았는지 확인 ──
-# 위 404 사태의 진짜 교훈은 "오버라이드를 빠뜨렸다"가 아니라 **빠뜨렸는지
-# 아무도 안 본다**는 쪽이다. 컨테이너는 멀쩡히 떴고 리퍼도 떴고 가디언도
-# 조용했다. 틀린 건 첫 작업이 들어온 뒤에야 드러났고, 그때는 이미 돈이 나갔다.
-# 그래서 부팅에서 **실제 컨테이너의 환경변수**를 읽어 맞는지 본다.
-# 컴포즈 파일을 읽어 확인하면 의미가 없다 — 틀린 건 바로 그 파일이었다.
+# 실제 컨테이너의 환경변수를 읽어 맞는지 본다(컴포즈 파일은 틀린 쪽이라 믿을 수 없다 — 404 사태).
 STEP="설정 도달 확인"
 CID=$($DC ps -q worker-sam3d 2>/dev/null | head -1)
 EFF=$(docker inspect "$CID" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
@@ -282,8 +219,7 @@ fi
 echo "[userdata] 버킷 확인 — 워커가 $EFF 를 본다"
 
 # ── 리퍼 확인 ──
-# 여기까지 성공해도 리퍼 컨테이너가 안 떴으면 요금을 끊을 주체가 없다.
-# 가디언이 5분 뒤 잡긴 하지만, 아는 즉시 실패하는 편이 낫다.
+# 리퍼가 안 떴으면 요금을 끊을 주체가 없다. 아는 즉시 실패한다.
 STEP="리퍼 확인"
 for i in $(seq 30); do
   docker ps --filter name=reaper --filter status=running --format '{{.Names}}' | grep -q . && break

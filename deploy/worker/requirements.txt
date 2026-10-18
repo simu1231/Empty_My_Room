@@ -1,2 +1,4 @@
 boto3==1.35.90
 requests==2.32.3
+# SAM3D_BACKEND=fal 일 때 sam3d_fal.py 가 쓴다(MOCK 워커는 import 하지 않는다).
+fal_client==1.0.3

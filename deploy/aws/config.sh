@@ -422,6 +422,22 @@ export EMR_SD_WARM=${EMR_SD_WARM:-1}
 # 틀리면 553초가 그대로 돌아온다.
 export EMR_SD_WARM_DROP=${EMR_SD_WARM_DROP:-0}
 
+# ── SAM3D 백엔드 (local | fal) ──────────────────────────────────────────
+# fal 이면 userdata 가 부팅 때 SSM Parameter Store(SecureString)에서 FAL_KEY 를
+# 읽어 deploy/.env 에 쓴다. 키 값은 유저데이터/시작 템플릿에 들어가지 않는다 —
+# 여기에는 파라미터 **이름**만 있다. 기본은 local(SSM 를 건드리지 않는다).
+#
+# 순서: ① 10-iam.sh (ssm:GetParameter 권한) → ② 이 값을 fal 로 두고
+# 20-launch-template.sh. 권한 없이 fal 로 굽으면 새 인스턴스가 전부 부팅에
+# 실패해 회수된다(안전하게 실패하지만 아무 워커도 못 뜬다).
+# 값 의미는 deploy/README.md 가 아니라 코드(sam3d_fal.py 머리말)에 있다.
+export EMR_SAM3D_BACKEND=${EMR_SAM3D_BACKEND:-local}
+export EMR_FAL_KEY_PARAM=${EMR_FAL_KEY_PARAM:-/sam3d/FAL_KEY}
+case "$EMR_SAM3D_BACKEND" in local|fal) ;; *)
+  echo "✗ EMR_SAM3D_BACKEND 는 local|fal 이어야 한다: $EMR_SAM3D_BACKEND" >&2; return 1 2>/dev/null || exit 1;; esac
+case "$EMR_FAL_KEY_PARAM" in /*) ;; *)
+  echo "✗ EMR_FAL_KEY_PARAM 은 /로 시작해야 한다: $EMR_FAL_KEY_PARAM" >&2; return 1 2>/dev/null || exit 1;; esac
+
 # ── 가디언(요금 폭주 차단) ──────────────────────────────────────────────
 # 리퍼는 컴포즈 스택 안의 컨테이너다. 그래서 컴포즈가 안 뜨면 리퍼도 없고,
 # ASG 헬스체크는 EC2(켜져 있는지)만 보므로 인스턴스가 일 없이 계속 과금된다.

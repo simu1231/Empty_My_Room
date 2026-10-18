@@ -26,18 +26,19 @@ async def generate_mesh(
     category: str = Form(''),
 ):
     img_bytes = await image.read()
-    pipeline = getattr(request.app.state, 'sam3d_pipeline', None) if CACHE_SAM3D_PIPELINE else None
+    use_local = sam3d_runner.sam3d_backend() == 'local'  # fal 이면 GPU 파이프라인이 필요 없다
+    pipeline = getattr(request.app.state, 'sam3d_pipeline', None) if (CACHE_SAM3D_PIPELINE and use_local) else None
 
     try:
         # 파이프라인 로드도 try 안에서 한다. 밖에 두면 로드 중 OOM이 났을 때
         # except/finally를 타지 않아 부분 할당된 텐서가 그대로 GPU에 남는다.
-        if pipeline is None:
+        if pipeline is None and use_local:
             pipeline = sam3d_runner.load_pipeline()
             if CACHE_SAM3D_PIPELINE:
                 request.app.state.sam3d_pipeline = pipeline
                 print("SAM3D 파이프라인 캐시 완료!")
 
-        payload = sam3d_runner.generate(pipeline, img_bytes, category)
+        payload = sam3d_runner.run_sam3d(img_bytes, category, pipeline)
         return Response(content=orjson.dumps(payload), media_type="application/json")
 
     except Exception as e:

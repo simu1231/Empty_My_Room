@@ -69,6 +69,18 @@ services:
       MOCK: "0"
       HOME: ${EMR_ROOT:-${HOME}}
       SAM3D_BACKEND_DIR: ${EMR_ROOT:-${HOME}}/Empty_My_Room/sam3d/backend
+      # ── SAM3D 백엔드 (local | fal) ─────────────────────────────────────
+      # fal 이면 SAM3D 파이프라인(13GB)을 올리지 않고 fal.ai 를 부른다. 되돌리려면
+      # SAM3D_BACKEND=local 로만 바꾸면 된다(코드/이미지 변경 없음).
+      # FAL_KEY 는 deploy/.env 나 셸 환경에서만 온다 — 이 파일에 값을 적지 않는다.
+      # (AWS 에서는 userdata 가 deploy/.env 를 부팅마다 새로 쓰므로 별도 전달 경로가 필요하다.)
+      SAM3D_BACKEND: ${SAM3D_BACKEND:-local}
+      FAL_KEY: ${FAL_KEY:-}
+      SAM3D_FAL_SEED: ${SAM3D_FAL_SEED:-5}
+      SAM3D_FAL_MAX_RETRIES: ${SAM3D_FAL_MAX_RETRIES:-0}
+      SAM3D_FAL_AXIS: ${SAM3D_FAL_AXIS:-x,-y,-z}
+      SAM3D_FAL_SIZE_MODE: ${SAM3D_FAL_SIZE_MODE:-none}
+      SAM3D_FAL_TIMEOUT: ${SAM3D_FAL_TIMEOUT:-120}
       # 캐싱 할당자가 세그먼트를 넓혀 쓰게 해 단편화를 줄인다(services.sh와 동일).
       PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
     volumes: *model_mounts
@@ -134,6 +146,15 @@ services:
       OMNI3D_URL: http://omni3d:8003
       # SAM2/LaMa 안전망 TTL. 기본값과 같지만 여기 적어 두면 재굽기 없이 조정된다.
       EMR_SEG_TTL_SEC: ${EMR_SEG_TTL_SEC:-600}
+      # ── SAM3D 백엔드 (local | fal) ─────────────────────────────────────
+      # 위 worker-sam3d 와 같은 값. 설명은 거기에.
+      SAM3D_BACKEND: ${SAM3D_BACKEND:-local}
+      FAL_KEY: ${FAL_KEY:-}
+      SAM3D_FAL_SEED: ${SAM3D_FAL_SEED:-5}
+      SAM3D_FAL_MAX_RETRIES: ${SAM3D_FAL_MAX_RETRIES:-0}
+      SAM3D_FAL_AXIS: ${SAM3D_FAL_AXIS:-x,-y,-z}
+      SAM3D_FAL_SIZE_MODE: ${SAM3D_FAL_SIZE_MODE:-none}
+      SAM3D_FAL_TIMEOUT: ${SAM3D_FAL_TIMEOUT:-120}
       # ── SD 가중치 ──────────────────────────────────────────────────────
       # fp16 safetensors 트리. tools/convert_sd_fp16.py 가 개발 PC 에서 만들고,
       # pack-envs.sh 가 hfcache.tar 에 담아 AMI 로 보낸다. 이 값이 없으면

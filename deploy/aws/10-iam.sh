@@ -34,6 +34,11 @@ echo "▶ 권한 정책"
 # 붙여야 한다. 로그 드라이버가 자격증명 때문에 실패하면 도커는 컨테이너를
 # 시작하지 않는다 — 권한 없이 드라이버를 켜면 워커가 전부 못 뜬다.
 #
+# ReadFalKey: SAM3D_BACKEND=fal 워커가 부팅 때 FAL_KEY(SecureString)를 읽는다.
+# 파라미터 **하나**만, 읽기(GetParameter)만. GetParameters/ByPath 는 주지 않는다.
+# 기본 키(aws/ssm)로 암호화했으면 kms 권한은 필요 없다. 고객 관리형 키면
+# 그 키 ARN 에 kms:Decrypt(조건 kms:ViaService=ssm.<리전>.amazonaws.com)를 더한다.
+#
 # 범위는 /emr/ 접두어로만 좁힌다. CreateLogGroup 까지 주는 건
 # awslogs-create-group=true 의 폴백용이다(평소에는 15-resources.sh 가 보존기간
 # 7일로 미리 만들어 둔다 — 자동 생성된 그룹은 보존기간이 무한이라 계속 과금된다).
@@ -76,6 +81,12 @@ cat > /tmp/emr-worker-policy.json <<JSON
         "arn:aws:logs:${AWS_REGION}:${ACCOUNT}:log-group:/emr/*",
         "arn:aws:logs:${AWS_REGION}:${ACCOUNT}:log-group:/emr/*:log-stream:*"
       ]
+    },
+    {
+      "Sid": "ReadFalKey",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": "arn:aws:ssm:${AWS_REGION}:${ACCOUNT}:parameter${EMR_FAL_KEY_PARAM}"
     },
     {
       "Sid": "ReaperReadsOwnGroup",

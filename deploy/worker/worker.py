@@ -224,9 +224,10 @@ def _run_sam3d_mesh(job, local_input, local_inputs):
         img_bytes = f.read()
     category = (job.get("params") or {}).get("category", "")
 
-    pipeline = _get_pipeline()
+    # fal 백엔드면 파이프라인(13GB)을 올리지 않는다.
+    pipeline = _get_pipeline() if sam3d_runner.sam3d_backend() == 'local' else None
     try:
-        payload = sam3d_runner.generate(pipeline, img_bytes, category)
+        payload = sam3d_runner.run_sam3d(img_bytes, category, pipeline)
     except Exception:
         _drop_pipeline()
         raise
@@ -449,11 +450,26 @@ def wait_for_warm_gate(heartbeat=None, poll: float = 1.0) -> float:
     return waited
 
 
+def _log_sam3d_backend_at_start():
+    """sam3d 큐 워커만: SAM3D 백엔드(local|fal)와 GPU 여유를 시작 로그에 남긴다."""
+    if MOCK or "sam3d" not in QUEUE_NAME:
+        return
+    try:
+        import sys
+        if BACKEND_DIR not in sys.path:
+            sys.path.insert(0, BACKEND_DIR)
+        from services import sam3d_runner
+        sam3d_runner.log_gpu_headroom("worker")
+    except Exception as e:   # 로그 때문에 워커가 못 뜨면 안 된다
+        print(f"[worker] SAM3D 백엔드 시작 로그 실패(무시): {e}")
+
+
 def main():
     queue_url = resolve_queue_url()
     idle_desc = f"{IDLE_EXIT_SEC}초" if IDLE_EXIT_SEC > 0 else "안 함(리퍼가 판단)"
     print(f"[worker] 시작 queue={QUEUE_NAME} mock={MOCK} 자가유휴종료={idle_desc}")
     last_work = time.time()
+    _log_sam3d_backend_at_start()
     publish_state(busy=False)   # 리퍼에게 "나 떴고 지금은 논다"를 먼저 알린다
     wait_for_warm_gate(heartbeat=lambda: publish_state(busy=False))
     last_work = time.time()     # 기다린 시간은 유휴로 세지 않는다

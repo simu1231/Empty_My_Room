@@ -342,3 +342,44 @@ def generate(pipeline, img_bytes: bytes, category: str = '') -> dict:
                 "colors":   colors_np.tolist(),
             },
         }
+
+
+# ── 백엔드 전환 ─────────────────────────────────────────────────────────
+# generate()는 로컬 GPU 경로 그대로다. 호출부(라우터/워커)는 run_sam3d() 만 부른다.
+#   SAM3D_BACKEND=local (기본) : 기존 방식. pipeline 이 필요하다.
+#   SAM3D_BACKEND=fal          : fal.ai 호출. GPU/파이프라인 로드가 필요 없다.
+
+def sam3d_backend() -> str:
+    b = os.environ.get('SAM3D_BACKEND', 'local').strip().lower()
+    if b not in ('local', 'fal'):
+        raise ValueError(f"SAM3D_BACKEND 는 local|fal 이어야 한다: {b!r}")
+    return b
+
+
+def run_sam3d(img_bytes: bytes, category: str = '', pipeline=None) -> dict:
+    """RGBA 이미지(알파=마스크) → 메쉬 dict. 반환 모양은 backend 와 무관하게 generate() 와 같다."""
+    if sam3d_backend() == 'fal':
+        from services import sam3d_fal
+        return sam3d_fal.generate_fal(img_bytes, category)
+    if pipeline is None:
+        raise ValueError("SAM3D_BACKEND=local 에는 pipeline 이 필요하다")
+    return generate(pipeline, img_bytes, category)
+
+
+def log_gpu_headroom(tag: str):
+    """시작 로그: 현재 백엔드와 GPU 남은 메모리. fal 이면 SAM3D 13GB 가 빠진 뒤의 여유를 본다.
+
+    torch.cuda.mem_get_info 는 호출한 프로세스에 CUDA 컨텍스트(수백 MB)를 만들어서
+    fal 모드 워커가 쓸데없이 GPU 를 물게 된다. nvidia-smi 로 읽어 부작용을 없앤다.
+    (시스템 전체 값이라 다른 컨테이너/프로세스가 쓰는 만큼이 이미 빠져 있다.)
+    """
+    import subprocess
+    try:
+        out = subprocess.run(
+            ['nvidia-smi', '--query-gpu=name,memory.used,memory.free,memory.total',
+             '--format=csv,noheader,nounits'],
+            capture_output=True, text=True, timeout=10, check=True).stdout.strip().splitlines()[0]
+        name, used, free, total = [x.strip() for x in out.split(',')]
+        print(f"[{tag}] SAM3D_BACKEND={sam3d_backend()} GPU={name} 사용 {used} / 여유 {free} / 전체 {total} MiB")
+    except Exception as e:
+        print(f"[{tag}] SAM3D_BACKEND={sam3d_backend()} GPU 메모리 조회 실패(무시): {e}")

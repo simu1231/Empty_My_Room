@@ -77,6 +77,8 @@ sed -e "s|__REGION__|${AWS_REGION}|g" \
     -e "s|__REPO_DIR__|${EMR_REPO_DIR}|g" \
     -e "s|__EMR_ROOT__|${EMR_ROOT}|g" \
     -e "s|__IMAGE_TAG__|${EMR_IMAGE_TAG}|g" \
+    -e "s|__SAM3D_BACKEND__|${EMR_SAM3D_BACKEND}|g" \
+    -e "s|__FAL_KEY_PARAM__|${EMR_FAL_KEY_PARAM}|g" \
     -e "s|__SD_WARM__|${EMR_SD_WARM}|g" \
     -e "s|__SD_WARM_DROP__|${EMR_SD_WARM_DROP}|g" \
     -e "s|__WARM_JOBS__|${EMR_WARM_JOBS}|g" \
