@@ -48,6 +48,30 @@ else
   exit 1
 fi
 
+# ── fal 모드는 fal 전환 코드를 담은 AMI 에서만 진행한다 ────────────────────
+# 옛 AMI 에 fal userdata 를 붙이면 컨테이너가 SAM3D_BACKEND 를 못 받아 **조용히 로컬로** 돈다(2026-10-17 의
+# v19 가 그 상태다). AMI ID 가 새것이라는 사실로는 내용을 알 수 없어서, AMI 의 FalReady 태그가 이 저장소
+# HEAD 의 fal 관련 파일 해시와 일치하는지 본다(fal-ready.sh 머리말). 태그는 빌더의 verify-ami.sh 가 이미지
+# 내용을 직접 검사한 뒤에만 출력하는 create-image 명령으로 붙는다. 조회 실패·태그 없음·불일치는 전부 중단이다.
+# local 모드(롤백)는 이 검사를 하지 않는다 — 옛 AMI 와 local userdata 조합은 안전하다.
+source ./fal-ready.sh
+if [ "$EMR_SAM3D_BACKEND" = fal ]; then
+  WANT=$(fal_ready_hash) || { echo "✗ 저장소 HEAD 에서 fal 해시를 계산하지 못했습니다 (git 저장소/커밋 확인)"; exit 1; }
+  GOT=$(aws ec2 describe-images --image-ids "$EMR_AMI_ID" \
+          --query "Images[0].Tags[?Key=='FalReady'].Value | [0]" --output text) \
+    || { echo "✗ AMI $EMR_AMI_ID 의 태그를 조회하지 못했습니다 — 중단"; exit 1; }
+  if [ -z "$GOT" ] || [ "$GOT" = None ]; then
+    echo "✗ AMI $EMR_AMI_ID 에 FalReady 태그가 없습니다 — fal 전환 코드가 들어갔는지 검증되지 않은 AMI 입니다."
+    echo "  새 AMI 를 빌더에서 bake-ami.sh → verify-ami.sh 로 검증하고, 출력되는 create-image 명령(FalReady 태그 포함)으로 만드세요."
+    echo "  (로컬 추론으로 두려면 EMR_SAM3D_BACKEND=local)"; exit 1
+  fi
+  if [ "$GOT" != "$WANT" ]; then
+    echo "✗ AMI 의 FalReady=$GOT 가 저장소 HEAD 의 $WANT 와 다릅니다 — AMI 가 이 코드로 구워지지 않았습니다."
+    echo "  fal 관련 파일(fal-ready.sh files)이 AMI 를 굽던 때와 달라졌거나 푸시 전 커밋입니다."; exit 1
+  fi
+  echo "▶ fal-ready 확인 — AMI $EMR_AMI_ID 의 FalReady=$GOT 가 HEAD 와 일치"
+fi
+
 # 세션 알림은 스위치 하나로 양쪽을 동시에 렌더한다 — 한쪽만 켜지는 사고를
 # 구조적으로 막는다. 왜 그게 위험한지는 config.sh 의 EMR_BACKEND_SESSION 주석에.
 # 끈 경우 상태 파일 경로를 빈 문자열로 넣는다. session_state.py 는 빈 값을
@@ -82,7 +106,7 @@ sed -e "s|__REGION__|${AWS_REGION}|g" \
     -e "s|__SD_WARM__|${EMR_SD_WARM}|g" \
     -e "s|__SD_WARM_DROP__|${EMR_SD_WARM_DROP}|g" \
     -e "s|__WARM_JOBS__|${EMR_WARM_JOBS}|g" \
-    -e "s|__WARM_SKIP__|${EMR_WARM_SKIP}|g" \
+    -e "s|__WARM_SKIP__|${EMR_WARM_SKIP_BOOT}|g" \
     -e "s|__WARM_BG_DIRS__|${EMR_WARM_BG_DIRS}|g" \
     -e "s|__WARM_BG_TIMEOUT__|${EMR_WARM_BG_TIMEOUT}|g" \
     -e "s|__GUARDIAN_GRACE_SEC__|${GUARDIAN_GRACE_SEC}|g" \

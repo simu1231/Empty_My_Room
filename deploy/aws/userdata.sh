@@ -2,6 +2,7 @@
 # 부팅마다 실행된다. 이미 구워진 스택을 올릴 뿐이다 — 모델 다운로드/빌드는 하지 않는다(AMI 에 있다).
 # 실패하면 인스턴스를 스스로 회수한다(아래 트랩): 실패한 채 살아 있으면 리퍼가 없어 요금만 나간다.
 # 이 파일은 렌더 후 16KB 를 넘으면 안 된다(주석도 센다). config.sh 의 같은 제목 주석을 읽을 것.
+# emr-userdata-features: fal-ssm gate-off ami-guard v1  (20/35 스크립트가 이 표식과 아래 코드 조각을 함께 확인한다)
 set -euxo pipefail
 # 콘솔에도 흘린다: 워커는 SSH 가 없고 실패하면 트랩이 인스턴스를 회수해 로그 파일이 사라진다.
 # 콘솔을 미리 검사하지 않는 이유: tee 가 대상 하나를 못 열면 set -e 아래 exec 이 기동을 죽인다.
@@ -84,7 +85,7 @@ umask 022
 if [ "__SAM3D_BACKEND__" = fal ]; then
   STEP="FAL_KEY 읽기"
   set +x
-  { printf 'SAM3D_BACKEND=fal\nFAL_KEY='; aws ssm get-parameter --region __REGION__ --name __FAL_KEY_PARAM__ --with-decryption --query Parameter.Value --output text; } >> deploy/.env
+  { printf 'SAM3D_BACKEND=fal\nWARM_GATE_FILE=\nFAL_KEY='; aws ssm get-parameter --region __REGION__ --name __FAL_KEY_PARAM__ --with-decryption --query Parameter.Value --output text; } >> deploy/.env
   set -x
   grep -q '^FAL_KEY=.' deploy/.env
 fi
@@ -211,6 +212,10 @@ STEP="설정 도달 확인"
 CID=$($DC ps -q worker-sam3d 2>/dev/null | head -1)
 EFF=$(docker inspect "$CID" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
         | sed -n 's/^S3_BUCKET=//p' | head -1)
+EB=$(docker inspect "$CID" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+        | sed -n 's/^SAM3D_BACKEND=//p' | head -1)
+# fal 인데 옛 AMI(compose 에 전달 줄이 없음)면 조용히 local 로 돈다 — 여기서 막는다.
+[ "__SAM3D_BACKEND__" != fal ] || [ "$EB" = fal ] || { echo "[userdata] 워커 SAM3D_BACKEND='$EB' (fal 이어야 한다) — 옛 AMI 로 의심, 기동 중단"; exit 1; }
 if [ "$EFF" != "$S3_BUCKET" ]; then
   echo "[userdata] 워커가 보는 버킷이 '$EFF' 다 — 배포가 정한 값은 '$S3_BUCKET'"
   echo "[userdata] 이대로 두면 모든 작업이 404 로 죽는다. 기동을 중단한다."

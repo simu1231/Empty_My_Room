@@ -226,6 +226,21 @@ else
 fi
 df -h / | awk 'NR==2 {printf "  ✔ 루트 %s 중 %s 사용 (여유 %s)\n", $2, $3, $4}'
 
+# ── fal 전환 코드 검사 → FalReady 태그 ─────────────────────────────────────
+# 이 검사가 통과해야만 아래 create-image 명령에 FalReady 태그가 들어간다. 20-launch-template.sh 와
+# 35-set-instance-types.sh 가 그 태그를 보고 fal 모드 시작 템플릿/시험 타입 적용을 허용한다(fal-ready.sh).
+# 실패해도 AMI 자체는 local 용으로 쓸 수 있으므로 FAIL 로 세지 않고, 태그만 빼고 크게 알린다.
+. ./fal-ready.sh
+FAL_TAG=""
+echo "▶ fal 전환 코드 검사 (FalReady 태그 조건)"
+if EMR_REPO_DIR="$EMR_REPO_DIR" EMR_IMAGE_TAG="$EMR_IMAGE_TAG" fal_check_ami_local \
+   && FALH=$(EMR_REPO_TOP="$EMR_REPO_DIR" fal_ready_hash); then
+  FAL_TAG=",{Key=FalReady,Value=$FALH}"
+  ok "FalReady=$FALH — fal 모드 시작 템플릿/시험 타입에 쓸 수 있는 AMI 가 된다"
+else
+  warn "FalReady 태그를 붙이지 않는다 — 이 AMI 는 fal 모드 시작 템플릿에 쓸 수 없다(local 용으로만)"
+fi
+
 echo
 if [ "$FAIL" -eq 0 ]; then
   # **여기가 인스턴스에서 도는 마지막 코드다.** 다음 단계인 create-image 는 개발
@@ -248,7 +263,7 @@ if [ "$FAIL" -eq 0 ]; then
   echo "  aws ec2 create-image --region $AWS_REGION \\"
   echo "    --instance-id ${IID:-<이 인스턴스>} --name emr-gpu-$EMR_IMAGE_TAG --no-reboot \\"
   echo "    --tag-specifications \\"
-  echo "      'ResourceType=image,Tags=[{Key=GitSha,Value=$EMR_IMAGE_TAG},{Key=Project,Value=emr},{Key=Name,Value=emr-gpu-$EMR_IMAGE_TAG}]' \\"
+  echo "      'ResourceType=image,Tags=[{Key=GitSha,Value=$EMR_IMAGE_TAG},{Key=Project,Value=emr},{Key=Name,Value=emr-gpu-$EMR_IMAGE_TAG}${FAL_TAG}]' \\"
   echo "      'ResourceType=snapshot,Tags=[{Key=GitSha,Value=$EMR_IMAGE_TAG},{Key=Project,Value=emr}]'"
 else
   echo "✗ 검증 실패 — 이대로 구우면 부팅은 되고 요금만 나가는 인스턴스가 된다."

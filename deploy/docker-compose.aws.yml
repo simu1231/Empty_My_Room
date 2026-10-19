@@ -87,7 +87,10 @@ services:
       IDLE_EXIT_SEC: "0"          # 스스로 안 끝낸다 — 리퍼가 인스턴스째 회수한다
       # 워밍 게이트는 **이 워커에만** 건다. scene 은 사이드카로 넘기기만 해서
       # 디스크를 거의 안 읽는다 — 같이 묶어 세우면 가벼운 작업까지 늦어진다.
-      WARM_GATE_FILE: /warm/warm-bg.done
+      # `-`(콜론 없음): .env 에 WARM_GATE_FILE= (빈 값)이 있으면 게이트를 끈다.
+      # userdata 가 fal 모드에서 그렇게 쓴다 — SAM3D 가중치를 안 읽는 워커가 워밍을 기다릴 이유가 없다.
+      # 값이 아예 없으면(local 모드) 기존대로 /warm/warm-bg.done 을 기다린다.
+      WARM_GATE_FILE: ${WARM_GATE_FILE-/warm/warm-bg.done}
       # 상한 180초. 워밍 대상이 47GB(약 600초)에서 8GB 로 줄었고, 64갈래
       # 80 MB/s 면 약 100초다. 상한은 "워밍이 멈췄을 때 언제 포기하느냐"이지
       # 기다릴 시간이 아니다 — 플래그가 뜨면 바로 통과한다. 600초로 두면

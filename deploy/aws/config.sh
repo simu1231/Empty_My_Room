@@ -425,18 +425,67 @@ export EMR_SD_WARM_DROP=${EMR_SD_WARM_DROP:-0}
 # ── SAM3D 백엔드 (local | fal) ──────────────────────────────────────────
 # fal 이면 userdata 가 부팅 때 SSM Parameter Store(SecureString)에서 FAL_KEY 를
 # 읽어 deploy/.env 에 쓴다. 키 값은 유저데이터/시작 템플릿에 들어가지 않는다 —
-# 여기에는 파라미터 **이름**만 있다. 기본은 local(SSM 를 건드리지 않는다).
+# 여기에는 파라미터 **이름**만 있다.
+#
+# **이 파일은 AWS 배포 스크립트만 읽는다.** 기본값 fal 은 AWS 에만 적용된다. 개발 PC 는
+# scripts/services.sh 와 compose 기본값(SAM3D_BACKEND 미설정 = local)을 쓰므로 로컬 GPU
+# 추론은 그대로다. AWS 에서 로컬 추론으로 되돌리려면 EMR_SAM3D_BACKEND=local 로 시작
+# 템플릿을 다시 렌더한다 — 단 local 은 Host RAM 30GB 가 필요하다(측정값)
 #
 # 순서: ① 10-iam.sh (ssm:GetParameter 권한) → ② 이 값을 fal 로 두고
 # 20-launch-template.sh. 권한 없이 fal 로 굽으면 새 인스턴스가 전부 부팅에
 # 실패해 회수된다(안전하게 실패하지만 아무 워커도 못 뜬다).
 # 값 의미는 deploy/README.md 가 아니라 코드(sam3d_fal.py 머리말)에 있다.
-export EMR_SAM3D_BACKEND=${EMR_SAM3D_BACKEND:-local}
+export EMR_SAM3D_BACKEND=${EMR_SAM3D_BACKEND:-fal}
 export EMR_FAL_KEY_PARAM=${EMR_FAL_KEY_PARAM:-/sam3d/FAL_KEY}
 case "$EMR_SAM3D_BACKEND" in local|fal) ;; *)
   echo "✗ EMR_SAM3D_BACKEND 는 local|fal 이어야 한다: $EMR_SAM3D_BACKEND" >&2; return 1 2>/dev/null || exit 1;; esac
 case "$EMR_FAL_KEY_PARAM" in /*) ;; *)
   echo "✗ EMR_FAL_KEY_PARAM 은 /로 시작해야 한다: $EMR_FAL_KEY_PARAM" >&2; return 1 2>/dev/null || exit 1;; esac
+
+# ── fal 모드의 SAM3D 워밍 제외 ───────────────────────────────────────────
+# AMI 에 구운 워밍 목록(/opt/emr/warmlist)은 SAM3D 가중치 7개(약 13GiB)를 담고 있다.
+# fal 모드에서는 안 읽히는 파일이라 부팅 뒤 디스크만 쓴다. **목록은 건드리지 않고**
+# 부팅 때 걸러내는 쪽(BG_SKIP)만 넓힌다 — 그래야 AMI 의 목록이 그대로라 local 로
+# 되돌려도 워밍이 살아 있다. bake-ami.sh 는 EMR_WARM_SKIP 을 쓰고 userdata 는
+# 이 변수를 쓴다(둘이 다르다).
+export EMR_WARM_SKIP_BOOT="$EMR_WARM_SKIP"
+if [ "$EMR_SAM3D_BACKEND" = fal ]; then
+  EMR_WARM_SKIP_BOOT="$EMR_WARM_SKIP_BOOT sam-3d-objects/checkpoints models--Ruicheng--moge-2-vitl"
+fi
+
+# ── GPU 인스턴스 프로파일 ────────────────────────────────────────────────
+# stable      : g6.2xlarge / g5.2xlarge (RAM 약 31GB). **운영 기본값이다.**
+# trial-g6xl  : g6.xlarge 한 가지(L4 22.3GiB, RAM 16GiB, vCPU 4). **측정 전 후보다 — 운영 확정 아님.**
+# trial-g4dn2xl: g4dn.2xlarge 한 가지(T4 16GiB, RAM 32GiB, vCPU 8). **측정 전 후보다 — 운영 확정 아님.**
+#               RAM 은 넉넉하지만 VRAM 이 16GiB 이고 T4(sm_75, Turing)다 — omni3d 의 직접 빌드 확장이
+#               sm_75 에서 도는지는 check_gpu_compat.py 로 그 GPU 에서 확인해야 한다(미검증).
+#               g4dn.xlarge(RAM 16GiB + VRAM 16GiB)는 일부러 넣지 않았다 — 둘 다 검증 전이다.
+#   서울 AZ 는 g6 가 {2a,2c,2d}, g4dn 이 {2a,2b,2c} 라 교집합은 {2a,2c}. 35-set-instance-types.sh 가
+#   현재 서브넷 중 새 타입을 파는 AZ 만 남긴다.
+#
+# xlarge 를 쓰는 이유는 SAM3D(VRAM 약 19GB, 콜드 RSS 15.2GB)가 빠진 구성이 들어가는지
+# 보려는 것이다. VRAM 이 줄어드는 것과 Host RAM 이 충분한 것은 별개다 — SAM3D 를 뺀
+# 구성의 RAM 은 저장소에 측정값이 없다. 통과 기준은 deploy/aws/measure-resources.sh 로
+# 스모크를 돌려 잰 값이고, 통과해도 한 번의 측정일 뿐이다(deploy/aws/TRIAL_G6XL.md).
+#
+# trial 은 fal 모드에서만 허용한다. local 은 RAM 30GB 가 필요해 xlarge 에서 스래싱한다
+# (2026-10-07 실측). 롤백은 EMR_GPU_PROFILE 을 지우고(=stable) 30-asg.sh 를 다시 돌린다.
+export EMR_GPU_PROFILE=${EMR_GPU_PROFILE:-stable}
+case "$EMR_GPU_PROFILE" in
+  stable) ;;
+  trial-g6xl|trial-g4dn2xl)
+    if [ "$EMR_SAM3D_BACKEND" != fal ]; then
+      echo "✗ EMR_GPU_PROFILE=$EMR_GPU_PROFILE 은 EMR_SAM3D_BACKEND=fal 에서만 쓸 수 있다 (local 은 RAM 30GB 필요)" >&2
+      return 1 2>/dev/null || exit 1
+    fi
+    case "$EMR_GPU_PROFILE" in
+      trial-g6xl)    export INSTANCE_TYPES="g6.xlarge" ;;
+      trial-g4dn2xl) export INSTANCE_TYPES="g4dn.2xlarge" ;;
+    esac ;;
+  *) echo "✗ EMR_GPU_PROFILE 은 stable|trial-g6xl|trial-g4dn2xl 이어야 한다: $EMR_GPU_PROFILE" >&2
+     return 1 2>/dev/null || exit 1 ;;
+esac
 
 # ── 가디언(요금 폭주 차단) ──────────────────────────────────────────────
 # 리퍼는 컴포즈 스택 안의 컨테이너다. 그래서 컴포즈가 안 뜨면 리퍼도 없고,
