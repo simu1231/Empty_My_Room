@@ -8,7 +8,7 @@
 #
 #   bash 35-set-instance-types.sh                       # 계획만(AWS 는 읽기만 한다)
 #   EMR_GPU_PROFILE=trial-g6xl EMR_TRIAL_ACK=1 EMR_APPLY=1 bash 35-set-instance-types.sh
-#   EMR_APPLY=1 bash 35-set-instance-types.sh           # 롤백: stable(g6.2xlarge g5.2xlarge)
+#   EMR_APPLY=1 bash 35-set-instance-types.sh           # 롤백: stable(g6.xlarge g6.2xlarge)
 #
 # 안전장치
 #   - 두 그룹 모두 desired=0 이고 인스턴스가 0대일 때만 바꾼다. 타입 변경은 이미 떠 있는
@@ -167,7 +167,7 @@ cat > /tmp/emr-mip-od.update.json <<JSON
   "InstancesDistribution": {
     "OnDemandBaseCapacity": 0,
     "OnDemandPercentageAboveBaseCapacity": 100,
-    "OnDemandAllocationStrategy": "lowest-price"
+    "OnDemandAllocationStrategy": "prioritized"
   }
 }
 JSON
@@ -189,4 +189,4 @@ echo "▶ 적용"
 "${CMD_SPOT[@]}"
 "${CMD_OD[@]}"
 echo "✔ 타입 변경 완료 — desired 는 0 그대로다(아직 아무것도 안 뜬다)."
-echo "  되돌리기: EMR_APPLY=1 bash $0   (EMR_GPU_PROFILE 미설정 = stable = g6.2xlarge g5.2xlarge)"
+echo "  되돌리기: EMR_APPLY=1 bash $0   (EMR_GPU_PROFILE 미설정 = stable = g6.xlarge g6.2xlarge)"

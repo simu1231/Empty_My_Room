@@ -144,7 +144,7 @@ export OD_FALLBACK_MIN=5
 # g6e 를 빼면 남는 두 타입의 제공 AZ 가 {2a,2c,2d} 로 완전히 겹쳐서, 어떤
 # 조합을 골라도 유효하다. 대신 2b 를 서브넷에서 빼야 한다 — 아래 30-asg.sh
 # 가 INSTANCE_TYPES 로부터 그 교집합을 직접 계산하므로 손으로 맞출 일은 없다.
-export INSTANCE_TYPES="g6.2xlarge g5.2xlarge"
+export INSTANCE_TYPES="g6.xlarge g6.2xlarge"   # g5 는 넣지 않는다: Omni3D 확장이 sm_89 용으로만 빌드돼 sm_86(A10G)에서 실패(check_gpu_compat 실측)
 
 # ── AMI / 이미지 ────────────────────────────────────────────────────────
 # conda 환경 · 모델 소스 · 가중치 · 저장소가 인스턴스에서 모두 이 아래 모인다.

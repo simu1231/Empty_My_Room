@@ -4,7 +4,7 @@ AWS fal 전환 + g6.xlarge 시험 준비의 정적/로컬 검증. AWS 는 건드
 지키려는 것
   1. 로컬 PC 는 SAM3D 로컬 추론이 기본이다(SAM3D_BACKEND 미설정 = local).
   2. AWS 스크립트의 기본은 fal 이고 local 로 되돌릴 수 있다.
-  3. stable 프로파일(g6.2xlarge g5.2xlarge)이 기본이고, trial-g6xl 은 fal 에서만 허용된다.
+  3. stable 프로파일(g6.xlarge g6.2xlarge)이 기본이고, trial-g6xl 은 fal 에서만 허용된다.
   4. 렌더된 유저데이터가 16384 바이트 한도 안(여유 포함)이고, 키 값이 들어 있지 않으며,
      SSM 읽기 구간이 xtrace 를 끈 채로 돈다.
   5. 타입 변경 스크립트는 계획만 출력하고, desired≠0 이면 거부하고, trial 은 ACK 가 있어야 한다.
@@ -56,11 +56,11 @@ class ConfigProfiles(unittest.TestCase):
     def test_defaults_aws_is_fal_and_stable(self):
         r = source_config()
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(r.stdout.strip(), "fal|stable|g6.2xlarge g5.2xlarge")
+        self.assertEqual(r.stdout.strip(), "fal|stable|g6.xlarge g6.2xlarge")
 
     def test_aws_can_roll_back_to_local(self):
         r = source_config({"EMR_SAM3D_BACKEND": "local"})
-        self.assertEqual(r.stdout.strip(), "local|stable|g6.2xlarge g5.2xlarge")
+        self.assertEqual(r.stdout.strip(), "local|stable|g6.xlarge g6.2xlarge")
 
     def test_trial_profile_uses_g6_xlarge_with_fal(self):
         r = source_config({"EMR_GPU_PROFILE": "trial-g6xl"})
@@ -81,7 +81,7 @@ class ConfigProfiles(unittest.TestCase):
 
     def test_stable_is_still_default_and_unchanged(self):
         r = source_config({}, 'echo "$EMR_GPU_PROFILE|$INSTANCE_TYPES"')
-        self.assertEqual(r.stdout.strip(), "stable|g6.2xlarge g5.2xlarge")
+        self.assertEqual(r.stdout.strip(), "stable|g6.xlarge g6.2xlarge")
 
     def test_trial_profile_rejected_with_local_backend(self):
         # local 은 Host RAM 30GB 가 필요해 xlarge(15.4GB)에서 스래싱한다(2026-10-07 실측).

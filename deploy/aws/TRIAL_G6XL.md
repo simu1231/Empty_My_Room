@@ -12,7 +12,7 @@
 | 이름 | 기본값 | 쓰이는 곳 |
 |---|---|---|
 | `EMR_SAM3D_BACKEND` | `fal` | AWS 스크립트(config.sh → userdata, smoke-test) |
-| `EMR_GPU_PROFILE` | `stable` | `stable` = `g6.2xlarge g5.2xlarge` / `trial-g6xl` = `g6.xlarge` / `trial-g4dn2xl` = `g4dn.2xlarge` (trial 은 fal 에서만 허용) |
+| `EMR_GPU_PROFILE` | `stable` | `stable` = `g6.xlarge g6.2xlarge` / `trial-g6xl` = `g6.xlarge` / `trial-g4dn2xl` = `g4dn.2xlarge` (trial 은 fal 에서만 허용) |
 | `EMR_TRIAL_ACK` | 없음 | trial 프로파일을 ASG 에 적용할 때 `1` 필요 |
 | `EMR_APPLY` | 없음 | `35-set-instance-types.sh` 가 실제로 바꾸려면 `1` (없으면 계획만) |
 | `EMR_FAL_KEY_PARAM` | `/sam3d/FAL_KEY` | SSM SecureString 이름 |
@@ -171,7 +171,7 @@ EMR_BUILDER_TYPES="g4dn.2xlarge" EMR_BASE_AMI=<새 AMI 또는 기존 AMI> bash d
 ## 롤백
 
 ```bash
-# 타입: stable(g6.2xlarge g5.2xlarge)로 복귀 — ASG 0/0 일 때
+# 타입: stable(g6.xlarge g6.2xlarge)로 복귀 — ASG 0/0 일 때
 EMR_APPLY=1 bash deploy/aws/35-set-instance-types.sh
 # 시작 템플릿: 이전 기본 버전으로
 aws ec2 modify-launch-template --launch-template-name emr-gpu-worker --default-version 19

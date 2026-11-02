@@ -114,7 +114,7 @@ cat > /tmp/emr-mip-od.json <<JSON
   "InstancesDistribution": {
     "OnDemandBaseCapacity": 0,
     "OnDemandPercentageAboveBaseCapacity": 100,
-    "OnDemandAllocationStrategy": "lowest-price"
+    "OnDemandAllocationStrategy": "prioritized"
   }
 }
 JSON
